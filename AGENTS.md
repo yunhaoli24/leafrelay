@@ -1,13 +1,5 @@
 # LeafRelay
 
-## Repository Identity
-
-- The primary independent repository is `yunhaoli24/leafrelay`; normal LeafRelay development targets its `main` branch through the local `origin` remote.
-- `yunhaoli24/Overleaf-Workshop` remains the contribution fork used for pull requests to the original project and is configured locally as `fork`.
-- `overleaf-workshop/Overleaf-Workshop` is the original upstream project and is configured locally as `upstream`.
-- Preserve the complete upstream Git history, authorship, notices, and AGPL-3.0 license. README and release material must describe LeafRelay as an independently maintained fork and must not imply endorsement by Overleaf or the upstream maintainers.
-- Review and port upstream changes deliberately. Do not automatically merge upstream branches into LeafRelay once its architecture begins to diverge.
-
 ## Local Replica Sync
 
 - Runtime local changes are event-driven through VS Code `FileSystemWatcher`; do not add periodic directory or hash polling.
