@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ROOT_NAME } from '../consts';
 import { RemoteFileSystemProvider } from '../core/remoteFileSystemProvider';
 
-import { IntellisenseProvider } from '.';
+import { IntellisenseProvider } from './intellisenseProvider';
 import { TexDocumentSymbolProvider } from './texDocumentSymbolProvider';
 import { TexDocumentFormatProvider } from './texDocumentFormatProvider';
 import { MisspellingCheckProvider } from './langMisspellingCheckProvider';

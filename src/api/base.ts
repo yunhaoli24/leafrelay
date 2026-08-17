@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Blob } from 'buffer';
+import { Blob } from 'node:buffer';
+import mime from 'mime';
+import { socketIOClient } from './socketIOClient';
 import { v4 as uuidv4 } from 'uuid';
-import { fetch, FormData } from 'undici';
 import { FileEntity, FileType, FolderEntity, OutputFileEntity } from '../core/remoteFileSystemProvider';
 import { log } from '../utils/outputChannel';
 
@@ -334,7 +335,7 @@ export class BaseAPI {
     // Reference: "github:overleaf/overleaf/services/web/frontend/js/ide/connection/ConnectionManager.js#L137"
     _initSocketV0(identity:Identity, query?:string) {
         const url = new URL(this.url).origin + (query ?? '');
-        return (require('socket.io-client').connect as any)(url, {
+        return socketIOClient.connect(url, {
             // Enable auto-reconnect to avoid creating new TCP connections on transient failures.
             // Creating new connections without proper teardown of old ones causes TCP RST packets
             // when the server sends data on abandoned connections (see issue #309).
@@ -691,7 +692,7 @@ export class BaseAPI {
 
     async uploadFile(identity:Identity, projectId:string, parentFolderId:string, filename:string, fileContent:Uint8Array) {
         const formData = new FormData();
-        const mimeType = require('mime-types').lookup(filename);
+        const mimeType = mime.getType(filename);
         formData.append('targetFolderId', parentFolderId);
         formData.append('name', filename);
         formData.append('type', mimeType? mimeType : 'text/plain');

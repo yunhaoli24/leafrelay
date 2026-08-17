@@ -12,6 +12,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -34,6 +35,30 @@ jobs:
 
       - name: Verify extension
         run: pnpm test
+
+      - name: Verify Extension Host activation
+        run: xvfb-run -a pnpm test:extension
+
+      - name: Start Overleaf Community Edition
+        run: docker compose -f test/integration/docker-compose.yml up -d
+
+      - name: Wait for Overleaf and verify HTTP integration
+        run: |
+          for attempt in $(seq 1 90); do
+            if pnpm test:overleaf; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Show Overleaf logs after failure
+        if: failure()
+        run: docker compose -f test/integration/docker-compose.yml logs
+
+      - name: Stop Overleaf Community Edition
+        if: always()
+        run: docker compose -f test/integration/docker-compose.yml down -v
 
       - name: Package extension
         run: pnpm exec vsce package --no-dependencies --out leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix

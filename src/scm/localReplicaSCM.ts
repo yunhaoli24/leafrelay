@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
-import { createHash } from 'crypto';
+import { homedir } from 'node:os';
+import { sep } from 'node:path';
+import { createHash } from 'node:crypto';
 import { minimatch } from 'minimatch';
 import { BaseSCM, CommitItem, SettingItem } from ".";
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
@@ -1035,10 +1037,9 @@ export class LocalReplicaSCMProvider extends BaseSCM {
     }
 
     public static get baseUriInputBox(): vscode.QuickPick<vscode.QuickPickItem> {
-        const sep = require('path').sep;
         const inputBox = vscode.window.createQuickPick();
         inputBox.placeholder = vscode.l10n.t('e.g., /home/user/empty/local/folder');
-        inputBox.value = require('os').homedir()+sep;
+        inputBox.value = homedir()+sep;
         // enable auto-complete
         inputBox.onDidChangeValue(async value => {
             try {

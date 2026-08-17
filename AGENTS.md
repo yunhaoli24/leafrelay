@@ -22,6 +22,7 @@
 ## Verification
 
 - Run `pnpm test` and `git diff --check` after synchronization changes. `pnpm test` runs compile, lint, and Vitest.
+- Pull requests and releases must also pass the VS Code Extension Host activation test and the ShareLaTeX container integration test before packaging.
 - Package local builds with `pnpm exec vsce package --no-dependencies --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.
 
 ## Toolchain

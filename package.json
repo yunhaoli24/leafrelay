@@ -1,6 +1,7 @@
 {
   "name": "leafrelay",
   "packageManager": "pnpm@11.17.0",
+  "type": "module",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
   "version": "0.1.2",
@@ -784,12 +785,15 @@
     "update-l10n": "pnpm exec l10n-dev export -o ./l10n ./src",
     "clean": "rimraf out views/chat-view/dist",
     "typecheck": "tsc -p ./ --noEmit",
-    "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node24 --external:vscode --outfile=out/extension.js --sourcemap",
-    "compile": "pnpm run clean && pnpm run typecheck && pnpm run build:extension && pnpm --filter chat-view run build",
-    "watch": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node24 --external:vscode --outfile=out/extension.js --sourcemap --watch",
+    "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=esm --target=node24 --external:vscode --outfile=out/extension.js --sourcemap",
+    "build:socket": "node scripts/copy-socket-runtime.mjs",
+    "compile": "pnpm run clean && pnpm run typecheck && pnpm run build:extension && pnpm run build:socket && pnpm --filter chat-view run build",
+    "watch": "esbuild src/extension.ts --bundle --platform=node --format=esm --target=node24 --external:vscode --outfile=out/extension.js --sourcemap --watch",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src --ext ts",
     "test": "vitest run --config vitest.config.mjs",
+    "test:extension": "vscode-test",
+    "test:overleaf": "node test/integration/overleaf.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -799,11 +803,10 @@
     "@vscode/l10n": "^0.0.18",
     "diff-match-patch": "^1.0.5",
     "fuzzysearch": "^1.0.3",
-    "mime-types": "^3.0.2",
+    "mime": "4.1.0",
     "minimatch": "^10.2.6",
     "prettier": "^3.9.6",
     "socket.io-client": "github:overleaf/socket.io-client#0.9.17-overleaf-5",
-    "undici": "^8.10.0",
     "uuid": "^14.0.1"
   },
   "devDependencies": {
@@ -816,6 +819,8 @@
     "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typescript-eslint/parser": "^8.67.0",
     "@vscode/l10n-dev": "^0.0.35",
+    "@vscode/test-cli": "0.0.15",
+    "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "^3.9.2",
     "download-cli": "^1.1.1",
     "esbuild": "^0.28.2",
