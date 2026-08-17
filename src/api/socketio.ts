@@ -4,6 +4,7 @@ import { FileEntity, DocumentEntity, FileRefEntity, FileType, FolderEntity, Proj
 import { EventBus } from '../utils/eventBus';
 import { log, notifyError } from '../utils/outputChannel';
 import { SocketIOAlt } from './socketioAlt';
+import { promisify } from 'node:util';
 
 const SOCKET_OPERATION_TIMEOUT_MS = 15000;
 
@@ -142,7 +143,7 @@ export class SocketIOAPI {
                 break;
         }
         // create emit
-        (this.socket.emit)[require('util').promisify.custom] = (event:string, ...args:any[]) => {
+        (this.socket.emit)[promisify.custom] = (event:string, ...args:any[]) => {
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
                     reject('timeout');
@@ -159,7 +160,7 @@ export class SocketIOAPI {
             });
             return Promise.race([waitPromise, timeoutPromise]);
         };
-        this.emit = require('util').promisify(this.socket.emit).bind(this.socket);
+        this.emit = promisify(this.socket.emit).bind(this.socket);
         // resume handlers
         this.initInternalHandlers();
         // Re-register existing event handlers on the new socket

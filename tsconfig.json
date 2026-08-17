@@ -1,10 +1,15 @@
 {
 	"compilerOptions": {
-		"module": "commonjs",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
 		"target": "ES2022",
 		"outDir": "out",
 		"lib": [
 			"ES2022"
+		],
+		"types": [
+			"node",
+			"vscode"
 		],
 		"sourceMap": true,
 		"rootDir": "src",

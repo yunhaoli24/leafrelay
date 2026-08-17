@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import * as vscode from 'vscode';
-import DiffMatchPatch = require('diff-match-patch');
+import { createHash } from 'node:crypto';
+import DiffMatchPatch from 'diff-match-patch';
 import { BaseAPI, MemberEntity, ProjectFileTreeDiffResponseSchema, ProjectSettingsSchema, ProjectUpdateResponseSchema } from '../api/base';
 import { SocketIOAPI, UpdateSchema } from '../api/socketio';
 import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
@@ -965,7 +966,7 @@ export class VirtualFileSystem extends vscode.Disposable {
                 hash: (()=>{
                     if (!doc.mtime || Date.now()-doc.mtime>5000) {
                         doc.mtime = Date.now();
-                        return require('crypto').createHash('sha1').update(
+                        return createHash('sha1').update(
                             "blob " + mergeRes.length + "\x00" + mergeRes
                         ).digest('hex');
                     }

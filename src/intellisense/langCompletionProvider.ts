@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
 import { SnippetItemSchema } from '../api/base';
-import { fuzzyFilter, IntellisenseProvider } from '.';
+import { fuzzyFilter, IntellisenseProvider } from './intellisenseProvider';
 import { RemoteFileSystemProvider, VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
 import { TexDocumentSymbolProvider } from './texDocumentSymbolProvider';
 
