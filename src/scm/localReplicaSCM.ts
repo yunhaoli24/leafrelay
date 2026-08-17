@@ -7,6 +7,7 @@ import { BaseSCM, CommitItem, SettingItem } from ".";
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
 import { ProjectFileTreeDiffResponseSchema } from '../api/base';
 import { error as logError, log, notifyError, warn } from '../utils/outputChannel';
+import { createLocalToRemoteMirrorPlan, ReplicaEntry } from './localReplicaMirror';
 
 const IGNORE_SETTING_KEY = 'ignore-patterns';
 const SYNC_STATE_SCHEMA_VERSION = 1;
@@ -272,6 +273,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             `local-replica-conflicts:${this.baseUri.toString()}`,
             [
                 {title:'Review Conflicts', run:() => this.reviewConflicts()},
+                {title:'Use Local for All', run:() => this.confirmReplaceRemoteWithLocal()},
                 {title:'Retry Sync', run:() => this.retrySync()},
             ],
         );
@@ -292,6 +294,107 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                 log('Local replica watchers remain paused until the synchronization problem is resolved.');
             }
         });
+    }
+
+    private async confirmReplaceRemoteWithLocal() {
+        const choice = await vscode.window.showWarningMessage(
+            `Replace the Overleaf project "${this.vfs.projectName}" with this local folder?`,
+            {
+                modal: true,
+                detail: `Remote files managed by LeafRelay will be deleted or overwritten to match ${this.baseUri.fsPath}. Ignored paths and local symbolic links are left untouched.`,
+            },
+            'Replace Overleaf',
+        );
+        if (choice!=='Replace Overleaf') { return; }
+        await this.enqueueSync(() => this.replaceRemoteWithLocal());
+    }
+
+    private async replaceRemoteWithLocal() {
+        this.syncReady = false;
+        this.status = {status:'push', message:'Replacing Overleaf with local folder'};
+        try {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Replacing Overleaf with local folder',
+                cancellable: false,
+            }, async progress => {
+                const localEntries = await this.scanReplicaEntries(this.baseUri, true);
+                const remoteEntries = await this.scanReplicaEntries(this.vfs.origin, false);
+                const plan = createLocalToRemoteMirrorPlan(localEntries, remoteEntries);
+                const total = plan.deleteRemote.length + plan.createDirectories.length + plan.writeFiles.length;
+                const report = (message: string) => progress.report({
+                    increment: total===0 ? 100 : 100/total,
+                    message,
+                });
+
+                this.syncStateBatchDepth += 1;
+                try {
+                    for (const relPath of plan.deleteRemote) {
+                        report(`Delete ${relPath}`);
+                        const remoteUri = this.vfs.pathToUri(relPath);
+                        if (await this.statOrUndefined(remoteUri)!==undefined) {
+                            this.setBypassCache(relPath, undefined);
+                            await vscode.workspace.fs.delete(remoteUri, {recursive:true});
+                        }
+                    }
+                    for (const relPath of plan.createDirectories) {
+                        report(`Create ${relPath}`);
+                        const remoteUri = this.vfs.pathToUri(relPath);
+                        await this.ensureParentDirectories(this.vfs.origin, relPath);
+                        await vscode.workspace.fs.createDirectory(remoteUri);
+                    }
+                    for (const relPath of plan.writeFiles) {
+                        report(`Upload ${relPath}`);
+                        const remoteUri = this.vfs.pathToUri(relPath);
+                        if (await this.statOrUndefined(remoteUri)!==undefined) {
+                            const {fileType, fileEntity} = await this.vfs._resolveUri(remoteUri);
+                            if (fileType==='doc' && fileEntity!==undefined) {
+                                const document = fileEntity as any;
+                                document.remoteCache = undefined;
+                                document.localCache = undefined;
+                                await vscode.workspace.fs.readFile(remoteUri);
+                            }
+                        }
+                        await this.syncLocalPath(relPath);
+                    }
+                } finally {
+                    this.syncStateBatchDepth -= 1;
+                }
+
+                const remoteVersion = await this.vfs.getCurrentVersion();
+                if (remoteVersion===undefined) {
+                    throw new Error('The remote project version could not be read after upload.');
+                }
+                const localHashes = await this.scanLocalFileHashes();
+                this.syncState = {
+                    schemaVersion: SYNC_STATE_SCHEMA_VERSION,
+                    projectUri: this.vfs.origin.toString(),
+                    remoteVersion,
+                    files: Object.fromEntries(localHashes),
+                };
+                await this.persistSyncState();
+                this.conflictPaths.clear();
+                this.syncReady = true;
+                log('LocalReplica: replaced Overleaf project with local folder', {
+                    projectId: this.vfs.projectId,
+                    baseUri: this.baseUri.toString(),
+                    deleted: plan.deleteRemote.length,
+                    directories: plan.createDirectories.length,
+                    files: plan.writeFiles.length,
+                    remoteVersion,
+                });
+            });
+            await vscode.window.showInformationMessage('Overleaf now matches this local folder. Live synchronization resumed.');
+        } catch (error) {
+            notifyError(
+                'LeafRelay could not finish replacing Overleaf with the local folder. Synchronization remains paused.',
+                error,
+                `local-replica-replace-remote:${this.baseUri.toString()}`,
+                [{title:'Try Again', run:() => this.confirmReplaceRemoteWithLocal()}],
+            );
+        } finally {
+            this.status = {status:'idle', message:''};
+        }
     }
 
     private async hasUncheckpointedLocalChange(relPath: string, type: 'update'|'delete'): Promise<boolean> {
@@ -438,6 +541,34 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             }
         }
         return files;
+    }
+
+    private async scanReplicaEntries(baseUri: vscode.Uri, local: boolean): Promise<ReplicaEntry[]> {
+        const results: ReplicaEntry[] = [];
+        const queue: Array<[vscode.Uri,string]> = [[baseUri, '/']];
+        while (queue.length!==0) {
+            const [directoryUri, directoryPath] = queue.shift()!;
+            const entries = await vscode.workspace.fs.readDirectory(directoryUri);
+            for (const [name, type] of entries) {
+                const relPath = this.normalizeRelPath(`${directoryPath}${name}`);
+                if (this.matchIgnorePatterns(relPath)) { continue; }
+                const uri = vscode.Uri.joinPath(directoryUri, name);
+                if (local && (type & vscode.FileType.SymbolicLink)!==0) {
+                    this.ignoredLocalSymbolicLinks.add(relPath);
+                    continue;
+                }
+                if (!local && this.ignoredLocalSymbolicLinks.has(relPath)) { continue; }
+                if ((type & vscode.FileType.Directory)!==0) {
+                    results.push({path:relPath, type:'directory'});
+                    queue.push([uri, `${relPath}/`]);
+                } else if ((type & vscode.FileType.File)!==0) {
+                    results.push({path:relPath, type:'file'});
+                } else {
+                    warn(`Skipping unsupported ${local ? 'local' : 'remote'} entry during mirror: "${relPath}".`);
+                }
+            }
+        }
+        return results;
     }
 
     private enqueueSync<T>(operation: () => Promise<T>): Promise<T> {
@@ -1169,6 +1300,10 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
     get settingItems(): SettingItem[] {
         return [
+            {
+                label: vscode.l10n.t('Replace Overleaf with this local folder ...'),
+                callback: () => this.confirmReplaceRemoteWithLocal(),
+            },
             // configure ignore patterns
             {
                 label: vscode.l10n.t('Configure sync ignore patterns ...'),

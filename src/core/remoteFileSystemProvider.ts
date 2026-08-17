@@ -930,8 +930,13 @@ export class VirtualFileSystem extends vscode.Disposable {
             return this.createFile(uri, content, true);
         }
 
-        // if exists but not doc --> create new
+        // Binary files cannot be updated through the document OT channel.
+        // Replace the existing entity before uploading the new content; trying
+        // to upload another entity with the same name is rejected by Overleaf.
         if (fileType && fileType!=='doc' && create) {
+            if (overwrite) {
+                await this.remove(uri, true);
+            }
             return this.createFile(uri, content, overwrite);
         }
 
