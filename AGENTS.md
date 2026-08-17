@@ -39,4 +39,4 @@
 - A direct `v*` tag matching `package.json` may invoke the same pipeline as a recovery path. The pipeline attaches the VSIX and checksum to the release and attempts Marketplace publishing.
 - Re-run the same release workflow after fixing transient publishing problems; asset uploads and Marketplace publication are idempotent.
 - The GitHub release and its VSIX must be created even when Marketplace publishing is temporarily unavailable.
-- Marketplace publication must use GitHub OIDC trusted publishing through `vsce publish --oidc`; do not add PAT secrets or a PAT fallback. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.
+- Marketplace publication must use GitHub OIDC trusted publishing through `vsce publish --oidc`; do not add PAT secrets or a PAT fallback. Keep the repository variable `MARKETPLACE_OIDC_ENABLED` disabled until Marketplace supports the token exchange and its trusted-publisher policy is configured. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.

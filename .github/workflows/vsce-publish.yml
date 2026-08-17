@@ -106,8 +106,14 @@ jobs:
             --clobber
 
       - name: Publish to VS Code Marketplace
+        if: vars.MARKETPLACE_OIDC_ENABLED == 'true'
         run: |
           pnpm exec vsce publish \
             --packagePath "${{ steps.package.outputs.vsix }}" \
             --oidc \
             --skip-duplicate
+
+      - name: Report deferred Marketplace publishing
+        if: vars.MARKETPLACE_OIDC_ENABLED != 'true'
+        run: |
+          echo "::warning::Marketplace OIDC publishing is not enabled. The VSIX remains available from the GitHub Release."
