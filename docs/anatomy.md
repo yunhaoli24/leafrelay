@@ -13,7 +13,8 @@ We will firstly take a glance at the project root directory in the separate view
 ├── LICENSE
 ├── README.md
 ├── commitlint.config.js
-├── package-lock.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
 ├── package.json
 ├── package.nls.json
 ├── tsconfig.json
@@ -21,7 +22,7 @@ We will firstly take a glance at the project root directory in the separate view
 
 - `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `LICENSE`, `README.md` are the standard files for open source projects.
 - `commitlint.config.js` is the configuration file for [commitlint](https://commitlint.js.org/#/).
-- `package.json` is the configuration file for [npm](https://docs.npmjs.com/cli/v7/configuring-npm/package-json), which contains the metadata of the extension. `package-lock.json` is the lock file for `package.json`.
+- `package.json` contains the extension metadata and scripts. `pnpm-workspace.yaml` links the extension and chat-view packages, while `pnpm-lock.yaml` records their reproducible dependency graph.
 - `package.nls.*json` is the configuration file for [vscode-nls](https://github.com/microsoft/vscode-nls), which contains the metadata of the localization of the `package.json`.
 - `tsconfig.json` is the configuration file for [TypeScript](https://www.typescriptlang.org/docs/handbook/tsconfig-json.html), which specifies the root files and compiler options required to compile the project.
 
@@ -309,7 +310,7 @@ The export `class GlobalStateManager` provides a wrapper to access `globalState`
 ## `views`: Webview Source Code
 
 ### `views/chat-view`
-A standalone vue project which provides chat webview and use `@vscode/webview-ui-toolkit` to communicate with [src/collaboration/chatViewProvider](#srccollaborationchatviewproviderts).
+A standalone Vue project that provides the chat webview. It uses `@vscode-elements/elements` for VS Code-native controls and communicates with [src/collaboration/chatViewProvider](#srccollaborationchatviewproviderts).
 
 ### `views/pdf-viewer`
 A patched `pdf.js` release which holds the original release in the `views/pdf-viewer/vendor` folder, and apply `pdfjs*.patch` to it.
@@ -320,14 +321,16 @@ The `index.js` and `index.css` files are the entry of the webview provided to [s
 ### `package.json`
 
 **scripts**
-> Common usage: `npm install` -> `npm run compile` -> `vsce package` / `vsce publish`
+> Common usage: `pnpm install` -> `pnpm run compile` -> `pnpm exec vsce package --no-dependencies`
 
 - **"download-pdfjs"**, **"download-latex-basics"**: invoked by `postinstall` to download the release of [`pdf.js`](https://github.com/mozilla/pdf.js/releases) and [`vscode-latex-basics`](https://github.com/jlelong/vscode-latex-basics) from Github.
-- **"postinstall"**: invoked after `npm install` to patch the node modules and download the extra vendor packages.
-- **"prepare"**: invoked after `npm install` to configure `husky` and `commitlint`.
+- **"postinstall"**: invoked after `pnpm install` to patch the node modules and download the extra vendor packages.
+- **"prepare"**: invoked after `pnpm install` to configure `husky` and `commitlint`.
 - **"vscode:prepublish"**: invoked before `vsce package` or `vsce publish` to compile the extension.
 
-- **"compile"**: invokes `tsc` to compile the extension in the `out` directory defined by `outDir` in `tsconfig.json`.
+- **"typecheck"**: validates the extension sources with TypeScript without emitting JavaScript.
+- **"build:extension"**: bundles the extension and its runtime dependencies into `out/extension.js` with esbuild, leaving only the VS Code API external.
+- **"compile"**: cleans generated output, type-checks and bundles the extension, then type-checks and builds the chat webview.
 - **"watch"**: invokes `tsc` to watch the changes of the extension, invoked by vscode when the extension is opened in the development mode.
 - **"lint"**: invokes `eslint` to lint the extension.
 

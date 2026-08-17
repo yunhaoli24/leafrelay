@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-08-17
+### Added
+- Add Vitest unit tests and PR verification for compile, lint, tests, and VSIX packaging.
+
+### Changed
+- Migrate the repository to a pnpm workspace and upgrade dependencies to current compatible releases.
+- Bundle the extension runtime with esbuild for deterministic pnpm-compatible VSIX packaging.
+- Replace the archived VS Code Webview UI Toolkit with `@vscode-elements/elements`.
+- Move the extension and webview build targets to modern TypeScript, ESLint flat config, Vite, and Vue tooling.
+
+### Fixed
+- Avoid stale Socket.IO `connectionRejected` listeners during project retries.
+- Allow slower Socket.IO joins and emits to complete before timing out.
+- Treat an uninitialized remote VFS as unavailable during reconnect instead of throwing.
+- Treat a missing compile log as having no diagnostics.
+
+## [0.1.1] - 2026-08-17
+### Changed
+- Automate GitHub Release packaging from `main`, with optional Marketplace publication.
+
 ## [0.1.0] - 2026-08-17
 ### Added
 - First LeafRelay release, based on Overleaf Workshop 0.15.10.

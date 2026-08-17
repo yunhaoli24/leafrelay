@@ -6,6 +6,7 @@ import { LatexParser, ErrorSchema } from './compileLogParser';
 import { EventBus } from '../utils/eventBus';
 import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
 import { error as logError, warn } from '../utils/outputChannel';
+import { isMissingFileSystemError } from '../utils/fileSystemErrors';
 
 // map string level to severity
 const severityMap: Record<string, vscode.DiagnosticSeverity> = {
@@ -70,8 +71,16 @@ class CompileDiagnosticProvider {
         const vfs = await this.vfsm.prefetch(uri);
         const logPath = `${OUTPUT_FOLDER_NAME}/output.log`;
         const _uri = vfs.pathToUri(logPath);
-        let content ='';
-        content = new TextDecoder().decode(await vfs.openFile(_uri));
+        let content = '';
+        try {
+            content = new TextDecoder().decode(await vfs.openFile(_uri));
+        } catch (error) {
+            if (isMissingFileSystemError(error)) {
+                return false;
+            }
+            logError(error);
+            throw error;
+        }
         const logs = new LatexParser(content).parse();
         if (logs === undefined) {
             return content === ''? true :false;

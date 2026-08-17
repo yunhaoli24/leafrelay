@@ -37,10 +37,10 @@
         content = md.render(content);
         // parse line references
         content = content.replace(/\[\[(([^#]+)#L(\d+)C(\d+)-L(\d+)C(\d+))\]\]/g,
-                    `<vscode-link class="show-line-ref" href='$2,$3,$4,$5,$6'>$1</vscode-link>`);
+                    `<a class="show-line-ref" href='$2,$3,$4,$5,$6'>$1</a>`);
         // parse user reference
         content = content.replace(/@\[\[([^#]+)#([^\]]+)\]\]/g,
-                    `<vscode-link href='$1,$2'>@$1</vscode-link>`);
+                    `<a class="user-ref" href='$1,$2'>@$1</a>`);
         return content;
     });
 
@@ -66,8 +66,10 @@
 
     function handleClick(event: Event) {
         const target = event.target as HTMLElement;
-        if (target.className==='show-line-ref') {
+        if (target.matches('a')) {
             event.preventDefault();
+        }
+        if (target.className==='show-line-ref') {
             const href = target.getAttribute('href')?.split(',') || [];
             const [path, strL1, strC1, strL2, strC2] = href;
             showLineRef(path, parseInt(strL1), parseInt(strC1), parseInt(strL2), parseInt(strC2));
@@ -115,7 +117,7 @@
                 @mouseenter="hoverButton='reply'"
                 @mouseleave="hoverButton=''"
                 @click="showReply=!showReply"
-                appearance="icon" aria-label="Reply">
+                secondary aria-label="Reply">
                 <span class="codicon codicon-comment"></span>
                 &nbsp;
                 <inline v-show="hoverButton=='reply'">Reply</inline>
@@ -168,6 +170,17 @@
         align-items: center;
         width: 100%;
         color: var(--vscode-descriptionForeground);
+    }
+
+    .message-item_content :deep(a) {
+        color: var(--vscode-textLink-foreground);
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .message-item_content :deep(a:hover) {
+        color: var(--vscode-textLink-activeForeground);
+        text-decoration: underline;
     }
 
     .clickable {

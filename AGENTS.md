@@ -21,8 +21,14 @@
 
 ## Verification
 
-- Run `npm run compile`, `npm run lint`, and `git diff --check` after synchronization changes.
-- Package local builds with `npx @vscode/vsce package --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.
+- Run `pnpm test` and `git diff --check` after synchronization changes. `pnpm test` runs compile, lint, and Vitest.
+- Package local builds with `pnpm exec vsce package --no-dependencies --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.
+
+## Toolchain
+
+- Use the pnpm workspace and the version declared in `package.json`; do not reintroduce npm lock files or per-package lock files.
+- The extension runtime is bundled with esbuild. Keep `vscode` external and package the VSIX with `--no-dependencies`.
+- Unit tests use Vitest and must run in GitHub Actions for pull requests.
 
 ## Release Process
 

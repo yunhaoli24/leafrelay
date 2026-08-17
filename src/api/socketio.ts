@@ -5,6 +5,8 @@ import { EventBus } from '../utils/eventBus';
 import { log, notifyError } from '../utils/outputChannel';
 import { SocketIOAlt } from './socketioAlt';
 
+const SOCKET_OPERATION_TIMEOUT_MS = 15000;
+
 function decodePackedUtf8(text: string): string {
     return Buffer.from(text, 'latin1').toString('utf-8');
 }
@@ -144,7 +146,7 @@ export class SocketIOAPI {
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
                     reject('timeout');
-                }, 5000);
+                }, SOCKET_OPERATION_TIMEOUT_MS);
             });
             const waitPromise = new Promise((resolve, reject) => {
                 this.socket.emit(event, ...args, (err:any, ...data:any[]) => {
@@ -375,27 +377,38 @@ export class SocketIOAPI {
         const timeoutPromise: Promise<ProjectEntity> = new Promise((_, reject) => {
             setTimeout(() => {
                 reject('timeout');
-            }, 5000);
+            }, SOCKET_OPERATION_TIMEOUT_MS);
         });
 
         switch(this.scheme) {
             case 'Alt':
             case 'v1':
+                const socket = this.socket;
                 const joinPromise = this.emit('joinProject', {project_id})
                 .then((returns:[ProjectEntity, string, number]) => {
                     const [project, permissionsLevel, protocolVersion] = returns;
                     this.record = Promise.resolve(project);
                     return project;
                 });
+                let rejectionHandler: ((err:any) => void) | undefined;
                 const rejectPromise = new Promise((_, reject) => {
-                    this.socket.on('connectionRejected', (err:any) => {
+                    rejectionHandler = (err:any) => {
                         // Only fall back to v2 if we haven't already tried it;
                         // otherwise let the outer retry logic handle backoff
                         this.scheme = 'v2';
                         reject(err.message);
-                    });
+                    };
+                    socket.once('connectionRejected', rejectionHandler);
                 });
-                return Promise.race([joinPromise, rejectPromise, timeoutPromise]);
+                try {
+                    return await Promise.race([joinPromise, rejectPromise, timeoutPromise]);
+                } finally {
+                    // A successful join or timeout must not leave a listener behind for
+                    // a later reconnect. Socket.IO 0.x exposes removeListener like EventEmitter.
+                    if (rejectionHandler && typeof socket.removeListener === 'function') {
+                        socket.removeListener('connectionRejected', rejectionHandler);
+                    }
+                }
             case 'v2':
                 return Promise.race([this.record!, timeoutPromise]);
         }

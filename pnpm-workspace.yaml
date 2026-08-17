@@ -1,0 +1,10 @@
+packages:
+  - views/chat-view
+
+overrides:
+  default-browser: 5.5.0
+
+allowBuilds:
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true
