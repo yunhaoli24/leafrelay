@@ -79,7 +79,15 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('setContext', `${ROOT_NAME}.activateCompile`, Boolean(setting.enableCompileNPreview));
         })()
         .catch(error => {
-            notifyError('The local Overleaf project could not reconnect. Please verify that you are logged in, then retry.', error, 'local-replica-reconnect');
+            notifyError(
+                'The local Overleaf project could not reconnect. Log in from LeafRelay, then retry the connection.',
+                error,
+                'local-replica-reconnect',
+                [
+                    {title:'Open LeafRelay', run:() => vscode.commands.executeCommand('workbench.view.extension.overleaf-workshop')},
+                    {title:'Retry Connection', run:() => activateLocalReplica(true)},
+                ],
+            );
         })
         .finally(() => { localReplicaActivation = undefined; });
         return localReplicaActivation;

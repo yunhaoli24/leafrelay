@@ -7,6 +7,11 @@ const NOTIFICATION_COOLDOWN_MS = 30000;
 
 type LogLevel = 'INFO' | 'WARN' | 'ERROR';
 
+export interface NotificationAction {
+    title: string;
+    run: () => void | PromiseLike<void>;
+}
+
 function formatArgument(argument: unknown): string {
     if (argument instanceof Error) {
         return argument.stack || argument.message;
@@ -65,15 +70,29 @@ export function error(...args: unknown[]) {
     writeLog('ERROR', args);
 }
 
-export function notifyError(message: string, detail?: unknown, key: string = message) {
+export function notifyError(
+    message: string,
+    detail?: unknown,
+    key: string = message,
+    actions: NotificationAction[] = [],
+) {
     writeLog('ERROR', detail===undefined ? [message] : [message, detail]);
     const now = Date.now();
     const previous = notificationTimes.get(key) || 0;
     if (now-previous<NOTIFICATION_COOLDOWN_MS) { return; }
     notificationTimes.set(key, now);
-    vscode.window.showErrorMessage(message, 'Show Logs').then(choice => {
+    vscode.window.showErrorMessage(message, ...actions.map(action => action.title), 'Show Logs').then(async choice => {
         if (choice==='Show Logs') {
             outputChannel?.show(true);
+            return;
+        }
+        const action = actions.find(candidate => candidate.title===choice);
+        if (action===undefined) { return; }
+        notificationTimes.delete(key);
+        try {
+            await action.run();
+        } catch (error) {
+            writeLog('ERROR', [`Notification action "${action.title}" failed.`, error]);
         }
     }, () => {});
 }

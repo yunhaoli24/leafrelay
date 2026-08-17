@@ -229,14 +229,69 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         );
     }
 
-    private markConflict(relPath: string, reason: string) {
+    private markConflict(relPath: string, reason: string, notify: boolean = true) {
         const normalizedPath = this.normalizeRelPath(relPath);
         this.conflictPaths.add(normalizedPath);
-        notifyError(
-            `Overleaf sync paused for "${normalizedPath}" because both local and remote changed. Resolve it manually, then reload the window.`,
+        logError(
+            `Overleaf sync paused for "${normalizedPath}" because both local and remote changed.`,
             reason,
-            `local-replica-conflict:${normalizedPath}`
         );
+        if (notify) { this.notifyConflicts(); }
+    }
+
+    private async reviewConflicts() {
+        const paths = [...this.conflictPaths].sort();
+        if (paths.length===0) {
+            await vscode.window.showInformationMessage('No unresolved LeafRelay sync conflicts remain.');
+            return;
+        }
+        const selected = await vscode.window.showQuickPick(
+            paths.map(path => ({label:path, description:'Compare Overleaf with local'})),
+            {
+                ignoreFocusOut: true,
+                title: 'LeafRelay Sync Conflicts',
+                placeHolder: 'Select a file to compare. Make both copies identical, then retry sync.',
+            },
+        );
+        if (selected===undefined) { return; }
+        const remoteUri = this.vfs.pathToUri(selected.label);
+        const localUri = vscode.Uri.joinPath(this.baseUri, selected.label);
+        await vscode.commands.executeCommand(
+            'vscode.diff',
+            remoteUri,
+            localUri,
+            `Overleaf ↔ Local: ${selected.label}`,
+        );
+    }
+
+    private notifyConflicts() {
+        const count = this.conflictPaths.size;
+        notifyError(
+            `LeafRelay paused ${count} conflicting path(s). Review each path, make the local and Overleaf copies identical, then retry sync. No conflicting file was overwritten.`,
+            undefined,
+            `local-replica-conflicts:${this.baseUri.toString()}`,
+            [
+                {title:'Review Conflicts', run:() => this.reviewConflicts()},
+                {title:'Retry Sync', run:() => this.retrySync()},
+            ],
+        );
+    }
+
+    private async retrySync() {
+        await this.enqueueSync(async () => {
+            this.conflictPaths.clear();
+            this.syncReady = false;
+            this.syncReady = await this.initializeSync()===true;
+            if (this.syncReady) {
+                log('LocalReplica: synchronization resumed', {
+                    projectId: this.vfs.projectId,
+                    baseUri: this.baseUri.toString(),
+                });
+                await vscode.window.showInformationMessage('LeafRelay synchronization resumed.');
+            } else {
+                log('Local replica watchers remain paused until the synchronization problem is resolved.');
+            }
+        });
     }
 
     private async hasUncheckpointedLocalChange(relPath: string, type: 'update'|'delete'): Promise<boolean> {
@@ -621,7 +676,40 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
     private async syncConcurrentPath(relPath: string) {
         const normalizedPath = this.normalizeRelPath(relPath);
-        this.markConflict(normalizedPath, 'The local checkpoint and the remote history both contain changes for this path.');
+        const localUri = vscode.Uri.joinPath(this.baseUri, normalizedPath);
+        const remoteUri = this.vfs.pathToUri(normalizedPath);
+        const localStat = await this.statOrUndefined(localUri);
+        const remoteStat = await this.statOrUndefined(remoteUri);
+
+        if (localStat===undefined && remoteStat===undefined) {
+            this.updateSyncStateFile(normalizedPath, undefined);
+            this.conflictPaths.delete(normalizedPath);
+            log(`Resolved startup conflict for "${normalizedPath}": both sides are deleted.`);
+            return;
+        }
+        if (localStat?.type===vscode.FileType.Directory && remoteStat?.type===vscode.FileType.Directory) {
+            this.updateSyncStateFile(normalizedPath, undefined);
+            this.conflictPaths.delete(normalizedPath);
+            log(`Resolved startup conflict for "${normalizedPath}": both sides are directories.`);
+            return;
+        }
+        if (localStat?.type===vscode.FileType.File && remoteStat?.type===vscode.FileType.File) {
+            const localContent = await vscode.workspace.fs.readFile(localUri);
+            const remoteContent = await vscode.workspace.fs.readFile(remoteUri);
+            if (sha256(localContent)===sha256(remoteContent)) {
+                this.baseCache[normalizedPath] = localContent;
+                this.updateSyncStateFile(normalizedPath, localContent);
+                this.conflictPaths.delete(normalizedPath);
+                log(`Resolved startup conflict for "${normalizedPath}": local and Overleaf contents match.`);
+                return;
+            }
+        }
+
+        this.markConflict(
+            normalizedPath,
+            'The local checkpoint and the remote history both contain different changes for this path.',
+            false,
+        );
         throw new Error(`Sync conflict paused for ${normalizedPath}`);
     }
 
@@ -701,11 +789,16 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
         if (failedPaths.length!==0) {
             await this.persistSyncState();
-            notifyError(
-                `Overleaf sync failed for ${failedPaths.length} path(s). The previous sync checkpoint was kept.`,
-                undefined,
-                'local-replica-incremental-failed'
-            );
+            if (this.conflictPaths.size!==0) {
+                this.notifyConflicts();
+            } else {
+                notifyError(
+                    `Overleaf sync failed for ${failedPaths.length} path(s). The previous sync checkpoint was kept.`,
+                    undefined,
+                    'local-replica-incremental-failed',
+                    [{title:'Retry Sync', run:() => this.retrySync()}],
+                );
+            }
             return false;
         }
 
@@ -729,9 +822,10 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
     private pauseUnsafeFullSync(reason: string): false {
         notifyError(
-            'Overleaf sync was paused because the remote history is unavailable and local files may have changed. No files were overwritten.',
+            'LeafRelay paused because remote history is unavailable and local files differ from the checkpoint. Restore the connection, then retry sync. No files were overwritten.',
             reason,
-            'local-replica-unsafe-full-sync'
+            'local-replica-unsafe-full-sync',
+            [{title:'Retry Sync', run:() => this.retrySync()}],
         );
         return false;
     }
