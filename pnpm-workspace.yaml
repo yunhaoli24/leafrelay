@@ -3,3 +3,8 @@ packages:
 
 overrides:
   default-browser: 5.5.0
+
+onlyBuiltDependencies:
+  - '@vscode/vsce-sign'
+  - esbuild
+  - keytar
