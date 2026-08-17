@@ -27,7 +27,8 @@
 ## Release Process
 
 - Never push release changes directly to `main`; create a branch and merge through a pull request.
-- Every merge to `main` is a Marketplace release and must contain a version not used by an earlier release.
+- Every merge to `main` creates a GitHub release and attempts a Marketplace release, and must contain a version not used by an earlier release.
 - Normal pull requests increment only the patch component, for example `0.1.0` to `0.1.1`.
 - Increment the minor or major component only when the user explicitly requests that release level.
-- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token.
+- The GitHub release and its VSIX must be created even when Marketplace publishing is temporarily unavailable.
+- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token. A manual workflow run may publish an existing version later.
