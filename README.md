@@ -87,9 +87,9 @@ Please refer to the development guidance in [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ### Release Policy
 
-Changes are merged through pull requests. Merging into `main` packages the version declared in `package.json`, creates the matching GitHub release with the VSIX attached, and publishes it to the VS Code Marketplace when the publisher credentials are configured. Marketplace publishing can be retried manually without rebuilding locally.
+Changes are merged through pull requests, but ordinary merges into `main` do not publish a release. Release Please maintains a generated release pull request containing the accumulated version and changelog changes. Merging that release pull request creates the tag and GitHub release, then an automated pipeline tests and packages the exact tag, attaches the VSIX and checksum, and publishes it to the VS Code Marketplace when publisher credentials are configured.
 
-Normal pull requests increment only the patch version, such as `0.1.0` to `0.1.1`. Minor or major version changes are reserved for explicitly planned releases.
+Ordinary pull requests do not edit the version. Before version `1.0.0`, fixes and features produce patch releases, while an explicit breaking change produces a minor release. The generated release pull request is merged only when a release is intentionally approved. Direct matching tags remain supported as a recovery path, and rerunning a release safely replaces its assets without duplicating its Marketplace version.
 
 ### References
 

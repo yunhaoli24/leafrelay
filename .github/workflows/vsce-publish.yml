@@ -3,25 +3,34 @@ name: Publish Extension
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - "v*"
+  workflow_call:
     inputs:
-      publish_marketplace:
-        description: Publish the packaged VSIX to the VS Code Marketplace
+      ref:
+        description: Release tag created by Release Please
         required: true
-        type: boolean
-        default: false
+        type: string
+    secrets:
+      VSCE_PAT:
+        required: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -47,39 +56,58 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           VSIX="leafrelay-${VERSION}.vsix"
           pnpm exec vsce package --no-dependencies --out "$VSIX"
+          sha256sum "$VSIX" > "$VSIX.sha256"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Verify version is not already released
-        if: github.event_name == 'push'
+      - name: Validate release version
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ steps.package.outputs.tag }}" >/dev/null 2>&1; then
-            echo "Release ${{ steps.package.outputs.tag }} already exists; bump package.json before merging." >&2
+          EXPECTED_TAG="${{ steps.package.outputs.tag }}"
+          RELEASE_REF="${{ inputs.ref || github.ref_name }}"
+          if [ "$RELEASE_REF" != "$EXPECTED_TAG" ]; then
+            echo "Release ref $RELEASE_REF does not match package.json version $EXPECTED_TAG." >&2
             exit 1
+          fi
+
+          if gh release view "$EXPECTED_TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7
         with:
-          name: leafrelay-${{ github.ref_name }}
-          path: ${{ steps.package.outputs.vsix }}
+          name: leafrelay-${{ steps.package.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.vsix }}
+            ${{ steps.package.outputs.vsix }}.sha256
 
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: steps.release.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.package.outputs.tag }}" \
-            "${{ steps.package.outputs.vsix }}" \
-            --target "$GITHUB_SHA" \
+            --target "${{ steps.package.outputs.commit }}" \
             --title "LeafRelay ${{ steps.package.outputs.tag }}" \
             --generate-notes
 
+      - name: Upload GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.package.outputs.tag }}" \
+            "${{ steps.package.outputs.vsix }}" \
+            "${{ steps.package.outputs.vsix }}.sha256" \
+            --clobber
+
       - name: Publish to VS Code Marketplace
-        if: github.event_name == 'push' || inputs.publish_marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
@@ -87,4 +115,7 @@ jobs:
             echo "::warning::VSCE_PAT is not configured; the VSIX is available from the GitHub Release and can be published later."
             exit 0
           fi
-          pnpm exec vsce publish --packagePath "${{ steps.package.outputs.vsix }}" --pat "$VSCE_PAT"
+          pnpm exec vsce publish \
+            --packagePath "${{ steps.package.outputs.vsix }}" \
+            --pat "$VSCE_PAT" \
+            --skip-duplicate

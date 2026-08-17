@@ -33,8 +33,10 @@
 ## Release Process
 
 - Never push release changes directly to `main`; create a branch and merge through a pull request.
-- Every merge to `main` creates a GitHub release and attempts a Marketplace release, and must contain a version not used by an earlier release.
-- Normal pull requests increment only the patch component, for example `0.1.0` to `0.1.1`.
-- Increment the minor or major component only when the user explicitly requests that release level.
+- Merging ordinary pull requests to `main` updates the Release Please pull request but does not publish. Ordinary pull requests must not edit the release version manually.
+- Merge the generated Release Please pull request only when the user explicitly requests a release. That merge creates the version tag and GitHub release, then invokes the reusable publish workflow.
+- Before version `1.0.0`, fixes and features produce patch releases; only an explicit breaking change produces a minor release. Major or otherwise forced versions require an explicit release decision.
+- A direct `v*` tag matching `package.json` may invoke the same pipeline as a recovery path. The pipeline attaches the VSIX and checksum to the release and attempts Marketplace publishing.
+- Re-run the same release workflow after fixing transient publishing problems; asset uploads and Marketplace publication are idempotent.
 - The GitHub release and its VSIX must be created even when Marketplace publishing is temporarily unavailable.
-- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token. A manual workflow run may publish an existing version later.
+- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.
