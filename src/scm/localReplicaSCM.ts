@@ -289,7 +289,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                     projectId: this.vfs.projectId,
                     baseUri: this.baseUri.toString(),
                 });
-                await vscode.window.showInformationMessage('LeafRelay synchronization resumed.');
+                void vscode.window.showInformationMessage('LeafRelay synchronization resumed.');
             } else {
                 log('Local replica watchers remain paused until the synchronization problem is resolved.');
             }
@@ -384,7 +384,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                     remoteVersion,
                 });
             });
-            await vscode.window.showInformationMessage('Overleaf now matches this local folder. Live synchronization resumed.');
+            void vscode.window.showInformationMessage('Overleaf now matches this local folder. Live synchronization resumed.');
         } catch (error) {
             notifyError(
                 'LeafRelay could not finish replacing Overleaf with the local folder. Synchronization remains paused.',
