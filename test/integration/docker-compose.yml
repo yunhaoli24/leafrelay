@@ -14,6 +14,7 @@ services:
       OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
       OVERLEAF_REDIS_HOST: redis
       REDIS_HOST: redis
+      OVERLEAF_INVITE_TOKEN_SECRET: leafrelay-ci-invite-token-secret
       EMAIL_CONFIRMATION_DISABLED: "true"
       ENABLED_LINKED_FILE_TYPES: project_file,project_output_file
 
