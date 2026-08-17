@@ -23,3 +23,11 @@
 
 - Run `npm run compile`, `npm run lint`, and `git diff --check` after synchronization changes.
 - Package local builds with `npx @vscode/vsce package --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.
+
+## Release Process
+
+- Never push release changes directly to `main`; create a branch and merge through a pull request.
+- Every merge to `main` is a Marketplace release and must contain a version not used by an earlier release.
+- Normal pull requests increment only the patch component, for example `0.1.0` to `0.1.1`.
+- Increment the minor or major component only when the user explicitly requests that release level.
+- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token.

@@ -28,9 +28,15 @@ To make a contribution to this project, please follow the steps below:
 
 5. Wait for the assigned reviewer to review your pull request.
    
-   If there are any problems, please fix them and commit the changes to the same branch with rebase. If the reviewer approves your pull request, it will be merged into the `master` branch.
+   If there are any problems, please fix them and commit the changes to the same branch with rebase. If the reviewer approves your pull request, it will be merged into the `main` branch.
 
 6. After the pull request is merged, the associated issue will be closed automatically.
+
+## Release Versions
+
+Every merge into `main` publishes the version declared in `package.json`. A pull request must therefore use a version that has not already been released.
+
+For normal changes, increment only the patch component, for example `0.1.0` to `0.1.1`. Do not increment the minor or major component unless that release level has been explicitly planned.
 
 
 ## Development Guidance
