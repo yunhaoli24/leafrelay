@@ -9,6 +9,7 @@ import { GlobalStateManager } from '../utils/globalStateManager';
 import { EventBus } from '../utils/eventBus';
 import { ROOT_NAME } from '../consts';
 import { error as logError, log, notifyError } from '../utils/outputChannel';
+import { partitionLocalReplicas } from './localReplicaSelection';
 
 const supportedSCMs = [
     LocalReplicaSCMProvider,
@@ -66,7 +67,14 @@ export class SCMCollectionProvider extends vscode.Disposable {
 
         this.core = new CoreSCMProvider( vfs );
         this.historyDataProvider = new HistoryViewProvider( vfs );
-        this.initSCMs();
+        void this.initSCMs().catch(error => {
+            notifyError(
+                'LeafRelay could not initialize synchronization for this project. Reload the window to retry.',
+                error,
+                `scm-initialization:${this.vfs.projectId}`,
+                [{title:'Reload Window', run:() => vscode.commands.executeCommand('workbench.action.reloadWindow')}],
+            );
+        });
 
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
         this.statusBarItem.command = `${ROOT_NAME}.projectSCM.configSCM`;
@@ -121,16 +129,50 @@ export class SCMCollectionProvider extends vscode.Disposable {
         this.statusBarItem.show();
     }
 
-    private initSCMs() {
+    private async initSCMs() {
         const scmPersists = GlobalStateManager.getServerProjectSCMPersists(this.context, this.vfs.serverName, this.vfs.projectId);
-        Object.values(scmPersists).forEach(async scmPersist => {
-            const scmProto = supportedSCMs.find(scm => scm.label===scmPersist.label);
-            if (scmProto!==undefined) {
-                const enabled = scmPersist.enabled ?? true;
-                const baseUri = vscode.Uri.parse(scmPersist.baseUri);
-                await this.createSCM(scmProto, baseUri, false, enabled);
-            }
+        const records = Object.values(scmPersists).map(scmPersist => {
+            const parsed = vscode.Uri.parse(scmPersist.baseUri);
+            const baseUri = parsed.scheme==='' ? vscode.Uri.file(scmPersist.baseUri) : parsed;
+            return {baseUri: baseUri.toString(), value: scmPersist};
         });
+        const workspaceRoot = vscode.workspace.workspaceFolders?.length===1
+            ? vscode.workspace.workspaceFolders[0].uri
+            : undefined;
+        const localReplicas = records.filter(record => record.value.label===LocalReplicaSCMProvider.label);
+        const activeWorkspaceUri = workspaceRoot?.scheme==='file' ? workspaceRoot.toString() : undefined;
+        const selected = partitionLocalReplicas(localReplicas, activeWorkspaceUri);
+        const activeLocalReplicaUris = new Set(selected.active.map(record => record.baseUri));
+
+        for (const record of records) {
+            const scmPersist = record.value;
+            const scmProto = supportedSCMs.find(scm => scm.label===scmPersist.label);
+            if (scmProto===undefined) { continue; }
+            if (scmProto===LocalReplicaSCMProvider && !activeLocalReplicaUris.has(record.baseUri)) {
+                log('SCMCollection: skipped inactive local replica', {
+                    projectId: this.vfs.projectId,
+                    activeWorkspace: activeWorkspaceUri,
+                    baseUri: record.baseUri,
+                });
+                continue;
+            }
+            await this.createSCM(scmProto, vscode.Uri.parse(record.baseUri), false, scmPersist.enabled ?? true);
+        }
+
+        if (selected.inactive.length!==0) {
+            const inactivePaths = selected.inactive.map(record => vscode.Uri.parse(record.baseUri).fsPath);
+            log('SCMCollection: other local replicas remain inactive', {
+                projectId: this.vfs.projectId,
+                inactivePaths,
+            });
+            const choice = await vscode.window.showWarningMessage(
+                `This Overleaf project is linked to ${selected.inactive.length} other local folder(s). Only the current workspace will sync. Manage unwanted replicas from Open Project Locally.`,
+                'Open LeafRelay',
+            );
+            if (choice==='Open LeafRelay') {
+                await vscode.commands.executeCommand('workbench.view.extension.overleaf-workshop');
+            }
+        }
     }
 
     private async createSCM(scmProto: SupportedSCM, baseUri: vscode.Uri, newSCM=false, enabled=true) {
