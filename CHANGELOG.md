@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3](https://github.com/yunhaoli24/leafrelay/compare/v0.1.2...v0.1.3) (2026-08-17)
+
+
+### Bug Fixes
+
+* restore extension activation under esm ([2d50866](https://github.com/yunhaoli24/leafrelay/commit/2d50866aa3960257d0013e61636f9fe165a15d93))
+* restore LeafRelay activation and command registration ([5297fa5](https://github.com/yunhaoli24/leafrelay/commit/5297fa52e15f4ee80e7f0ffcaddfb6b95b57b99e))
+
 ## [0.1.2] - 2026-08-17
 ### Added
 - Add Vitest unit tests and PR verification for compile, lint, tests, and VSIX packaging.
