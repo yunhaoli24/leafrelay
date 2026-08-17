@@ -1,6 +1,8 @@
 <script setup lang="ts">
-    import * as ui from "@vscode/webview-ui-toolkit";
-    ui.provideVSCodeDesignSystem().register(ui.allComponents);
+    import '@vscode-elements/elements/dist/vscode-badge/index.js';
+    import '@vscode-elements/elements/dist/vscode-button/index.js';
+    import '@vscode-elements/elements/dist/vscode-divider/index.js';
+    import '@vscode-elements/elements/dist/vscode-textarea/index.js';
 
     import { ref, onMounted, provide, watchEffect } from "vue";
     import { getMessages, MessageTree, type Message } from "./utils";

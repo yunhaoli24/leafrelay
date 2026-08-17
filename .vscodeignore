@@ -11,7 +11,13 @@ CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 commitlint.config.js
 package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+eslint.config.mjs
+vitest.config.mjs
+test/**
 .yarnrc
+node_modules/**
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map

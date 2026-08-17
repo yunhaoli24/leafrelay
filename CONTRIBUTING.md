@@ -42,8 +42,8 @@ For normal changes, increment only the patch component, for example `0.1.0` to `
 ## Development Guidance
 
 ### Prerequisites
-- [Node.js LTS](https://nodejs.org/en/) (>= 20.10.0)
-- Visual Studio Code (>= 1.80.0)
+- [Node.js LTS](https://nodejs.org/en/) (>= 24)
+- Visual Studio Code (>= 1.125.0)
   > Recommended extensions: [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint), [JavaScript and TypeScript Nightly](https://marketplace.visualstudio.com/items?itemName=ms-vscode.vscode-typescript-next), [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar), [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
 - Operating System with common Unix commands.
   > If you are using Windows, please refer to [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10), [Cygwin](https://www.cygwin.com/) or [Git Bash](https://gitforwindows.org/).
@@ -56,18 +56,17 @@ For normal changes, increment only the patch component, for example `0.1.0` to `
 git clone https://github.com/yunhaoli24/leafrelay.git
 cd leafrelay
 
-# Install the official VS Code extension manager
-npm install -g @vscode/vsce
+# Enable the pnpm version declared by the repository
+corepack enable
 
-# Install dependencies
-npm install
-cd views/chat-view && npm install && cd ../..
+# Install the extension and chat-view workspace dependencies
+pnpm install --frozen-lockfile
 
 # Build the Extension
-npm run compile
+pnpm run compile
 
 # [Optional] Package the Extension
-vsce package
+pnpm exec vsce package --no-dependencies
 ```
 
 ### Testing

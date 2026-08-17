@@ -9,7 +9,7 @@
 </script>
 
 <template>
-    <vscode-button :callback="callback" @click="callback(unreadRecord[0])" appearance="secondary" v-show="unreadRecord.length>0">
+    <vscode-button @click="callback(unreadRecord[0])" secondary v-show="unreadRecord.length>0">
         <inline>New Messages</inline>
         &nbsp;
         <vscode-badge>{{unreadRecord.length}}</vscode-badge>

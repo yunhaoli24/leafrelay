@@ -21,30 +21,32 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.17.0
+          run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
-          cache: npm
+          node-version: "24"
+          cache: pnpm
 
       - name: Install dependencies
-        run: |
-          npm ci
-          npm --prefix views/chat-view ci
+        run: pnpm install --frozen-lockfile
 
       - name: Verify extension
-        run: |
-          npm run compile
-          npm run lint
+        run: pnpm test
 
       - name: Package extension
         id: package
         run: |
           VERSION=$(node -p "require('./package.json').version")
           VSIX="leafrelay-${VERSION}.vsix"
-          npx @vscode/vsce package --out "$VSIX"
+          pnpm exec vsce package --no-dependencies --out "$VSIX"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
@@ -60,7 +62,7 @@ jobs:
           fi
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: leafrelay-${{ github.ref_name }}
           path: ${{ steps.package.outputs.vsix }}
@@ -85,4 +87,4 @@ jobs:
             echo "::warning::VSCE_PAT is not configured; the VSIX is available from the GitHub Release and can be published later."
             exit 0
           fi
-          npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix }}" --pat "$VSCE_PAT"
+          pnpm exec vsce publish --packagePath "${{ steps.package.outputs.vsix }}" --pat "$VSCE_PAT"

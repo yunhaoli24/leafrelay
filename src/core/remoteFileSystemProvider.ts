@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import * as vscode from 'vscode';
-import * as DiffMatchPatch from 'diff-match-patch';
+import DiffMatchPatch = require('diff-match-patch');
 import { BaseAPI, MemberEntity, ProjectFileTreeDiffResponseSchema, ProjectSettingsSchema, ProjectUpdateResponseSchema } from '../api/base';
 import { SocketIOAPI, UpdateSchema } from '../api/socketio';
 import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
@@ -447,7 +447,7 @@ export class VirtualFileSystem extends vscode.Disposable {
         parentFolder: FolderEntity, fileEntity: FileEntity, fileType:FileType, path:string
     } | undefined {
         if (!this.root) {
-            throw vscode.FileSystemError.FileNotFound();
+            return undefined;
         }
         root = root || this.root.rootFolder[0];
         path = path || '/';

@@ -534,7 +534,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
     }
 
     removeProjectFromTag(project: ProjectItem) {
-        vscode.window.showWarningMessage(vscode.l10n.t('Remove project "{label}" from tag "{name}" ?', {label:project.label,name:project.tag?.name}), "Yes", "No")
+        vscode.window.showWarningMessage(vscode.l10n.t('Remove project "{label}" from tag "{name}" ?', {label:project.label,name:project.tag?.name ?? ''}), "Yes", "No")
         .then((answer) => {
             if (answer === "Yes") {
                 GlobalStateManager.authenticate(this.context, project.parent.name)

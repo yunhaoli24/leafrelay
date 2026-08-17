@@ -123,7 +123,7 @@ export class ClientManager {
                 Object.keys(this.onlineUsers).map(clientId => {
                     const user = this.onlineUsers[clientId];
                     const docPath = user.doc_id ? this.vfs._resolveById(user.doc_id)?.path.slice(1) : undefined;
-                    const cursorInfo = user.row ? vscode.l10n.t('At {docPath}, Line {row}', {docPath, row:user.row+1}) : undefined;
+                    const cursorInfo = user.row && docPath ? vscode.l10n.t('At {docPath}, Line {row}', {docPath, row:user.row+1}) : undefined;
 
                     return {
                         label: user.name,

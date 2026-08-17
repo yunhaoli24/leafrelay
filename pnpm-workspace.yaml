@@ -1,0 +1,5 @@
+packages:
+  - views/chat-view
+
+overrides:
+  default-browser: 5.5.0
