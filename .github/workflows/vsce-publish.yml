@@ -11,6 +11,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Existing release tag to publish or retry
+        required: true
+        type: string
   workflow_call:
     inputs:
       ref:
