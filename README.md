@@ -85,6 +85,12 @@ The following Overleaf (ShareLatex) Community Edition docker images provided on 
 
 Please refer to the development guidance in [CONTRIBUTING.md](./CONTRIBUTING.md)
 
+### Release Policy
+
+Changes are merged through pull requests. Merging into `main` packages the version declared in `package.json`, creates the matching GitHub release with the VSIX attached, and publishes it to the VS Code Marketplace when the publisher credentials are configured. Marketplace publishing can be retried manually without rebuilding locally.
+
+Normal pull requests increment only the patch version, such as `0.1.0` to `0.1.1`. Minor or major version changes are reserved for explicitly planned releases.
+
 ### References
 
 - [Overleaf Workshop upstream project](https://github.com/overleaf-workshop/Overleaf-Workshop)

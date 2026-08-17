@@ -1,12 +1,12 @@
-name: Build or Publish Extension
+name: Publish Extension
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       publish_marketplace:
@@ -45,7 +45,19 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           VSIX="leafrelay-${VERSION}.vsix"
           npx @vscode/vsce package --out "$VSIX"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version is not already released
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.package.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.package.outputs.tag }} already exists; bump package.json before merging." >&2
+            exit 1
+          fi
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
@@ -53,8 +65,24 @@ jobs:
           name: leafrelay-${{ github.ref_name }}
           path: ${{ steps.package.outputs.vsix }}
 
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.package.outputs.tag }}" \
+            "${{ steps.package.outputs.vsix }}" \
+            --target "$GITHUB_SHA" \
+            --title "LeafRelay ${{ steps.package.outputs.tag }}" \
+            --generate-notes
+
       - name: Publish to VS Code Marketplace
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_marketplace
+        if: github.event_name == 'push' || inputs.publish_marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix }}" --pat "$VSCE_PAT"
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::warning::VSCE_PAT is not configured; the VSIX is available from the GitHub Release and can be published later."
+            exit 0
+          fi
+          npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix }}" --pat "$VSCE_PAT"
