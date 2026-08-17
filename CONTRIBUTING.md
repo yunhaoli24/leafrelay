@@ -34,9 +34,9 @@ To make a contribution to this project, please follow the steps below:
 
 ## Release Versions
 
-Every merge into `main` packages and creates a GitHub release for the version declared in `package.json`, then attempts to publish it to the VS Code Marketplace. A pull request must therefore use a version that has not already been released. If Marketplace publishing is temporarily unavailable, the same version can be published later through a manual workflow run.
+Merging an ordinary pull request into `main` does not publish a release. Release Please collects releasable Conventional Commits in a generated release pull request and maintains the version and `CHANGELOG.md`; ordinary pull requests must not edit the release version manually.
 
-For normal changes, increment only the patch component, for example `0.1.0` to `0.1.1`. Do not increment the minor or major component unless that release level has been explicitly planned.
+Merge the generated release pull request only when a release is intended. Release Please then creates the matching tag and GitHub release, and the automated publishing pipeline tests and packages that exact tag, attaches the VSIX and checksum, and attempts Marketplace publishing. Before version `1.0.0`, `fix:` and `feat:` changes both increment the patch component; an explicit breaking change such as `feat!:` increments the minor component. Re-run the same release workflow after correcting a transient release or Marketplace problem.
 
 
 ## Development Guidance
