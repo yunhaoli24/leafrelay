@@ -1,10 +1,12 @@
 name: Package Extension
+
 permissions:
   contents: read
-  packages: write
+
 on:
   pull_request:
-    branches: [master]
+    branches:
+      - main
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -12,36 +14,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
 
-    - name: Install dependencies
-      run: | 
-          npm install
-          cd views/chat-view
-          npm install
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix views/chat-view ci
 
-    - name: Install vsce
-      run: npm install -g vsce
+      - name: Verify extension
+        run: |
+          npm run compile
+          npm run lint
 
-    - name: Bump version and package
-      id: bump
-      run: |
-        npm version patch -no-git-tag-version
-        COMMIT_SHA=$(git rev-parse --short HEAD)
-        NEW_VERSION=$(jq -r '.version' package.json)
-        NEW_VERSION_WITH_SHA="${NEW_VERSION}-${COMMIT_SHA}"
-        jq --arg version "$NEW_VERSION_WITH_SHA" '.version = $version' package.json > temp.json && mv temp.json package.json
-        echo "NEW_VERSION=$NEW_VERSION_WITH_SHA" >> $GITHUB_ENV
-        vsce package
+      - name: Package extension
+        run: npx @vscode/vsce package --out leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: overleaf-workshop-${{ env.NEW_VERSION }}.vsix
-        path: ./*.vsix
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: leafrelay-pr-${{ github.event.number }}
+          path: leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix

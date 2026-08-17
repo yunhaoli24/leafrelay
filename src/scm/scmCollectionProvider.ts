@@ -219,7 +219,7 @@ export class SCMCollectionProvider extends vscode.Disposable {
             }
         })
         .catch(error => {
-            notifyError(`Could not create ${scmProto.label}. See the Overleaf Workshop output for details.`, error, 'scm-create-failed');
+            notifyError(`Could not create ${scmProto.label}. See the LeafRelay output for details.`, error, 'scm-create-failed');
         });
     }
 

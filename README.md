@@ -5,11 +5,13 @@
 
 LeafRelay provides reliable bidirectional synchronization between local LaTeX projects and Overleaf, with VS Code integration and full collaboration support.
 
+VS Code extension ID: `yunhaoli24.leafrelay`
+
 ### From Overleaf Workshop
 
 LeafRelay began as a fork of [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop) 0.15.10 and is now developed as an independent project focused on reliable synchronization, background operation, and a clean client architecture.
 
-The project remains under the [GNU Affero General Public License v3.0](./LICENSE). The current VS Code integration keeps its legacy identifiers while the synchronization engine and daemon interfaces are introduced incrementally.
+The project remains under the [GNU Affero General Public License v3.0](./LICENSE). Existing `overleaf-workshop.*` settings, commands, and project URIs are retained as compatibility interfaces while the synchronization engine and daemon interfaces are introduced incrementally.
 
 ### User Guide
 

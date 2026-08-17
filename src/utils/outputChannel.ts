@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { ELEGANT_NAME } from '../consts';
 
 let outputChannel: vscode.LogOutputChannel | undefined;
 const notificationTimes = new Map<string, number>();
@@ -32,7 +33,7 @@ function formatArgument(argument: unknown): string {
 
 export function initOutputChannel(context: vscode.ExtensionContext): vscode.LogOutputChannel {
     if (outputChannel===undefined) {
-        outputChannel = vscode.window.createOutputChannel('Overleaf Workshop', {log:true});
+        outputChannel = vscode.window.createOutputChannel(ELEGANT_NAME, {log:true});
         context.subscriptions.push(outputChannel);
     }
     return outputChannel;

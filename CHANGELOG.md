@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0] - 2026-08-17
+### Added
+- First LeafRelay release, based on Overleaf Workshop 0.15.10.
+- External-editor synchronization through VS Code file-system events.
+- Process-wide request scheduling with shared HTTP 429 cooldown handling.
+- Incremental local-replica startup and reconnect reconciliation.
+
+### Changed
+- Publish under the independent VS Code extension ID `yunhaoli24.leafrelay`.
+- Preserve both local and remote content when the same path changed on both sides.
+- Restore local replicas after reauthentication without repeating project setup.
+- Ignore dot-prefixed paths and symbolic links during local synchronization.
+
 ## [0.15.10] - 2026-07-11
 ### Changed
 - fix: enhance connection resilience and fix TCP RST causing spurious connection lost (fixes #309)

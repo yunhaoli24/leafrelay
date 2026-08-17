@@ -1,22 +1,20 @@
-# Contributing to Overleaf Workshop
-The Overleaf Workshop extension is an open source project and we welcome contributions of all kinds from the community.
+# Contributing to LeafRelay
+LeafRelay is an open source project and we welcome contributions of all kinds from the community.
 There are many ways to contribute, from improving the documentation, submitting bug reports and feature requests or writing code which can be incorporated into the extension itself.
 
 In this document, we will mainly elaborate on how to make code contributions to the project.
 
 ## Contribution Guidance
 
-> [!WARNING]
-> We will not accept any pull request that is not associated with an issue.
-> If you have any question about the project, please create an issue or discuss it in the [Discussions](https://github.com/overleaf-workshop/Overleaf-Workshop/discussions) section.
+For substantial changes, open an issue in the [LeafRelay repository](https://github.com/yunhaoli24/leafrelay/issues) before implementation so the behavior and compatibility impact can be discussed.
 
 To make a contribution to this project, please follow the steps below:
 
-1. Create or find an `Bug Report` or `Feature Request` issue on [GitHub](https://github.com/overleaf-workshop/Overleaf-Workshop/issues).
+1. Create or find a `Bug Report` or `Feature Request` issue on [GitHub](https://github.com/yunhaoli24/leafrelay/issues).
    
    If you are creating a new issue, please make sure that it is not a duplicate of an existing issue.
 
-2. Fork this repository and create a new branch from `master` branch.
+2. Fork this repository and create a new branch from the `main` branch.
 
    It is recommended to name the branch with the issue number, e.g., `issue-123`, or related keywords, e.g., `fix-xxx`, `feat-xxx`.
 
@@ -24,7 +22,7 @@ To make a contribution to this project, please follow the steps below:
 
    Please make sure that your commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
 
-4. Create a pull request to the `master` branch of this repository.
+4. Create a pull request to the `main` branch of this repository.
    
    Please make sure that the pull request is associated with the issue you are working on. If you do not know how to do this, please refer to [Linking a pull request to an issue](https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue).
 
@@ -49,11 +47,11 @@ To make a contribution to this project, please follow the steps below:
 
 ```bash
 # Clone the Repository and Change Directory
-git clone https://github.com/overleaf-workshop/Overleaf-Workshop.git
-cd Overleaf-Workshop
+git clone https://github.com/yunhaoli24/leafrelay.git
+cd leafrelay
 
-# Install `vsce` globally
-npm install -g vsce # may require `sudo` on Linux
+# Install the official VS Code extension manager
+npm install -g @vscode/vsce
 
 # Install dependencies
 npm install
@@ -71,4 +69,4 @@ In VSCode, press <kbd>F5</kbd> to start debugging. A new VSCode window will be o
 
 ### Documentation
 - [VSCode Extension API](https://code.visualstudio.com/api/references/vscode-api)
-- [Overleaf Workshop Extension Documentation](https://github.com/overleaf-workshop/Overleaf-Workshop/tree/master/docs/README.md)
+- [LeafRelay Extension Documentation](./docs/README.md)

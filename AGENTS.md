@@ -22,4 +22,4 @@
 ## Verification
 
 - Run `npm run compile`, `npm run lint`, and `git diff --check` after synchronization changes.
-- Package local builds with `npx @vscode/vsce package --out overleaf-workshop-local-0.15.10.vsix` and install with `code --install-extension <vsix> --force`.
+- Package local builds with `npx @vscode/vsce package --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.

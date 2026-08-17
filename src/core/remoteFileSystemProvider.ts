@@ -1332,7 +1332,7 @@ export class VirtualFileSystem extends vscode.Disposable {
             return undefined;
         } else {
             const message = `Failed to fetch file history: ${res.message || 'unknown error'}`;
-            notifyError('Overleaf history request failed. See the Overleaf Workshop output log.', message, `file-history:${res.statusCode || 'unknown'}`);
+            notifyError('Overleaf history request failed. See the LeafRelay output log.', message, `file-history:${res.statusCode || 'unknown'}`);
             throw new Error(message);
         }
     }
@@ -1349,7 +1349,7 @@ export class VirtualFileSystem extends vscode.Disposable {
             return undefined;
         } else {
             const message = `Failed to fetch file tree history: ${res.message || 'unknown error'}`;
-            notifyError('Overleaf history request failed. See the Overleaf Workshop output log.', message, `file-tree-history:${res.statusCode || 'unknown'}`);
+            notifyError('Overleaf history request failed. See the LeafRelay output log.', message, `file-tree-history:${res.statusCode || 'unknown'}`);
             throw new Error(message);
         }
     }

@@ -1,6 +1,6 @@
 {
-    "extension.displayName": "Overleaf Workshop",
-    "extension.description": "Open Overleaf/ShareLaTex projects in VSCode, with full collaboration support.",
+    "extension.displayName": "LeafRelay",
+    "extension.description": "Reliably synchronize local LaTeX projects with Overleaf, with VS Code collaboration and preview support.",
 
     "commands.remoteFileSystem.refreshLinkedFile.title": "Overleaf: Refresh File",
     "commands.remoteFileSystem.createLinkedFile.title": "Overleaf: Import File ...",
@@ -68,5 +68,5 @@
     "views.explorer.overleaf-workshop.chatWebview.name": "Chat",
     "views.explorer.overleaf-workshop.chatWebview.contextualTitle": "Overleaf Chat",
 
-    "customEditors.overleaf-workshop.pdfViewer.displayName": "Overleaf Workshop PDF Viewer"
+    "customEditors.overleaf-workshop.pdfViewer.displayName": "LeafRelay PDF Viewer"
 }

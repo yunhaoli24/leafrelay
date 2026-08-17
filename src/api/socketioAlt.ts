@@ -65,7 +65,7 @@ class SyncTimer {
         try {
             await this._callback();
         } catch (error) {
-            notifyError('Overleaf background refresh failed. See the Overleaf Workshop output log.', error, 'alternative-refresh-failed');
+            notifyError('Overleaf background refresh failed. See the LeafRelay output log.', error, 'alternative-refresh-failed');
         } finally {
             this.trigger();
         }

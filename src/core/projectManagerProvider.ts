@@ -237,7 +237,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
             'Login with Cookies': () => {
                 vscode.window.showInputBox({
                     'placeHolder': vscode.l10n.t('Cookies, e.g., "sharelatex.sid=..." or "overleaf_session2=..."'),
-                    'prompt': vscode.l10n.t('README: [How to Login with Cookies](https://github.com/overleaf-workshop/overleaf-workshop#how-to-login-with-cookies)'),
+                    'prompt': vscode.l10n.t('README: [How to Login with Cookies](https://github.com/yunhaoli24/leafrelay#how-to-login-with-cookies)'),
                 })
                 .then(cookies => cookies ? Promise.resolve(cookies) : Promise.reject())
                 .then(cookies =>
@@ -688,7 +688,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
                     replicas = Object.values(scmPersists).filter(scmPersist => scmPersist.label===LocalReplicaSCMProvider.label);
                     replicas = await usableReplicaRecords(replicas);
                     if (replicas.length===0) {
-                        notifyError('Local replica creation did not produce a usable SCM record. See the Overleaf Workshop output for details.', undefined, 'local-replica-create-empty');
+                        notifyError('Local replica creation did not produce a usable SCM record. See the LeafRelay output for details.', undefined, 'local-replica-create-empty');
                         return;
                     }
                 } else {
@@ -818,7 +818,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
             }),
             vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.openProjectLocalReplica`, (item) => {
                 return this.openProjectLocalReplica(item).catch(error => {
-                    notifyError('Open Project Locally failed. See the Overleaf Workshop output for details.', error, 'open-project-locally-failed');
+                    notifyError('Open Project Locally failed. See the LeafRelay output for details.', error, 'open-project-locally-failed');
                 });
             }),
         ];

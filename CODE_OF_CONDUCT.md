@@ -77,7 +77,7 @@ This code of conduct and its related procedures also applies to unacceptable beh
 
 ## 10. Contact info
 
-[iamhyc](mailto:ychong__at__petalmail_com)
+[@yunhaoli24](https://github.com/yunhaoli24)
 
 ## 11. License and attribution
 

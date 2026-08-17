@@ -1,14 +1,15 @@
 {
-  "name": "overleaf-workshop",
+  "name": "leafrelay",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.15.10",
+  "version": "0.1.0",
   "icon": "resources/icons/app_icon.png",
   "author": {
-    "name": "iamhyc",
-    "email": "ychong@petalmail.com"
+    "name": "yunhaoli24",
+    "url": "https://github.com/yunhaoli24"
   },
-  "publisher": "iamhyc",
+  "publisher": "yunhaoli24",
+  "license": "AGPL-3.0-only",
   "contributors": [
     {
       "name": "iamhyc",
@@ -47,11 +48,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/overleaf-workshop/overleaf-workshop"
+    "url": "https://github.com/yunhaoli24/leafrelay"
   },
   "bugs": {
-    "url": "https://github.com/overleaf-workshop/overleaf-workshop/issues"
+    "url": "https://github.com/yunhaoli24/leafrelay/issues"
   },
+  "homepage": "https://github.com/yunhaoli24/leafrelay#readme",
   "engines": {
     "vscode": "^1.80.0"
   },
