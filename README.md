@@ -1,15 +1,26 @@
-# Overleaf Workshop
+# LeafRelay
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/overleaf-workshop/Overleaf-Workshop)](https://github.com/overleaf-workshop/Overleaf-Workshop)
-[![version](https://vsmarketplacebadges.dev/version-short/iamhyc.overleaf-workshop.jpg)](https://marketplace.visualstudio.com/items?itemName=iamhyc.overleaf-workshop)
-[![installs](https://vsmarketplacebadges.dev/installs-short/iamhyc.overleaf-workshop.jpg)](https://marketplace.visualstudio.com/items?itemName=iamhyc.overleaf-workshop)
-[![rating](https://vsmarketplacebadges.dev/rating-short/iamhyc.overleaf-workshop.jpg)](https://marketplace.visualstudio.com/items?itemName=iamhyc.overleaf-workshop&ssr=false#review-details)
+[![GitHub Repo stars](https://img.shields.io/github/stars/yunhaoli24/leafrelay)](https://github.com/yunhaoli24/leafrelay)
+[![GitHub License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
 
-Open Overleaf (ShareLatex) projects in VSCode, with full collaboration support.
+LeafRelay provides reliable bidirectional synchronization between local LaTeX projects and Overleaf, with VS Code integration and full collaboration support.
+
+> [!IMPORTANT]
+> LeafRelay is an independently maintained fork of [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop). It is not affiliated with or endorsed by Overleaf or the upstream maintainers.
+
+### Project Lineage
+
+LeafRelay currently builds on Overleaf Workshop 0.15.10 and preserves its complete Git history, original authorship, and copyright notices. The project remains licensed under the [GNU Affero General Public License v3.0](./LICENSE).
+
+- **Independent project:** [yunhaoli24/leafrelay](https://github.com/yunhaoli24/leafrelay)
+- **Upstream project:** [overleaf-workshop/Overleaf-Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop)
+- **Upstream contribution fork:** [yunhaoli24/Overleaf-Workshop](https://github.com/yunhaoli24/Overleaf-Workshop)
+
+The current transition keeps the legacy VS Code extension identifiers for compatibility. Future releases will separate the synchronization engine from the VS Code presentation layer and introduce LeafRelay-specific package and extension identifiers.
 
 ### User Guide
 
-The full user guide is available at [GitHub Wiki](https://github.com/overleaf-workshop/Overleaf-Workshop/wiki).
+Until LeafRelay-specific documentation is complete, refer to the [upstream GitHub Wiki](https://github.com/overleaf-workshop/Overleaf-Workshop/wiki) for the original extension workflow. LeafRelay-specific synchronization behavior and release notes are documented in this repository.
 
 ### Features
 
@@ -81,6 +92,7 @@ Please refer to the development guidance in [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ### References
 
+- [Overleaf Workshop upstream project](https://github.com/overleaf-workshop/Overleaf-Workshop)
 - [Overleaf Official Logos](https://www.overleaf.com/for/partners/logos)
 - [Overleaf Web Route List](./docs/webapi.md)
 - [James-Yu/LaTeX-Workshop](https://github.com/James-Yu/LaTeX-Workshop)
