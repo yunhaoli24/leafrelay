@@ -1,100 +1,63 @@
 # LeafRelay
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/yunhaoli24/leafrelay)](https://github.com/yunhaoli24/leafrelay)
-[![GitHub License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/yunhaoli24.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+[![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
+[![License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
 
-LeafRelay provides reliable bidirectional synchronization between local LaTeX projects and Overleaf, with VS Code integration and full collaboration support.
+**Reliable two-way sync between Overleaf and a local project in Visual Studio Code.**
 
-VS Code extension ID: `yunhaoli24.leafrelay`
+LeafRelay is a VS Code extension for Overleaf and LaTeX users who edit the same project with a local IDE, terminal, scripts, or AI coding tools. It keeps the local folder and Overleaf synchronized while making conflicts visible instead of silently choosing a winner.
 
-### From Overleaf Workshop
+> Already using Overleaf Workshop? LeafRelay is an independent extension with a new Marketplace ID: `yunhaoli24.leafrelay`. Existing `.overleaf/settings.json` project associations remain reusable.
 
-LeafRelay began as a fork of [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop) 0.15.10 and is now developed as an independent project focused on reliable synchronization, background operation, and a clean client architecture.
+[中文说明](./README.zh-CN.md)
 
-The project remains under the [GNU Affero General Public License v3.0](./LICENSE). Existing `overleaf-workshop.*` settings, commands, and project URIs are retained as compatibility interfaces while the synchronization engine and daemon interfaces are introduced incrementally.
+## Why LeafRelay?
 
-### User Guide
+Overleaf Workshop pioneered the VS Code workflow, but older local-replica behavior was centered on editor-driven changes. That becomes fragile when the local folder is changed by another editor, a terminal, a script, or an AI tool: updates may wait for an editor save, reconnects may download far more than necessary, duplicate local replicas may compete, and simultaneous edits can overwrite one side without a clear decision.
 
-Until LeafRelay-specific documentation is complete, refer to the [upstream GitHub Wiki](https://github.com/overleaf-workshop/Overleaf-Workshop/wiki) for the original extension workflow. LeafRelay-specific synchronization behavior and release notes are documented in this repository.
+LeafRelay is built around those failure modes:
 
-### Features
+- **External edits sync automatically** through file-system events, including edits made by another editor, a terminal, a script, or an AI tool.
+- **Incremental startup and reconnects** transfer only changed files whenever the local checkpoint is usable.
+- **Conflicts stop safely** when both local and Overleaf changed the same path; neither copy is silently overwritten.
+- **One active local replica per workspace** prevents old folders from racing the project and pushing stale content.
+- **Rate-limit aware requests** serialize project traffic and respect Overleaf `429` cooldowns instead of creating request bursts.
+- **Dot directories and symbolic links stay out of sync**, including generated build folders such as `.output`.
 
-> [!NOTE]
-> For SSO login or captcha enabled servers like `https://www.overleaf.com`, please use "**Login with Cookies**" method.
-> For more details, please refer to [How to Login with Cookies](#how-to-login-with-cookies).
+LeafRelay keeps the original Overleaf Workshop virtual-project and collaboration features while prioritizing dependable local-folder synchronization for daily work.
 
-- Login Server, Open Projects and Edit Files
+## Install
 
-    <img src="https://raw.githubusercontent.com/overleaf-workshop/Overleaf-Workshop/master/docs/assets/demo01-login.gif" height=400px/>
+Install **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)** from the VS Code Marketplace. VS Code will receive future releases through its normal extension update mechanism.
 
-- On-the-fly Compiling and Previewing
-  > <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd> to compile, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> preview.
+## Start syncing
 
-    <img src="https://raw.githubusercontent.com/overleaf-workshop/Overleaf-Workshop/master/docs/assets/demo03-synctex.gif" height=400px/>
+1. Open the **LeafRelay** view in VS Code and add your Overleaf server.
+2. Sign in, choose a project, and select **Open Project Locally**.
+3. Open the selected folder in VS Code. Changes made locally or on Overleaf will then flow in both directions.
 
-- SyncTeX and Reverse SyncTeX
-  > <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> to jump to PDF.
-  > Double click on PDF to jump to source code
+For project details, login options, self-hosted Overleaf, and troubleshooting, see the [user documentation](./docs/README.md).
 
-- Chat with Collaborators
+## Development
 
-    <img src="https://raw.githubusercontent.com/overleaf-workshop/Overleaf-Workshop/master/docs/assets/demo06-chat.gif" height=400px/>
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run compile
+```
 
-- Open Project Locally, Compile/Preview with [LaTeX-Workshop](https://github.com/James-Yu/LaTeX-Workshop)
+Pull requests run the VS Code activation check and a ShareLaTeX container integration test before packaging. Releases are prepared by Release Please and published automatically from the generated release pull request.
 
-    <img src="https://raw.githubusercontent.com/overleaf-workshop/Overleaf-Workshop/master/docs/assets/demo07-local.gif" height=400px/>
+## Project background
 
-### How to Login with Cookies
+LeafRelay started from [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop) and is now maintained as an independent project under the [AGPL-3.0-only](./LICENSE). The focus is reliable Overleaf-to-local synchronization, while the project continues to evolve toward reusable sync components beyond VS Code.
 
-<img src="https://raw.githubusercontent.com/overleaf-workshop/Overleaf-Workshop/master/docs/assets/login_with_cookie.png" height=400px/>
+## Links
 
-In an already logged-in browser (Firefox for example):
-
-1. Open "Developer Tools" (usually by pressing <kbd>F12</kbd>) and switch to the "Network" tab;
-
-   Then, navigate to the Overleaf main page (e.g., `https://www.overleaf.com`) in the address bar.
-
-2. Filter the listed items with `/project` and select the exact match.
-
-3. Check the "Cookie" under "Request Headers" of the selected item and copy its value to login.
-    > The format of the Cookie value would be like: `overleaf_session2=...` or `sharelatex.sid=...`
-
-### Compatibility
-
-The following Overleaf (ShareLatex) Community Edition docker images provided on [Docker Hub](https://hub.docker.com/r/sharelatex/sharelatex) have been tested and verified to be compatible with this extension.
-
-- [x] [sharelatex/sharelatex:5.0.4](https://hub.docker.com/layers/sharelatex/sharelatex/5.0.4/images/sha256-429f6c4c02d5028172499aea347269220fb3505cbba2680f5c981057ffa59316?context=explore) (verified by [@Mingbo-Lee](https://github.com/Mingbo-Lee))
-
-- [x] [sharelatex/sharelatex:4.2.4](https://hub.docker.com/layers/sharelatex/sharelatex/4.2.4/images/sha256-ac0fc6dbda5e82b9c979721773aa120ad3c4a63469b791b16c3711e0b937528c?context=explore)
-
-- [x] [sharelatex/sharelatex:4.1](https://hub.docker.com/layers/sharelatex/sharelatex/4.1/images/sha256-3798913f1ada2da8b897f6b021972db7874982b23bef162019a9ac57471bcee8?context=explore) (verified by [@iamhyc](https://github.com/iamhyc))
-
-- [x] [sharelatex/sharelatex:3.5](https://hub.docker.com/layers/sharelatex/sharelatex/3.5/images/sha256-f97fa20e45cdbc688dc051cc4b0e0f4f91ae49fd12bded047d236ca389ad80ac?context=explore) (verified by [@iamhyc](https://github.com/iamhyc))
-
-- [ ] [sharelatex/sharelatex:3.4](https://hub.docker.com/layers/sharelatex/sharelatex/3.4/images/sha256-2a72e9b6343ed66f37ded4e6da8df81ed66e8af77e553b91bd19307f98badc7a?context=explore)
-
-- [ ] [sharelatex/sharelatex:3.3](https://hub.docker.com/layers/sharelatex/sharelatex/3.3/images/sha256-e1ec01563d259bbf290de4eb90dce201147c0aae5a07738c8c2e538f6d39d3a8?context=explore)
-
-- [ ] [sharelatex/sharelatex:3.2](https://hub.docker.com/layers/sharelatex/sharelatex/3.2/images/sha256-5db71af296f7c16910f8e8939e3841dad8c9ac48ea0a807ad47ca690087f44bf?context=explore)
-
-- [ ] [sharelatex/sharelatex:3.1](https://hub.docker.com/layers/sharelatex/sharelatex/3.1/images/sha256-5b9de1e65257cea4682c1654af06408af7f9c0e2122952d6791cdda45705e84e?context=explore)
-
-- [ ] [sharelatex/sharelatex:3.0](https://hub.docker.com/layers/sharelatex/sharelatex/3.0/images/sha256-a36e54c66ef62fdee736ce2229289aa261b44f083a9fd553cf8264500612db27?context=explore)
-
-### Development
-
-Please refer to the development guidance in [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-### Release Policy
-
-Changes are merged through pull requests, but ordinary merges into `main` do not publish a release. Release Please maintains a generated release pull request containing the accumulated version and changelog changes. Merging that release pull request creates the tag and GitHub release, then an automated pipeline tests and packages the exact tag, attaches the VSIX and checksum, and publishes it to the VS Code Marketplace when publisher credentials are configured.
-
-Ordinary pull requests do not edit the version. Before version `1.0.0`, fixes and features produce patch releases, while an explicit breaking change produces a minor release. The generated release pull request is merged only when a release is intentionally approved. Direct matching tags remain supported as a recovery path, and rerunning a release safely replaces its assets without duplicating its Marketplace version.
-
-### References
-
-- [Overleaf Workshop upstream project](https://github.com/overleaf-workshop/Overleaf-Workshop)
-- [Overleaf Official Logos](https://www.overleaf.com/for/partners/logos)
-- [Overleaf Web Route List](./docs/webapi.md)
-- [James-Yu/LaTeX-Workshop](https://github.com/James-Yu/LaTeX-Workshop)
-- [jlelong/vscode-latex-basics](https://github.com/jlelong/vscode-latex-basics/tags)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+- [Issues and feature requests](https://github.com/yunhaoli24/leafrelay/issues)
+- [Contributing](./CONTRIBUTING.md)
+- [Documentation](./docs/README.md)
+- [Original Overleaf Workshop project](https://github.com/overleaf-workshop/Overleaf-Workshop)
