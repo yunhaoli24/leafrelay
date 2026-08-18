@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5](https://github.com/yunhaoli24/leafrelay/compare/v0.1.4...v0.1.5) (2026-08-18)
+
+
+### Bug Fixes
+
+* resolve sync conflicts per path ([#12](https://github.com/yunhaoli24/leafrelay/issues/12)) ([c373026](https://github.com/yunhaoli24/leafrelay/commit/c373026963a56e5d76b4fe520b7d701d292e22b1))
+
 ## [0.1.4](https://github.com/yunhaoli24/leafrelay/compare/v0.1.3...v0.1.4) (2026-08-17)
 
 
