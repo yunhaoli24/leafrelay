@@ -4,7 +4,7 @@
   "type": "module",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "icon": "resources/icons/app_icon.png",
   "author": {
     "name": "yunhaoli24",
