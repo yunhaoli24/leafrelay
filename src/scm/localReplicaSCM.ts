@@ -1,25 +1,26 @@
 import * as vscode from 'vscode';
 import { homedir } from 'node:os';
 import { sep } from 'node:path';
-import { createHash } from 'node:crypto';
 import { minimatch } from 'minimatch';
 import { BaseSCM, CommitItem, SettingItem } from ".";
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
 import { ProjectFileTreeDiffResponseSchema } from '../api/base';
 import { error as logError, log, notifyError, warn } from '../utils/outputChannel';
+import {
+    createSyncState,
+    LocalReplicaSyncState,
+    parseSyncState,
+    readTextBase,
+    removeSyncCheckpoint,
+    sha256,
+    updateSyncCheckpoint,
+} from '../sync/checkpoint';
+import {encodeTextBase, mergeText} from '../sync/threeWayMerge';
 
 const IGNORE_SETTING_KEY = 'ignore-patterns';
-const SYNC_STATE_SCHEMA_VERSION = 1;
 const SYNC_STATE_PATH = '.overleaf/sync-state.json';
 
 type FileCache = {date:number, hash:number};
-
-interface LocalReplicaSyncState {
-    schemaVersion: number,
-    projectUri: string,
-    remoteVersion: number,
-    files: {[path:string]: string},
-}
 
 /**
  * Returns a hash code from a string
@@ -38,10 +39,6 @@ function hashCode(content?: Uint8Array): number {
         hash |= 0; // Convert to 32bit integer
     }
     return hash;
-}
-
-function sha256(content: Uint8Array): string {
-    return createHash('sha256').update(content).digest('hex');
 }
 
 /**
@@ -413,13 +410,8 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         const stateUri = vscode.Uri.joinPath(this.baseUri, SYNC_STATE_PATH);
         try {
             const content = await vscode.workspace.fs.readFile(stateUri);
-            const state = JSON.parse(new TextDecoder().decode(content)) as LocalReplicaSyncState;
-            if (state.schemaVersion!==SYNC_STATE_SCHEMA_VERSION ||
-                state.projectUri!==this.vfs.origin.toString() ||
-                !Number.isInteger(state.remoteVersion) ||
-                typeof state.files!=='object' || state.files===null) {
-                return undefined;
-            }
+            const state = parseSyncState(new TextDecoder().decode(content), this.vfs.origin.toString());
+            if (state===undefined) { return undefined; }
             this.lastPersistedSyncState = JSON.stringify(state, null, 2);
             return state;
         } catch {
@@ -466,15 +458,34 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         if (this.syncState===undefined) { return; }
         const normalizedPath = this.normalizeRelPath(relPath);
         if (content===undefined) {
-            for (const path of Object.keys(this.syncState.files)) {
-                if (path===normalizedPath || path.startsWith(`${normalizedPath}/`)) {
-                    delete this.syncState.files[path];
-                }
-            }
+            removeSyncCheckpoint(this.syncState, normalizedPath);
         } else {
-            this.syncState.files[normalizedPath] = sha256(content);
+            updateSyncCheckpoint(this.syncState, normalizedPath, content);
         }
         this.scheduleSyncStateWrite();
+    }
+
+    private async hydrateTextBases(localHashes: Map<string,string>) {
+        if (this.syncState===undefined) { return; }
+        for (const [relPath, checkpointHash] of Object.entries(this.syncState.files)) {
+            if (this.syncState.textBases[relPath]!==undefined || localHashes.get(relPath)!==checkpointHash) {
+                continue;
+            }
+            const content = await this.readFile(relPath);
+            if (content===undefined) { continue; }
+            const textBase = encodeTextBase(content);
+            if (textBase!==undefined) {
+                this.syncState.textBases[relPath] = textBase;
+                this.baseCache[relPath] = content;
+            }
+        }
+    }
+
+    private getTextBase(relPath: string): Uint8Array | undefined {
+        const normalizedPath = this.normalizeRelPath(relPath);
+        const cached = this.baseCache[normalizedPath];
+        if (cached!==undefined) { return cached; }
+        return readTextBase(this.syncState, normalizedPath);
     }
 
     private async scanLocalFileHashes(): Promise<Map<string,string>> {
@@ -595,7 +606,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                 }
             }
 
-            const stateFiles: {[path:string]: string} = {};
+            const nextState = createSyncState(this.vfs.origin.toString(), remoteVersion);
             const total = files.length;
             for (let i=0; i<total; i++) {
                 const relPath = files[i];
@@ -612,7 +623,8 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                     await this.writeFile(relPath, remoteContent);
                 }
                 this.baseCache[relPath] = remoteContent;
-                stateFiles[relPath] = sha256(remoteContent);
+                updateSyncCheckpoint(nextState, relPath, remoteContent);
+                await this.vfs.acceptDocumentCheckpoint(vfsUri, remoteContent);
             }
 
             // The caller has already proved these files still match the old
@@ -620,7 +632,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             // cannot discard uncheckpointed local work.
             if (root==='/') {
                 for (const relPath of localHashes.keys()) {
-                    if (stateFiles[relPath]!==undefined) { continue; }
+                    if (nextState.files[relPath]!==undefined) { continue; }
                     const localUri = vscode.Uri.joinPath(this.baseUri, relPath);
                     if (await this.ignoreLocalSymbolicLink(localUri)) { continue; }
                     this.setBypassCache(relPath, undefined);
@@ -628,12 +640,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                 }
             }
 
-            this.syncState = {
-                schemaVersion: SYNC_STATE_SCHEMA_VERSION,
-                projectUri: this.vfs.origin.toString(),
-                remoteVersion,
-                files: stateFiles,
-            };
+            this.syncState = nextState;
             await this.persistSyncState();
             log(`Local replica full sync completed: ${files.length} remote file(s), version ${remoteVersion}.`);
             return true;
@@ -684,6 +691,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         }
         this.baseCache[normalizedPath] = remoteContent;
         this.updateSyncStateFile(normalizedPath, remoteContent);
+        await this.vfs.acceptDocumentCheckpoint(remoteUri, remoteContent);
         log(`[pull] startup update "${normalizedPath}"`);
     }
 
@@ -727,13 +735,18 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         this.setBypassCache(normalizedPath, localContent);
         await this.ensureParentDirectories(this.vfs.origin, normalizedPath);
         await vscode.workspace.fs.writeFile(remoteUri, localContent);
-        await vscode.workspace.fs.readFile(remoteUri);
-        this.baseCache[normalizedPath] = localContent;
-        this.updateSyncStateFile(normalizedPath, localContent);
+        const synchronizedContent = await vscode.workspace.fs.readFile(remoteUri);
+        if (sha256(localContent)!==sha256(synchronizedContent)) {
+            this.setBypassCache(normalizedPath, synchronizedContent);
+            await vscode.workspace.fs.writeFile(localUri, synchronizedContent);
+        }
+        this.baseCache[normalizedPath] = synchronizedContent;
+        this.updateSyncStateFile(normalizedPath, synchronizedContent);
+        await this.vfs.acceptDocumentCheckpoint(remoteUri, synchronizedContent);
         log(`[push] startup update "${normalizedPath}"`);
     }
 
-    private async syncConcurrentPath(relPath: string) {
+    private async syncConcurrentPath(relPath: string, notify: boolean = false) {
         const normalizedPath = this.normalizeRelPath(relPath);
         const localUri = vscode.Uri.joinPath(this.baseUri, normalizedPath);
         const remoteUri = this.vfs.pathToUri(normalizedPath);
@@ -758,16 +771,43 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             if (sha256(localContent)===sha256(remoteContent)) {
                 this.baseCache[normalizedPath] = localContent;
                 this.updateSyncStateFile(normalizedPath, localContent);
+                await this.vfs.acceptDocumentCheckpoint(remoteUri, localContent);
                 this.conflictPaths.delete(normalizedPath);
                 log(`Resolved startup conflict for "${normalizedPath}": local and Overleaf contents match.`);
                 return;
             }
+            const baseContent = this.getTextBase(normalizedPath);
+            let conflictReason = 'No synchronized text baseline is available for an automatic three-way merge.';
+            if (baseContent!==undefined) {
+                const mergeResult = mergeText(baseContent, localContent, remoteContent);
+                if (mergeResult.status==='merged') {
+                    const mergedContent = mergeResult.content!;
+                    this.setBypassCache(normalizedPath, mergedContent);
+                    await vscode.workspace.fs.writeFile(remoteUri, mergedContent);
+                    const synchronizedContent = await vscode.workspace.fs.readFile(remoteUri);
+                    if (sha256(localContent)!==sha256(synchronizedContent)) {
+                        await vscode.workspace.fs.writeFile(localUri, synchronizedContent);
+                    }
+                    this.setBypassCache(normalizedPath, synchronizedContent);
+                    this.baseCache[normalizedPath] = synchronizedContent;
+                    this.updateSyncStateFile(normalizedPath, synchronizedContent);
+                    await this.vfs.acceptDocumentCheckpoint(remoteUri, synchronizedContent);
+                    this.conflictPaths.delete(normalizedPath);
+                    log(`Automatically merged non-overlapping local and Overleaf changes for "${normalizedPath}".`);
+                    return;
+                }
+                conflictReason = mergeResult.status==='binary'
+                    ? 'Binary content changed on both sides and cannot be merged automatically.'
+                    : 'Local and Overleaf edits overlap in the same text region.';
+            }
+            this.markConflict(normalizedPath, conflictReason, notify);
+            throw new Error(`Sync conflict paused for ${normalizedPath}`);
         }
 
         this.markConflict(
             normalizedPath,
-            'The local checkpoint and the remote history both contain different changes for this path.',
-            false,
+            'The local and Overleaf path types or deletion states changed incompatibly.',
+            notify,
         );
         throw new Error(`Sync conflict paused for ${normalizedPath}`);
     }
@@ -779,6 +819,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         remoteDiff?: ProjectFileTreeDiffResponseSchema,
     ): Promise<boolean> {
         this.syncState = state;
+        await this.hydrateTextBases(localHashes);
         const localChangedPaths = new Set<string>();
         const knownPaths = new Set([...Object.keys(state.files), ...localHashes.keys()]);
         for (const path of knownPaths) {
@@ -1001,9 +1042,18 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                         const newContent = await vscode.workspace.fs.readFile(fromUri);
                         if (this.bypassSync(action, type, relPath, newContent)) { return; }
                         await vscode.workspace.fs.writeFile(toUri, newContent);
-                        this.baseCache[relPath] = newContent;
-                        if (action==='push') { await vscode.workspace.fs.readFile(toUri); } // update remote cache
-                        this.updateSyncStateFile(relPath, newContent);
+                        let synchronizedContent = newContent;
+                        if (action==='push') {
+                            synchronizedContent = await vscode.workspace.fs.readFile(toUri);
+                            if (sha256(synchronizedContent)!==sha256(newContent)) {
+                                this.setBypassCache(relPath, synchronizedContent);
+                                await vscode.workspace.fs.writeFile(fromUri, synchronizedContent);
+                                log(`Applied concurrently merged Overleaf changes to local "${relPath}".`);
+                            }
+                        }
+                        this.baseCache[relPath] = synchronizedContent;
+                        this.updateSyncStateFile(relPath, synchronizedContent);
+                        await this.vfs.acceptDocumentCheckpoint(action==='push' ? toUri : fromUri, synchronizedContent);
                     } catch (error) {
                         const errorMessage = error instanceof Error ? error.message : (error as any)?.message || String(error);
                         if (errorMessage.includes('remote document changed while the local document was being updated')) {
@@ -1037,7 +1087,12 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         if (this.isConflictPath(relPath)) { return; }
         const localUri = vscode.Uri.joinPath(this.baseUri, relPath);
         if (await this.hasUncheckpointedLocalChange(relPath, type)) {
-            this.markConflict(relPath, 'A remote event arrived while the local file differed from the last synchronized checkpoint.');
+            if (type==='update') {
+                await this.syncConcurrentPath(relPath, true);
+                await this.persistSyncStateImmediately();
+                return;
+            }
+            this.markConflict(relPath, 'The Overleaf file was deleted while the local file contained uncheckpointed changes.');
             return;
         }
         await this.applySync('pull', type, relPath, vfsUri, localUri);
