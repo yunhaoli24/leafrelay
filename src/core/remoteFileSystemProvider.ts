@@ -11,6 +11,7 @@ import { EventBus } from '../utils/eventBus';
 import { SCMCollectionProvider } from '../scm/scmCollectionProvider';
 import { ExtendedBaseAPI, ProjectLinkedFileProvider, UrlLinkedFileProvider } from '../api/extendedBase';
 import { error, log, notifyError, warn } from '../utils/outputChannel';
+import {mergeText} from '../sync/threeWayMerge';
 
 const __OUTPUTS_ID = `${ROOT_NAME}-outputs`;
 
@@ -922,6 +923,16 @@ export class VirtualFileSystem extends vscode.Disposable {
         ]);
     }
 
+    async acceptDocumentCheckpoint(uri: vscode.Uri, content: Uint8Array) {
+        const {fileType, fileEntity} = await this._resolveUri(uri);
+        if (fileType!=='doc' || fileEntity===undefined) { return; }
+        const doc = fileEntity as DocumentEntity;
+        const checkpoint = new TextDecoder().decode(content);
+        if (doc.remoteCache===checkpoint) {
+            doc.localCache = checkpoint;
+        }
+    }
+
     async writeFile(uri: vscode.Uri, content:Uint8Array, create:boolean, overwrite:boolean) {
         const {fileType, fileEntity} = await this._resolveUri(uri);
 
@@ -950,19 +961,23 @@ export class VirtualFileSystem extends vscode.Disposable {
             if (doc.version===undefined || doc.localCache===undefined || doc.remoteCache===undefined) {
                 return;
             }
-            // `content` is the caller's complete desired file. Applying a
-            // local-to-remote patch to it reverses the direction and can send
-            // stale remote text back to Overleaf. Treat a divergent remote
-            // cache as a conflict instead of guessing how to merge it.
+            let mergeRes = _content;
             if (doc.localCache!==doc.remoteCache) {
                 if (_content===doc.remoteCache) {
                     doc.localCache = _content;
                     return;
                 }
-                throw vscode.FileSystemError.Unavailable('The remote document changed while the local document was being updated.');
+                const mergeResult = mergeText(
+                    new TextEncoder().encode(doc.localCache),
+                    content,
+                    new TextEncoder().encode(doc.remoteCache),
+                );
+                if (mergeResult.status!=='merged') {
+                    throw vscode.FileSystemError.Unavailable('The remote document changed while the local document was being updated.');
+                }
+                mergeRes = new TextDecoder().decode(mergeResult.content);
             }
             const dmp = new DiffMatchPatch();
-            const mergeRes = _content;
             const update = {
                 doc: doc._id,
                 lastV: doc.lastVersion,

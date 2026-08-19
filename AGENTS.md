@@ -1,9 +1,15 @@
 # LeafRelay
 
+## Architecture
+
+- LeafRelay is a synchronization engine first. Keep protocol, request scheduling, checkpoints, reconciliation, and merge logic independent of VS Code APIs so the same core can later power `leafrelay serve`, background services, and other clients.
+- VS Code-specific modules are adapters for URI/file-system access, watchers, commands, notifications, and views. Do not put reusable synchronization decisions in the extension adapter layer.
+- Prefer maintained libraries for established algorithms and protocols. Wrap them behind small core interfaces and test the behavioral boundaries LeafRelay relies on.
+
 ## Local Replica Sync
 
 - Runtime local changes are event-driven through VS Code `FileSystemWatcher`; do not add periodic directory or hash polling.
-- `.overleaf/sync-state.json` stores the remote history version and SHA-256 content baseline used only for startup/reconnect reconciliation.
+- `.overleaf/sync-state.json` stores the remote history version, per-path SHA-256 checkpoint, and common UTF-8 text baseline used for startup, reconnect, and three-way reconciliation. Binary paths retain fingerprints but no merge baseline.
 - `.overleaf/settings.json` is the authoritative local-replica association. It must contain enough project URI and SCM settings metadata to rebuild the transient per-login project/SCM state after authentication expires.
 - Persist each successfully synchronized path's SHA-256 checkpoint before processing the next path, so a later conflict or failure does not discard completed progress. Skip writes when serialized state is unchanged and write the disposable cache in place to avoid delete/create watcher events.
 - History API failures such as HTTP 429 must not be interpreted as a missing version. Leave the checkpoint unchanged and retry on a later reconnect.
@@ -16,14 +22,14 @@
 - A background project used by `Open Project Locally` must not register workspace-global commands, views, status items, or compile actions. Those features belong only to the project identified by the active workspace; deterministic feature-registration failures must not enter the connection retry loop.
 - Ignore every path containing a dot-prefixed component, including `.output`, before any stat/read/write work.
 - Ignore symbolic links and paths below symbolic-link directories in both directions. Never upload them, overwrite/delete them during a pull, or include them in sync state.
-- Never choose a winner or synthesize a merge when both sides changed. Pause that path, preserve both sides, and let the user explicitly resolve only that path with local or Overleaf content. Do not expose whole-project replacement as a conflict action and do not create conflict-copy files.
+- When both sides changed a text file, use a maintained diff3 implementation with the last synchronized text as the common base. Automatically synchronize only a clean, non-overlapping merge. Pause overlapping text edits, binary concurrent changes, deletions, and incompatible path-type changes, preserving both sides for an explicit per-path choice. Do not expose whole-project replacement or create conflict-copy files.
 - Full remote-to-local sync is automatic only for an empty replica or when all local hashes still match the checkpoint. Missing/invalid history plus uncheckpointed local changes pauses all replica watchers.
 
 ## Verification
 
 - Run `pnpm test` and `git diff --check` after synchronization changes. `pnpm test` runs compile, lint, and Vitest.
 - Pull requests and releases must also pass the VS Code Extension Host activation test and the ShareLaTeX container integration test before packaging.
-- Package local builds with `pnpm exec vsce package --no-dependencies --out leafrelay-local.vsix` and install with `code --install-extension <vsix> --force`.
+- Package artifacts in CI. User installations and updates come from the VS Code Marketplace; do not replace the installed extension with a local VSIX during normal development.
 
 ## Toolchain
 

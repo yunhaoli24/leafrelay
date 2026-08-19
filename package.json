@@ -805,6 +805,7 @@
     "fuzzysearch": "^1.0.3",
     "mime": "4.1.0",
     "minimatch": "^10.2.6",
+    "node-diff3": "^3.2.1",
     "prettier": "^3.9.6",
     "socket.io-client": "github:overleaf/socket.io-client#0.9.17-overleaf-5",
     "uuid": "^14.0.1"
