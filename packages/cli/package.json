@@ -1,8 +1,14 @@
 {
   "name": "leafrelay",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Reliable two-way synchronization between Overleaf and a local directory.",
-  "keywords": ["overleaf", "latex", "sync", "cli", "collaboration"],
+  "keywords": [
+    "overleaf",
+    "latex",
+    "sync",
+    "cli",
+    "collaboration"
+  ],
   "type": "module",
   "bin": {
     "leafrelay": "./dist/cli.js"
@@ -15,7 +21,12 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "README.zh-CN.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=24"
   },

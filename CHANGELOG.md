@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7](https://github.com/yunhaoli24/leafrelay/compare/v0.1.6...v0.1.7) (2026-08-20)
+
+
+### Features
+
+* add standalone LeafRelay service ([#18](https://github.com/yunhaoli24/leafrelay/issues/18)) ([47c7f71](https://github.com/yunhaoli24/leafrelay/commit/47c7f710af57c2b9e7e85bdb7a960fb10282d066))
+
+
+### Bug Fixes
+
+* establish LeafRelay extension identity ([#16](https://github.com/yunhaoli24/leafrelay/issues/16)) ([f8db2ed](https://github.com/yunhaoli24/leafrelay/commit/f8db2ed742986f2deabca670f8c3ea8ae18cd370))
+
 ## [0.1.6](https://github.com/yunhaoli24/leafrelay/compare/v0.1.5...v0.1.6) (2026-08-19)
 
 
