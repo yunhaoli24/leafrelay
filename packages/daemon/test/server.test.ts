@@ -46,6 +46,17 @@ describe('LeafRelay daemon IPC', () => {
 
         expect(first.initializeResult.pid).toBe(second.initializeResult.pid);
         expect((await first.status()).clients).toBe(2);
+        expect(await first.listServers()).toEqual([{
+            name:'www.overleaf.com',
+            url:'https://www.overleaf.com/',
+            loggedIn:false,
+        }]);
+        await first.addServer('Community', 'http://localhost:8080');
+        expect(await second.listServers()).toContainEqual({
+            name:'Community',
+            url:'http://localhost:8080/',
+            loggedIn:false,
+        });
         await first.shutdownDaemon();
         first.close();
         second.close();

@@ -2,6 +2,10 @@ import {randomBytes} from 'node:crypto';
 import {appendFile, chmod, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Server, type Socket} from 'node:net';
 import {
+    readProjectSettings,
+    startServe,
+} from '@leafrelay/core';
+import {
     LEAFRELAY_PROTOCOL_VERSION,
     RPC_METHOD,
     RPC_NOTIFICATION,
@@ -14,9 +18,17 @@ import {
     type ReplicaConflictResolutionParams,
     type ReplicaStatusNotification,
     type ReplicaConflictNotification,
+    type ProjectCallParams,
+    type ProjectEventNotification,
+    type ProjectOpenParams,
+    type ServerCallParams,
+    type ServerImportParams,
+    type ServerLoginParams,
 } from '@leafrelay/protocol';
 import {createMessageConnection, ResponseError, type MessageConnection} from 'vscode-jsonrpc/node';
 import {daemonPaths, type DaemonPaths} from './paths';
+import {decodeRpcValue, encodeRpcValue} from './codec';
+import {NetworkRuntimeRegistry} from './networkRuntime';
 import {ReplicaAlreadyActiveError, ReplicaRegistry} from './replicaRegistry';
 
 declare const LEAFRELAY_DAEMON_VERSION:string;
@@ -43,6 +55,7 @@ export class LeafRelayDaemonServer {
     private readonly token:string;
     private readonly startedAt = new Date().toISOString();
     private readonly clients = new Set<ClientConnection>();
+    private readonly network:NetworkRuntimeRegistry;
     private readonly replicas:ReplicaRegistry;
     private server?:Server;
     private idleTimer?:NodeJS.Timeout;
@@ -51,11 +64,31 @@ export class LeafRelayDaemonServer {
     constructor(private readonly options:DaemonServerOptions={}) {
         this.paths = options.paths ?? daemonPaths();
         this.token = options.token ?? randomBytes(32).toString('hex');
+        this.network = new NetworkRuntimeRegistry({
+            projectEvent:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.projectEvent, notification),
+            log:(level, message) => void this.log(level, message),
+        });
         this.replicas = new ReplicaRegistry({
             status:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.replicaStatus, notification),
             conflict:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.replicaConflict, notification),
             empty:() => this.scheduleIdleExit(),
             log:message => void this.log('info', message),
+        }, async (directory, startOptions) => {
+            const settings = await readProjectSettings(directory);
+            const lease = await this.network.acquireReplica(settings.serverName, settings.projectId);
+            try {
+                const running = await startServe(directory, {...startOptions, remote:lease.remote});
+                return {
+                    ...running,
+                    stop:async () => {
+                        await running.stop();
+                        lease.release();
+                    },
+                };
+            } catch (error) {
+                lease.release();
+                throw error;
+            }
         });
     }
 
@@ -99,7 +132,7 @@ export class LeafRelayDaemonServer {
             protocolVersion:LEAFRELAY_PROTOCOL_VERSION,
             startedAt:this.startedAt,
             clients:this.clients.size,
-            projects:0,
+            projects:this.network.projectCount,
             replicas:this.replicas.list(),
         };
     }
@@ -142,6 +175,36 @@ export class LeafRelayDaemonServer {
             await this.replicas.retry(params.replicaId, params.path);
             return null;
         }));
+        rpc.onRequest(RPC_METHOD.serverList, () => this.authorized(client, () => this.network.listServers()));
+        rpc.onRequest(RPC_METHOD.serverAdd, (params:{name:string; url:string}) => this.authorized(client, async () => {
+            await this.network.addServer(params.name, params.url);
+            return null;
+        }));
+        rpc.onRequest(RPC_METHOD.serverRemove, (params:{server:string}) => this.authorized(client, async () => {
+            await this.network.removeServer(params.server);
+            return null;
+        }));
+        rpc.onRequest(RPC_METHOD.sessionLogin, (params:ServerLoginParams) => this.authorized(client, () => this.network.login(params)));
+        rpc.onRequest(RPC_METHOD.sessionImport, (params:ServerImportParams) => this.authorized(client, () => this.network.importSession(params)));
+        rpc.onRequest(RPC_METHOD.sessionLogout, (params:{server:string}) => this.authorized(client, async () => {
+            await this.network.logout(params.server);
+            return null;
+        }));
+        rpc.onRequest(RPC_METHOD.serverCall, (params:ServerCallParams) => this.authorized(client, async () => {
+            const result = await this.network.callServer(params.server, params.operation, decodeRpcValue(params.args) as unknown[]);
+            return encodeRpcValue(result);
+        }));
+        rpc.onRequest(RPC_METHOD.projectOpen, (params:ProjectOpenParams) => this.authorized(client, () => (
+            this.network.openProject(client.clientId!, params.server, params.projectId)
+        )));
+        rpc.onRequest(RPC_METHOD.projectClose, (params:{projectKey:string}) => this.authorized(client, () => {
+            this.network.closeProject(client.clientId!, params.projectKey);
+            return null;
+        }));
+        rpc.onRequest(RPC_METHOD.projectCall, (params:ProjectCallParams) => this.authorized(client, async () => {
+            const result = await this.network.callProject(params.projectKey, params.operation, decodeRpcValue(params.args) as unknown[]);
+            return encodeRpcValue(await result);
+        }));
         rpc.onClose(() => this.closeClient(client));
         rpc.onError(error => void this.log('error', `JSON-RPC connection error: ${String(error[0])}`));
         rpc.listen();
@@ -172,13 +235,14 @@ export class LeafRelayDaemonServer {
     private closeClient(client:ClientConnection):void {
         if (!this.clients.delete(client)) { return; }
         if (client.clientId) { this.replicas.detachClient(client.clientId); }
+        if (client.clientId) { this.network.detachClient(client.clientId); }
         this.scheduleIdleExit();
     }
 
     private notifyOwners(
         owners:ReadonlySet<string>,
-        method:typeof RPC_NOTIFICATION.replicaStatus|typeof RPC_NOTIFICATION.replicaConflict,
-        notification:ReplicaStatusNotification|ReplicaConflictNotification,
+        method:typeof RPC_NOTIFICATION.replicaStatus|typeof RPC_NOTIFICATION.replicaConflict|typeof RPC_NOTIFICATION.projectEvent,
+        notification:ReplicaStatusNotification|ReplicaConflictNotification|ProjectEventNotification,
     ):void {
         for (const client of this.clients) {
             if (client.clientId && owners.has(client.clientId)) { void client.rpc.sendNotification(method, notification); }
@@ -206,6 +270,7 @@ export class LeafRelayDaemonServer {
     private async performStop():Promise<void> {
         this.cancelIdleExit();
         await this.replicas.stopAll();
+        await this.network.stopAll();
         for (const client of this.clients) {
             client.rpc.dispose();
             client.socket.destroy();

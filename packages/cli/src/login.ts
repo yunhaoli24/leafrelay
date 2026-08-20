@@ -1,5 +1,6 @@
 import {input, password, select} from '@inquirer/prompts';
-import {BaseAPI, configPath, normalizeServerUrl, saveServerSession} from '@leafrelay/core';
+import {configPath, normalizeServerUrl} from '@leafrelay/core';
+import {connectCliDaemon} from './daemonClient';
 
 export interface LoginOptions {
     cookie?: string;
@@ -9,7 +10,6 @@ export interface LoginOptions {
 
 export async function login(server: string, options: LoginOptions): Promise<void> {
     const url = normalizeServerUrl(server);
-    const api = new BaseAPI(url);
     const environmentCookie = process.env.LEAFRELAY_COOKIE;
     let cookie = options.cookie ?? environmentCookie;
     let email = options.email;
@@ -31,20 +31,14 @@ export async function login(server: string, options: LoginOptions): Promise<void
         }
     }
 
-    const response = cookie
-        ? await api.cookiesLogin(cookie)
-        : await api.passportLogin(email ?? '', secret ?? await password({message:'Password'}));
-    if (response.type!=='success' || !response.identity || !response.userInfo) {
-        throw new Error(response.message || `Login to ${url} failed.`);
+    const client = await connectCliDaemon();
+    try {
+        const user = await client.login(cookie
+            ? {server:url, cookie}
+            : {server:url, email:email ?? '', password:secret ?? await password({message:'Password'})});
+        console.log(`Logged in to ${url} as ${user.userEmail || email || user.userId}.`);
+        console.log(`Session saved to ${configPath()}.`);
+    } finally {
+        client.close();
     }
-
-    await saveServerSession({
-        url,
-        userId:response.userInfo.userId,
-        userEmail:response.userInfo.userEmail || email || '',
-        identity:response.identity,
-        updatedAt:new Date().toISOString(),
-    });
-    console.log(`Logged in to ${url} as ${response.userInfo.userEmail || email || response.userInfo.userId}.`);
-    console.log(`Session saved to ${configPath()}.`);
 }

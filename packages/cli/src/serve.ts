@@ -1,24 +1,14 @@
-import {LeafRelayDaemonClient, type DaemonClientOptions} from '@leafrelay/daemon';
+import {LeafRelayDaemonClient} from '@leafrelay/daemon';
 import type {ReplicaAttachResult, ReplicaConflictNotification, ReplicaStatusNotification} from '@leafrelay/protocol';
-
-declare const LEAFRELAY_VERSION:string;
+import {connectCliDaemon} from './daemonClient';
 
 export interface RunningServe {
     readonly replica:ReplicaAttachResult;
     stop():Promise<void>;
 }
 
-function clientOptions(autoStart=true):DaemonClientOptions {
-    return {
-        clientName:'cli',
-        clientVersion:LEAFRELAY_VERSION,
-        daemonEntrypoint:new URL('./daemon.js', import.meta.url),
-        autoStart,
-    };
-}
-
 export async function startServe(directory=process.cwd()):Promise<RunningServe> {
-    const client = await LeafRelayDaemonClient.connect(clientOptions());
+    const client = await connectCliDaemon();
     client.onLog(event => console.log(`${event.timestamp} [${event.level}] ${event.message}`));
     client.onReplicaStatus((event:ReplicaStatusNotification) => {
         console.log(`Replica ${event.replicaId}: ${event.status.state}${event.status.message ? ` (${event.status.message})` : ''}`);
@@ -61,7 +51,7 @@ export async function serve(directory=process.cwd()):Promise<void> {
 export async function daemonStatus():Promise<void> {
     let client:LeafRelayDaemonClient|undefined;
     try {
-        client = await LeafRelayDaemonClient.connect(clientOptions(false));
+        client = await connectCliDaemon(false);
         console.log(JSON.stringify(await client.status(), null, 2));
     } catch {
         console.log('LeafRelay daemon is not running.');
@@ -73,7 +63,7 @@ export async function daemonStatus():Promise<void> {
 export async function daemonStop():Promise<void> {
     let client:LeafRelayDaemonClient|undefined;
     try {
-        client = await LeafRelayDaemonClient.connect(clientOptions(false));
+        client = await connectCliDaemon(false);
         await client.shutdownDaemon();
         console.log('LeafRelay daemon stopped.');
     } catch {
@@ -85,7 +75,7 @@ export async function daemonStop():Promise<void> {
 
 export async function daemonRestart():Promise<void> {
     await daemonStop();
-    const client = await LeafRelayDaemonClient.connect(clientOptions());
+    const client = await connectCliDaemon();
     const status = await client.status();
     console.log(`LeafRelay daemon restarted (pid ${status.pid}).`);
     client.close();

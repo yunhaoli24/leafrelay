@@ -17,8 +17,14 @@ import {
     type ReplicaConflictNotification,
     type ReplicaConflictResolutionParams,
     type ReplicaStatusNotification,
+    type ProjectEventNotification,
+    type ProjectOpenResult,
+    type ServerDescriptor,
+    type ServerImportParams,
+    type ServerLoginParams,
 } from '@leafrelay/protocol';
 import {createMessageConnection, type MessageConnection} from 'vscode-jsonrpc/node';
+import {decodeRpcValue, encodeRpcValue} from './codec';
 import {daemonPaths, type DaemonPaths} from './paths';
 
 const START_TIMEOUT_MS = 15_000;
@@ -102,6 +108,60 @@ export class LeafRelayDaemonClient {
 
     onReplicaConflict(handler:(event:ReplicaConflictNotification) => void):void {
         this.rpc.onNotification(RPC_NOTIFICATION.replicaConflict, handler);
+    }
+
+    listServers():Promise<ServerDescriptor[]> {
+        return this.rpc.sendRequest(RPC_METHOD.serverList);
+    }
+
+    async addServer(name:string, url:string):Promise<void> {
+        await this.rpc.sendRequest(RPC_METHOD.serverAdd, {name, url});
+    }
+
+    async removeServer(server:string):Promise<void> {
+        await this.rpc.sendRequest(RPC_METHOD.serverRemove, {server});
+    }
+
+    login(params:ServerLoginParams):Promise<{userId:string; userEmail:string}> {
+        return this.rpc.sendRequest(RPC_METHOD.sessionLogin, params);
+    }
+
+    importSession(params:ServerImportParams):Promise<{userId:string; userEmail:string}> {
+        return this.rpc.sendRequest(RPC_METHOD.sessionImport, params);
+    }
+
+    async logout(server:string):Promise<void> {
+        await this.rpc.sendRequest(RPC_METHOD.sessionLogout, {server});
+    }
+
+    async callServer<T=unknown>(server:string, operation:string, args:unknown[]=[]):Promise<T> {
+        const result = await this.rpc.sendRequest(RPC_METHOD.serverCall, {
+            server,
+            operation,
+            args:encodeRpcValue(args),
+        });
+        return decodeRpcValue(result) as T;
+    }
+
+    openProject(server:string, projectId:string):Promise<ProjectOpenResult> {
+        return this.rpc.sendRequest(RPC_METHOD.projectOpen, {server, projectId});
+    }
+
+    async closeProject(projectKey:string):Promise<void> {
+        await this.rpc.sendRequest(RPC_METHOD.projectClose, {projectKey});
+    }
+
+    async callProject<T=unknown>(projectKey:string, operation:string, args:unknown[]=[]):Promise<T> {
+        const result = await this.rpc.sendRequest(RPC_METHOD.projectCall, {
+            projectKey,
+            operation,
+            args:encodeRpcValue(args),
+        });
+        return decodeRpcValue(result) as T;
+    }
+
+    onProjectEvent(handler:(event:ProjectEventNotification) => void):void {
+        this.rpc.onNotification(RPC_NOTIFICATION.projectEvent, handler);
     }
 
     async shutdownDaemon():Promise<void> {

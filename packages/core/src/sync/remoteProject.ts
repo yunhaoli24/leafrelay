@@ -21,6 +21,12 @@ export interface RemoteEntry {
 
 export type RemoteChange = {path:string; previousPath?:string};
 
+export interface RemoteProjectTransport {
+    api:BaseAPI;
+    identity:Identity;
+    socket:SocketIOAPI;
+}
+
 function normalizePath(path: string): string {
     const normalized = `/${posix.normalize(path).replace(/^\/+/, '')}`;
     if (normalized.includes('/../') || normalized.endsWith('/..')) {
@@ -46,29 +52,37 @@ export class RemoteProject {
     private readonly entries = new Map<string, RemoteEntry>();
     private readonly idToPath = new Map<string, string>();
     private changeHandler?: (change:RemoteChange) => void;
+    private readonly externalTransport?:RemoteProjectTransport;
 
     constructor(
         private readonly url:string,
         private readonly projectId:string,
         private readonly cookies:string,
+        transport?:RemoteProjectTransport,
     ) {
-        this.api = new BaseAPI(url);
+        this.externalTransport = transport;
+        this.api = transport?.api ?? new BaseAPI(url);
     }
 
     async connect(): Promise<void> {
-        const login = await this.api.cookiesLogin(this.cookies);
-        if (login.type!=='success' || !login.identity) {
-            throw new Error(login.message || `Authentication to ${this.url} failed.`);
+        if (this.externalTransport) {
+            this.identity = this.externalTransport.identity;
+            this.socket = this.externalTransport.socket;
+        } else {
+            const login = await this.api.cookiesLogin(this.cookies);
+            if (login.type!=='success' || !login.identity) {
+                throw new Error(login.message || `Authentication to ${this.url} failed.`);
+            }
+            this.identity = login.identity;
+            this.socket = new SocketIOAPI(this.url, this.api, this.identity, this.projectId);
         }
-        this.identity = login.identity;
-        this.socket = new SocketIOAPI(this.url, this.api, this.identity, this.projectId);
         this.project = await this.socket.joinProject(this.projectId);
         this.reindex();
         this.registerEvents();
     }
 
     disconnect() {
-        this.socket?.disconnect();
+        if (!this.externalTransport) { this.socket?.disconnect(); }
     }
 
     onChange(handler: (change:RemoteChange) => void) {

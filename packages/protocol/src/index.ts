@@ -151,6 +151,11 @@ export interface ProjectOpenParams {
     projectId:string;
 }
 
+export interface ProjectOpenResult {
+    projectKey:string;
+    shared:boolean;
+}
+
 export interface ProjectCallParams {
     projectKey:string;
     operation:string;

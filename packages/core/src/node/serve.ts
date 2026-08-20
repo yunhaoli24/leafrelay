@@ -23,6 +23,7 @@ export interface StartServeOptions {
     cookie?:string;
     log?:(message:string) => void;
     onConflict?:(path:string, reason:string) => void;
+    remote?:RemoteProject;
 }
 
 export async function startServe(directory=process.cwd(), options:StartServeOptions={}):Promise<RunningServe> {
@@ -33,7 +34,7 @@ export async function startServe(directory=process.cwd(), options:StartServeOpti
         throw new Error(`No login is stored for ${settings.serverName}. Run: leafrelay login ${settings.serverName}`);
     }
     const cookie = options.cookie || process.env.LEAFRELAY_COOKIE || session.identity.cookies;
-    const remote = new RemoteProject(session.url || settings.serverUrl, settings.projectId, cookie);
+    const remote = options.remote ?? new RemoteProject(session.url || settings.serverUrl, settings.projectId, cookie);
     await remote.connect();
 
     const configuredPatterns = settings.localReplica.settings['ignore-patterns'];
