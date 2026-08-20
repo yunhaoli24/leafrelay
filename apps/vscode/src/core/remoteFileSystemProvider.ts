@@ -291,10 +291,8 @@ export class VirtualFileSystem extends vscode.Disposable {
                 scheme: this.socket.connectionScheme,
             });
 
-            // Only recreate the socket when the connection scheme has changed
-            // (e.g., v1→v2 after connectionRejected). For transient disconnects,
-            // socket.io's built-in auto-reconnect handles re-establishing the TCP
-            // connection without creating a new one — avoiding TCP RST packets.
+            // Recreate the socket only when switching between realtime and alternative mode.
+            // Transient disconnects are handled by the active transport's reconnect loop.
             if (this.socket.needsReinit) {
                 this.socket.init();
                 this.handlersRegistered = false;

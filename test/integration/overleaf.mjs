@@ -26,7 +26,9 @@ const createOutput = execFileSync('docker', [
     '/bin/bash', '-ce',
     `cd /overleaf/services/web && node modules/server-ce-scripts/scripts/create-user --admin --email=${email}`,
 ], {encoding:'utf8'});
-const activationUrlText = createOutput.match(/https?:\/\/\S+\/user\/activate\?\S+/)?.[0];
+const activationUrlText = createOutput.match(
+    /https?:\/\/[^\s"\\]+\/user\/activate\?token=[a-zA-Z0-9_-]+&user_id=[a-f0-9]{24}/,
+)?.[0];
 assert.ok(activationUrlText, `create-user did not return an activation URL:\n${createOutput}`);
 const activationUrl = new URL(activationUrlText);
 activationUrl.protocol = baseUrl.protocol;

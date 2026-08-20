@@ -74,7 +74,7 @@ export interface EventsHandler {
     onRootDocUpdated?: (rootDocId:string) => void,
 }
 
-type ConnectionScheme = 'Alt' | 'v1' | 'v2';
+type ConnectionScheme = 'Alt' | 'realtime';
 type AlternativeSocketFactory = (
     url:string,
     api:BaseAPI,
@@ -100,11 +100,7 @@ export class SocketIOAPI {
                 private readonly identity:Identity,
                 private readonly projectId:string)
     {
-        try {
-            this.scheme = new URL(url).hostname==='www.overleaf.com' ? 'v2' : 'v1';
-        } catch {
-            this.scheme = 'v1';
-        }
+        this.scheme = 'realtime';
         this.init();
     }
 
@@ -143,11 +139,7 @@ export class SocketIOAPI {
                     this.url, this.api, this.identity, this.projectId, this.record!,
                 );
                 break;
-            case 'v1':
-                this.record = undefined;
-                this.socket = this.api._initSocketV0(this.identity);
-                break;
-            case 'v2':
+            case 'realtime':
                 this.record = undefined;
                 const query = `?projectId=${this.projectId}&t=${Date.now()}`;
                 this.socket = this.api._initSocketV0(this.identity, query);
@@ -213,11 +205,6 @@ export class SocketIOAPI {
         });
         this.socket.on('connectionRejected', (err:any) => {
             log('SocketIOAPI: connectionRejected', {scheme: this.scheme, projectId: this.projectId, error: err});
-            // If v2 also gets rejected, fall back to v1 rather than staying stuck
-            if (this.scheme === 'v2') {
-                log('SocketIOAPI: v2 rejected, falling back to v1');
-                this.scheme = 'v1';
-            }
             // Disable auto-reconnect on this socket: the server explicitly rejected
             // our connection parameters. Reconnecting would just get rejected again,
             // creating unnecessary TCP connection churn (and RST packets).
@@ -231,7 +218,7 @@ export class SocketIOAPI {
             logError(`Overleaf connection error: ${message}`);
         });
 
-        if (this.scheme==='v2') {
+        if (this.scheme==='realtime') {
             this.record = new Promise((resolve, reject) => {
                 this.socket.on('joinProjectResponse', (res:any) => {
                     const publicId = res.publicId as string;
@@ -262,7 +249,7 @@ export class SocketIOAPI {
     }
 
     toggleAlternativeConnectionScheme(url: string, updatedRecord?: ProjectEntity) {
-        this.scheme = this.scheme==='Alt' ? 'v1' : 'Alt';
+        this.scheme = this.scheme==='Alt' ? 'realtime' : 'Alt';
         if (updatedRecord) {
             this.url = url;
             this.record = Promise.resolve(updatedRecord);
@@ -384,34 +371,11 @@ export class SocketIOAPI {
 
         switch(this.scheme) {
             case 'Alt':
-            case 'v1':
-                const socket = this.socket;
-                const joinPromise = this.emit('joinProject', {project_id})
-                .then((returns:[ProjectEntity, string, number]) => {
-                    const [project, permissionsLevel, protocolVersion] = returns;
-                    this.record = Promise.resolve(project);
-                    return project;
-                });
-                let rejectionHandler: ((err:any) => void) | undefined;
-                const rejectPromise = new Promise((_, reject) => {
-                    rejectionHandler = (err:any) => {
-                        // Only fall back to v2 if we haven't already tried it;
-                        // otherwise let the outer retry logic handle backoff
-                        this.scheme = 'v2';
-                        reject(err.message);
-                    };
-                    socket.once('connectionRejected', rejectionHandler);
-                });
-                try {
-                    return await Promise.race([joinPromise, rejectPromise, timeoutPromise]);
-                } finally {
-                    // A successful join or timeout must not leave a listener behind for
-                    // a later reconnect. Socket.IO 0.x exposes removeListener like EventEmitter.
-                    if (rejectionHandler && typeof socket.removeListener === 'function') {
-                        socket.removeListener('connectionRejected', rejectionHandler);
-                    }
-                }
-            case 'v2':
+                return Promise.race([
+                    this.emit('joinProject', {project_id}).then((returns:[ProjectEntity]) => returns[0]),
+                    timeoutPromise,
+                ]);
+            case 'realtime':
                 return Promise.race([this.record!, timeoutPromise]);
         }
     }
