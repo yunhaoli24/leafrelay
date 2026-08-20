@@ -41,8 +41,10 @@ describe('ReplicaRegistry', () => {
         }));
         const registry = new ReplicaRegistry({status:()=>{}, conflict:()=>{}, empty:()=>{}, log:()=>{}}, start);
 
-        const first = await registry.attach('client-1', {directory:firstRoot});
-        const shared = await registry.attach('client-2', {directory:firstRoot});
+        const [first, shared] = await Promise.all([
+            registry.attach('client-1', {directory:firstRoot}),
+            registry.attach('client-2', {directory:firstRoot}),
+        ]);
         expect(shared.replicaId).toBe(first.replicaId);
         expect(shared.shared).toBe(true);
         expect(start).toHaveBeenCalledTimes(1);

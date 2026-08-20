@@ -46,6 +46,7 @@ export class ReplicaRegistry {
     private readonly byId = new Map<string,ReplicaEntry>();
     private readonly byRoot = new Map<string,ReplicaEntry>();
     private readonly byProject = new Map<string,ReplicaEntry>();
+    private readonly projectOperations = new Map<string,Promise<void>>();
 
     constructor(
         private readonly events:ReplicaRegistryEvents,
@@ -58,6 +59,16 @@ export class ReplicaRegistry {
         const root = await realpath(resolve(params.directory));
         const settings = await readProjectSettings(root);
         const projectKey = `${settings.serverName}\0${settings.projectId}`;
+        return this.withProjectLock(projectKey, () => this.attachResolved(clientId, params, root, settings, projectKey));
+    }
+
+    private async attachResolved(
+        clientId:string,
+        params:ReplicaAttachParams,
+        root:string,
+        settings:Awaited<ReturnType<typeof readProjectSettings>>,
+        projectKey:string,
+    ):Promise<ReplicaAttachResult> {
         const rootEntry = this.byRoot.get(root);
         if (rootEntry) {
             if (rootEntry.projectKey!==projectKey) {
@@ -197,5 +208,19 @@ export class ReplicaRegistry {
             status:entry.status,
             conflicts:entry.running.conflicts(),
         };
+    }
+
+    private async withProjectLock<T>(projectKey:string, operation:() => Promise<T>):Promise<T> {
+        const previous = this.projectOperations.get(projectKey) ?? Promise.resolve();
+        let release!:() => void;
+        const current = new Promise<void>(resolveOperation => { release = resolveOperation; });
+        this.projectOperations.set(projectKey, current);
+        await previous;
+        try {
+            return await operation();
+        } finally {
+            release();
+            if (this.projectOperations.get(projectKey)===current) { this.projectOperations.delete(projectKey); }
+        }
     }
 }

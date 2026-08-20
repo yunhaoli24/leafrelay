@@ -175,12 +175,6 @@ importers:
       '@inquirer/prompts':
         specifier: 8.6.0
         version: 8.6.0(@types/node@26.2.0)
-      '@leafrelay/daemon':
-        specifier: workspace:*
-        version: link:../daemon
-      '@leafrelay/protocol':
-        specifier: workspace:*
-        version: link:../protocol
       chokidar:
         specifier: 5.0.0
         version: 5.0.0
@@ -209,6 +203,12 @@ importers:
       '@leafrelay/core':
         specifier: workspace:*
         version: link:../core
+      '@leafrelay/daemon':
+        specifier: workspace:*
+        version: link:../daemon
+      '@leafrelay/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/core:
     dependencies:

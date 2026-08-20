@@ -1,2 +1,1 @@
-export * from '@leafrelay/core';
-export {startServe} from './serve';
+export {startServe, type RunningServe} from './serve';

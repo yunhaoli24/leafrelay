@@ -22,8 +22,9 @@ LeafRelay is built around those failure modes:
 - **External edits sync automatically** through file-system events, including edits made by another editor, a terminal, a script, or an AI tool.
 - **Incremental startup and reconnects** transfer only changed files whenever the local checkpoint is usable.
 - **Conflicts stop safely** when both local and Overleaf changed the same path; neither copy is silently overwritten.
-- **One active local replica per workspace** prevents old folders from racing the project and pushing stale content.
+- **One writable folder per Overleaf project** prevents old replicas from racing the active folder and pushing stale content.
 - **Rate-limit aware requests** serialize project traffic and respect Overleaf `429` cooldowns instead of creating request bursts.
+- **One shared background service** coordinates every VS Code window and CLI process, so a project has one watcher, one realtime connection, and one upload queue.
 - **Dot directories and symbolic links stay out of sync**, including generated build folders such as `.output`.
 
 LeafRelay keeps the original Overleaf Workshop virtual-project and collaboration features while prioritizing dependable local-folder synchronization for daily work.
@@ -60,7 +61,9 @@ cd /path/to/local-replica
 leafrelay serve
 ```
 
-`leafrelay login` stores sessions by server in `~/.leafrelay/config.json`. Set `LEAFRELAY_CONFIG` to use another config file, or `LEAFRELAY_COOKIE` to override the saved cookie for one process.
+The first VS Code window or CLI command starts a shared local daemon. Later clients connect through `~/.leafrelay/daemon.sock`, so running VS Code and `leafrelay serve` together does not duplicate uploads.
+
+`leafrelay login` stores sessions by server in `~/.leafrelay/config.json`. Use `leafrelay daemon status|stop|restart` to inspect or control the background process. Set `LEAFRELAY_HOME` to relocate all user state, `LEAFRELAY_CONFIG` to relocate only the login file, or `LEAFRELAY_COOKIE` to override the saved cookie for one process.
 
 ## Development
 
@@ -73,7 +76,7 @@ pnpm run compile
 
 Pull requests run the VS Code activation check and a ShareLaTeX container integration test before packaging. Releases are prepared by Release Please and publish the VS Code extension, npm package, and GitHub release artifacts through automated workflows.
 
-The pnpm monorepo keeps the reusable synchronization engine in `packages/core`, the background CLI in `packages/cli`, and the VS Code adapter in `apps/vscode`.
+The pnpm monorepo separates the protocol, reusable synchronization core, shared daemon, CLI, and VS Code adapter.
 
 ## Project background
 
