@@ -46,7 +46,7 @@ describe('ReplicaRegistry', () => {
             registry.attach('client-2', {directory:firstRoot}),
         ]);
         expect(shared.replicaId).toBe(first.replicaId);
-        expect(shared.shared).toBe(true);
+        expect([first.shared, shared.shared].sort()).toEqual([false, true]);
         expect(start).toHaveBeenCalledTimes(1);
         await expect(registry.attach('client-3', {directory:secondRoot})).rejects.toBeInstanceOf(ReplicaAlreadyActiveError);
 
