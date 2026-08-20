@@ -3,6 +3,9 @@ import {execFileSync} from 'node:child_process';
 import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {load} from 'cheerio';
+import makeFetchCookie from 'fetch-cookie';
+import {CookieJar} from 'tough-cookie';
 import {
     BaseAPI,
     RemoteProject,
@@ -11,10 +14,10 @@ import {
 } from '../../packages/core/dist/index.js';
 
 const baseUrl = new URL(process.env.OVERLEAF_URL ?? 'http://localhost:8080/');
-const loginResponse = await fetch(new URL('login', baseUrl), {redirect:'manual'});
+const sessionFetch = makeFetchCookie(fetch, new CookieJar());
+const loginResponse = await sessionFetch(new URL('login', baseUrl));
 assert.equal(loginResponse.status, 200, 'the Overleaf login page is available');
-assert.match(await loginResponse.text(), /<input.*name="_csrf".*value="([^"]*)">/);
-assert.ok(loginResponse.headers.getSetCookie().length > 0, 'the login page establishes a session cookie');
+assert.ok(load(await loginResponse.text())('input[name="_csrf"]').attr('value'), 'the login page exposes a CSRF token');
 
 const email = `leafrelay-${Date.now()}@example.com`;
 const password = 'LeafRelay-Integration-2026';
@@ -29,18 +32,20 @@ const activationUrl = new URL(activationUrlText);
 activationUrl.protocol = baseUrl.protocol;
 activationUrl.host = baseUrl.host;
 
-const activationPage = await fetch(activationUrl, {redirect:'manual'});
-const activationCookies = activationPage.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+const activationPage = await sessionFetch(activationUrl);
+assert.equal(activationPage.status, 200, `activation page returned ${activationPage.status}`);
 const activationHtml = await activationPage.text();
-const activationCsrf = activationHtml.match(/name="ol-csrfToken"\s+content="([^"]+)"/)?.[1]
-    ?? activationHtml.match(/name="_csrf"[^>]+value="([^"]+)"/)?.[1];
+const activationForm = load(activationHtml)('form[action="/user/password/set"]');
+const activationCsrf = activationForm.find('input[name="_csrf"]').attr('value');
+const passwordResetToken = activationForm.find('input[name="passwordResetToken"]').attr('value');
 assert.ok(activationCsrf, 'the activation page exposes a CSRF token');
-const passwordResponse = await fetch(new URL('user/password/set', baseUrl), {
+assert.ok(passwordResetToken, 'the activation page exposes a password reset token');
+const passwordResponse = await sessionFetch(new URL('user/password/set', baseUrl), {
     method:'POST',
     redirect:'manual',
-    headers:{'Content-Type':'application/json', Cookie:activationCookies},
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
-        passwordResetToken:activationUrl.searchParams.get('token'),
+        passwordResetToken,
         password,
         _csrf:activationCsrf,
     }),
