@@ -25,11 +25,12 @@ import {
     type ServerImportParams,
     type ServerLoginParams,
 } from '@leafrelay/protocol';
-import {createMessageConnection, ResponseError, type MessageConnection} from 'vscode-jsonrpc/node';
+import {ResponseError, type MessageConnection} from 'vscode-jsonrpc/node';
 import {daemonPaths, type DaemonPaths} from './paths';
 import {decodeRpcValue, encodeRpcValue} from './codec';
 import {NetworkRuntimeRegistry} from './networkRuntime';
 import {ReplicaAlreadyActiveError, ReplicaRegistry} from './replicaRegistry';
+import {createSocketRpcConnection} from './transport';
 
 declare const LEAFRELAY_DAEMON_VERSION:string;
 
@@ -139,7 +140,7 @@ export class LeafRelayDaemonServer {
 
     private accept(socket:Socket):void {
         this.cancelIdleExit();
-        const rpc = createMessageConnection(socket, socket);
+        const rpc = createSocketRpcConnection(socket);
         const client:ClientConnection = {socket, rpc, initialized:false};
         this.clients.add(client);
         rpc.onRequest(RPC_METHOD.initialize, (params:InitializeParams) => this.initialize(client, params));
