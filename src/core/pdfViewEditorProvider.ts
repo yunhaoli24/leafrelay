@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
 import { EventBus } from '../utils/eventBus';
 import { GlobalStateManager } from '../utils/globalStateManager';
 
@@ -10,7 +10,7 @@ export class PdfDocument implements vscode.CustomDocument {
     readonly onDidChange = this._onDidChange.event;
 
     constructor(readonly uri: vscode.Uri) {
-        if (uri.scheme !== ROOT_NAME) {
+        if (uri.scheme !== OVERLEAF_URI_SCHEME) {
             throw new Error(`Invalid uri scheme: ${uri}`);
         }
         this.uri = uri;
@@ -85,14 +85,14 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
         webviewPanel.webview.onDidReceiveMessage((e) => {
             switch (e.type) {
                 case 'syncPdf':
-                    vscode.commands.executeCommand(`${ROOT_NAME}.compileManager.syncPdf`, e.content);
+                    vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.syncPdf`, e.content);
                     break;
                 case 'saveState':
                     GlobalStateManager.updatePdfViewPersist(this.context, doc.uri.toString(), e.content);
                     break;
                 case 'ready':
                     const state = GlobalStateManager.getPdfViewPersist(this.context, doc.uri.toString());
-                    const config = vscode.workspace.getConfiguration('overleaf-workshop.pdfViewer');
+                    const config = vscode.workspace.getConfiguration('leafrelay.pdfViewer');
                     const colorThemes = config.get('themes', undefined);
                     const defaults = {
                         scrollMode: config.get('defaultScrollMode', 'vertical'),
@@ -109,7 +109,7 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
 
     public get triggers(): vscode.Disposable[] {
         return [
-            vscode.window.registerCustomEditorProvider(`${ROOT_NAME}.pdfViewer`, this, {
+            vscode.window.registerCustomEditorProvider(`${EXTENSION_NAMESPACE}.pdfViewer`, this, {
                 webviewOptions: {
                     retainContextWhenHidden: true,
                 },

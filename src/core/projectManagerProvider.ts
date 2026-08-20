@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
 import { ProjectTagsResponseSchema } from '../api/base';
 import { GlobalStateManager } from '../utils/globalStateManager';
 import { VirtualFileSystem, parseUri } from './remoteFileSystemProvider';
@@ -129,7 +129,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
                     // get project items
                     const normalProjects = [], trashedProjects = [], archivedProjects = [];
                     for (const project of projects) {
-                        const uri = `${ROOT_NAME}://${element.name}/${encodeURIComponent(project.name)}?user=${project.userId}&project=${project.id}`;
+                        const uri = `${OVERLEAF_URI_SCHEME}://${element.name}/${encodeURIComponent(project.name)}?user=${project.userId}&project=${project.id}`;
                         const status = project.archived ? 'archived' : project.trashed ? 'trashed' : 'normal';
                         const item = new ProjectItem(element.api, uri, element, project.id, project.name, status);
                         switch (status) {
@@ -227,7 +227,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
                 .then(success => {
                     if (success) {
                         this.refresh();
-                        vscode.commands.executeCommand(`${ROOT_NAME}.localReplica.activate`, true);
+                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, true);
                     } else {
                         vscode.window.showErrorMessage( vscode.l10n.t('Login failed.') );
                     }
@@ -246,7 +246,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
                 .then(success => {
                     if (success) {
                         this.refresh();
-                        vscode.commands.executeCommand(`${ROOT_NAME}.localReplica.activate`, true);
+                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, true);
                     } else {
                         vscode.window.showErrorMessage( vscode.l10n.t('Login failed.') );
                     }
@@ -638,7 +638,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
         // A remote Overleaf folder cannot share the same workspace with a local
         // replica. Offer a new window instead of silently returning before the
         // local-replica creation prompt is reached.
-        const vfsFolder = vscode.workspace.workspaceFolders?.find(folder => folder.uri.scheme===ROOT_NAME);
+        const vfsFolder = vscode.workspace.workspaceFolders?.find(folder => folder.uri.scheme===OVERLEAF_URI_SCHEME);
         if (vfsFolder) {
             const answer = await vscode.window.showWarningMessage(
                 vscode.l10n.t('An Overleaf project is already open in this window.'),
@@ -751,72 +751,72 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
     get triggers() {
         return [
             // register tree data provider
-            vscode.window.registerTreeDataProvider(`${ROOT_NAME}.projectManager`, this),
+            vscode.window.registerTreeDataProvider(`${EXTENSION_NAMESPACE}.projectManager`, this),
             // register server-related commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.addServer`, () => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.addServer`, () => {
                 this.addServer();
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.removeServer`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.removeServer`, (item) => {
                 this.removeServer(item.name);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.loginServer`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.loginServer`, (item) => {
                 this.loginServer(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.logoutServer`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.logoutServer`, (item) => {
                 this.logoutServer(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.refreshServer`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.refreshServer`, (item) => {
                 this.refreshServer(item);
             }),
             // register project-related commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.newProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.newProject`, (item) => {
                 this.newProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.copyProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.copyProject`, (item) => {
                 this.copyProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.renameProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.renameProject`, (item) => {
                 this.renameProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.deleteProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.deleteProject`, (item) => {
                 this.deleteProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.archiveProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.archiveProject`, (item) => {
                 this.archiveProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.unarchiveProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.unarchiveProject`, (item) => {
                 this.unarchiveProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.trashProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.trashProject`, (item) => {
                 this.trashProject(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.untrashProject`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.untrashProject`, (item) => {
                 this.untrashProject(item);
             }),
             // register tag-related commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.createTag`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.createTag`, (item) => {
                 this.createTag(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.renameTag`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.renameTag`, (item) => {
                 this.renameTag(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.deleteTag`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.deleteTag`, (item) => {
                 this.deleteTag(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.addProjectToTag`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.addProjectToTag`, (item) => {
                 this.addProjectToTag(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.removeProjectFromTag`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.removeProjectFromTag`, (item) => {
                 this.removeProjectFromTag(item);
             }),
             // register open project commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.openProjectInCurrentWindow`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectInCurrentWindow`, (item) => {
                 this.openProjectInCurrentWindow(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.openProjectInNewWindow`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectInNewWindow`, (item) => {
                 this.openProjectInNewWindow(item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectManager.openProjectLocalReplica`, (item) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectLocalReplica`, (item) => {
                 return this.openProjectLocalReplica(item).catch(error => {
                     notifyError('Open Project Locally failed. See the LeafRelay output for details.', error, 'open-project-locally-failed');
                 });

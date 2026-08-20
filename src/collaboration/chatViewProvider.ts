@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { SocketIOAPI } from '../api/socketio';
 import { ProjectMessageResponseSchema } from '../api/base';
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
 import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -93,7 +93,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     revealChatView() {
         // this.webviewView?.show(true);
-        vscode.commands.executeCommand(`${ROOT_NAME}.chatWebview.focus`);
+        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.chatWebview.focus`);
         this.hasUnreadMessages = 0;
     }
 
@@ -121,7 +121,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async showLineRef(path:string, range:vscode.Range) {
-        const uri = (vscode.workspace.workspaceFolders?.[0].uri.scheme===ROOT_NAME) ?
+        const uri = (vscode.workspace.workspaceFolders?.[0].uri.scheme===OVERLEAF_URI_SCHEME) ?
                     this.vfs.pathToUri(path) : await LocalReplicaSCMProvider.pathToUri(path);
         if (uri === undefined) { return; }
 
@@ -134,16 +134,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     get triggers() {
         return [
             // register commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.collaboration.copyLineRef`, () => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.collaboration.copyLineRef`, () => {
                 const ref = this.getLineRef();
                 ref && vscode.env.clipboard.writeText(ref);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.collaboration.insertLineRef`, () => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.collaboration.insertLineRef`, () => {
                 const ref = this.getLineRef();
                 ref && this.insertText(ref + ' ');
             }),
             // register chat webview
-            vscode.window.registerWebviewViewProvider(`${ROOT_NAME}.chatWebview`, this, {webviewOptions:{retainContextWhenHidden:true}}),
+            vscode.window.registerWebviewViewProvider(`${EXTENSION_NAMESPACE}.chatWebview`, this, {webviewOptions:{retainContextWhenHidden:true}}),
         ];
     }
 }

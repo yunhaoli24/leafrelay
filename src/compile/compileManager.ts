@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { RemoteFileSystemProvider, parseUri } from '../core/remoteFileSystemProvider';
-import { ROOT_NAME, ELEGANT_NAME, OUTPUT_FOLDER_NAME } from '../consts';
+import { OVERLEAF_URI_SCHEME, ELEGANT_NAME, EXTENSION_NAMESPACE, OUTPUT_FOLDER_NAME } from '../consts';
 import { PdfDocument } from '../core/pdfViewEditorProvider';
 import { LatexParser, ErrorSchema } from './compileLogParser';
 import { EventBus } from '../utils/eventBus';
@@ -25,7 +25,7 @@ const pdfViewRecord: {
 } = {};
 
 class CompileDiagnosticProvider {
-    private diagnosticCollection = vscode.languages.createDiagnosticCollection(ROOT_NAME);
+    private diagnosticCollection = vscode.languages.createDiagnosticCollection(EXTENSION_NAMESPACE);
     constructor(private readonly vfsm: RemoteFileSystemProvider) {};
 
     private async getRange(log: ErrorSchema, path: string, vfs: any) {
@@ -116,7 +116,7 @@ class CompileDiagnosticProvider {
     get triggers() {
         return [
             this.diagnosticCollection,
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.compileErrorCheck`, async (uri) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.compileErrorCheck`, async (uri) => {
                 return await this.updateDiagnostics(uri);
             }),
         ];
@@ -135,7 +135,7 @@ export class CompileManager {
     ) {
         this.vfsm = vfsm;
         this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -1);
-        this.status.command = `${ROOT_NAME}.compilerManager.settings`;
+        this.status.command = `${EXTENSION_NAMESPACE}.compilerManager.settings`;
         this.diagnosticProvider = new CompileDiagnosticProvider(vfsm);
         // listen pdf open event
         EventBus.on('pdfWillOpenEvent', ({uri, doc, webviewPanel}) => {
@@ -153,7 +153,7 @@ export class CompileManager {
         // check if supported vfs
         uri = uri || vscode.window.activeTextEditor?.document.uri;
         uri = uri || vscode.workspace.workspaceFolders?.[0].uri;
-        if (uri?.scheme === ROOT_NAME) {
+        if (uri?.scheme === OVERLEAF_URI_SCHEME) {
             return uri;
         }
         // check if supported local replica
@@ -235,7 +235,7 @@ export class CompileManager {
                 })
                 .then(status =>
                     status ?
-                        vscode.commands.executeCommand(`${ROOT_NAME}.compileManager.compileErrorCheck`, uri)
+                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.compileErrorCheck`, uri)
                         : Promise.reject()
                 )
                 .then(async (hasError) => {
@@ -271,7 +271,7 @@ export class CompileManager {
                 path: `/${rootPath}/${OUTPUT_FOLDER_NAME}/output.pdf`,
             });
             vscode.commands.executeCommand('vscode.openWith', pdfUri,
-                `${ROOT_NAME}.pdfViewer`,
+                `${EXTENSION_NAMESPACE}.pdfViewer`,
                 { preview: false, viewColumn: vscode.ViewColumn.Beside }
             );
         }
@@ -459,18 +459,18 @@ export class CompileManager {
             // register status bar
             this.status,
             // register compile commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.compile`, () => this.compile(true)),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.viewPdf`, () =>  this.openPdf()),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.syncCode`, () => this.syncCode()),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.syncPdf`, (r) => this.syncPdf(r)),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compilerManager.settings`, ()=> this.compileSettings()),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.setCompiler`, () => this.setCompiler()),
-            vscode.commands.registerCommand(`${ROOT_NAME}.compileManager.setRootDoc`, () => this.setRootDoc()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.compile`, () => this.compile(true)),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.viewPdf`, () =>  this.openPdf()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.syncCode`, () => this.syncCode()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.syncPdf`, (r) => this.syncPdf(r)),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compilerManager.settings`, ()=> this.compileSettings()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setCompiler`, () => this.setCompiler()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setRootDoc`, () => this.setRootDoc()),
             // register compile conditions
             vscode.workspace.onDidSaveTextDocument(async (e) => {
                 const uri = await CompileManager.check.bind(this)(e.uri);
                 const vfs = uri && await this.vfsm.prefetch(uri);
-                const compileCondition = vscode.workspace.getConfiguration(`${ROOT_NAME}.compileOnSave`).get('enabled', true);
+                const compileCondition = vscode.workspace.getConfiguration(`${EXTENSION_NAMESPACE}.compileOnSave`).get('enabled', true);
                 const postfixCondition = e.fileName.match(/\.tex$|\.sty$|\.cls$|\.bib$/i);
                 if (compileCondition && postfixCondition && vfs?.isInvisibleMode===false) {
                     this.compile();

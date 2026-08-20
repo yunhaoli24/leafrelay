@@ -6,11 +6,11 @@ import { EventEmitter } from 'node:events';
 import { BaseAPI, Identity, ProjectMessageResponseSchema, ProjectSettingsSchema } from './base';
 import { DocumentEntity, FileEntity, ProjectEntity, VirtualFileSystem } from '../core/remoteFileSystemProvider';
 import { UpdateSchema, UpdateUserSchema } from './socketio';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE } from '../consts';
 
-const keyHistoryRefreshInterval = `${ROOT_NAME}.invisibleMode.historyRefreshInterval`;
-const keyChatMessageRefreshInterval = `${ROOT_NAME}.invisibleMode.chatMessageRefreshInterval`;
-const keyInactiveTimeout = `${ROOT_NAME}.invisibleMode.inactiveTimeout`;
+const keyHistoryRefreshInterval = 'invisibleMode.historyRefreshInterval';
+const keyChatMessageRefreshInterval = 'invisibleMode.chatMessageRefreshInterval';
+const keyInactiveTimeout = 'invisibleMode.inactiveTimeout';
 
 type EmitCallbackType = (err: Error|undefined, ...data:any[]) => void;
 type EmitEventsSupport = {
@@ -132,20 +132,20 @@ export class SocketIOAlt {
     }
 
     private get historyRefreshInterval(): number {
-        return vscode.workspace.getConfiguration(ROOT_NAME).get<number>(keyHistoryRefreshInterval, 3) * 1000;//ms
+        return vscode.workspace.getConfiguration(EXTENSION_NAMESPACE).get<number>(keyHistoryRefreshInterval, 3) * 1000;//ms
     }
 
     private get messageRefreshInterval(): number {
-        return vscode.workspace.getConfiguration(ROOT_NAME).get<number>(keyChatMessageRefreshInterval, 3) * 1000;//ms
+        return vscode.workspace.getConfiguration(EXTENSION_NAMESPACE).get<number>(keyChatMessageRefreshInterval, 3) * 1000;//ms
     }
 
     private watchConfigurations() {
         return vscode.workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration(`${ROOT_NAME}.invisibleMode.historyRefreshInterval`)) {
+                if (e.affectsConfiguration(`${EXTENSION_NAMESPACE}.${keyHistoryRefreshInterval}`)) {
                     this.vfsRefreshTask.interval = this.historyRefreshInterval;
                 }
 
-                if (e.affectsConfiguration(`${ROOT_NAME}.invisibleMode.chatMessageRefreshInterval`)) {
+                if (e.affectsConfiguration(`${EXTENSION_NAMESPACE}.${keyChatMessageRefreshInterval}`)) {
                     this.msgRefreshTask.interval = this.messageRefreshInterval;
                 }
             });
@@ -272,7 +272,7 @@ export class SocketIOAlt {
             this._eventEmitter.emit('clientTracking.clientUpdated', user);
         });
         this.connectedUsers = this.connectedUsers.filter(user => {
-            const DisconnectionTimeout = vscode.workspace.getConfiguration(ROOT_NAME).get<number>(keyInactiveTimeout, 180) * 1000;//ms
+            const DisconnectionTimeout = vscode.workspace.getConfiguration(EXTENSION_NAMESPACE).get<number>(keyInactiveTimeout, 180) * 1000;//ms
             const isDisconnected = Date.now() - (user.last_updated_at||Date.now()) > DisconnectionTimeout;
             if (isDisconnected) {
                 this._eventEmitter.emit('clientTracking.clientDisconnected', user.id);

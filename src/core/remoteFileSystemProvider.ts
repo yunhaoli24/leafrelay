@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import DiffMatchPatch from 'diff-match-patch';
 import { BaseAPI, MemberEntity, ProjectFileTreeDiffResponseSchema, ProjectSettingsSchema, ProjectUpdateResponseSchema } from '../api/base';
 import { SocketIOAPI, UpdateSchema } from '../api/socketio';
-import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OUTPUT_FOLDER_NAME, OVERLEAF_URI_SCHEME } from '../consts';
 import { GlobalStateManager } from '../utils/globalStateManager';
 import { ClientManager } from '../collaboration/clientManager';
 import { EventBus } from '../utils/eventBus';
@@ -13,7 +13,7 @@ import { ExtendedBaseAPI, ProjectLinkedFileProvider, UrlLinkedFileProvider } fro
 import { error, log, notifyError, warn } from '../utils/outputChannel';
 import {mergeText} from '../sync/threeWayMerge';
 
-const __OUTPUTS_ID = `${ROOT_NAME}-outputs`;
+const __OUTPUTS_ID = `${EXTENSION_NAMESPACE}-outputs`;
 
 export type FileType = 'doc' | 'file' | 'folder' | 'outputs';
 export type FolderKey = 'docs' | 'fileRefs' | 'folders' | 'outputs';
@@ -216,7 +216,7 @@ export class VirtualFileSystem extends vscode.Disposable {
         if (workspaceFolders.length!==1) { return false; }
 
         const workspaceUri = workspaceFolders[0].uri;
-        if (workspaceUri.scheme===ROOT_NAME) {
+        if (workspaceUri.scheme===OVERLEAF_URI_SCHEME) {
             return workspaceUri.authority===this.origin.authority && workspaceUri.query===this.origin.query;
         }
         if (workspaceUri.scheme!=='file') { return false; }
@@ -388,7 +388,7 @@ export class VirtualFileSystem extends vscode.Disposable {
             this.retryConnection = 0;
             this.reconnectingNotification = false;
             if (this.clientManagerItem!==undefined || this.scmCollectionItem!==undefined) {
-                vscode.commands.executeCommand(`${ROOT_NAME}.compileManager.compile`);
+                vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.compile`);
             }
             return project;
         };
@@ -1550,12 +1550,12 @@ export class RemoteFileSystemProvider implements vscode.FileSystemProvider {
     get triggers() {
         return [
             // register file system provider
-            vscode.workspace.registerFileSystemProvider(ROOT_NAME, this, { isCaseSensitive: true }),
+            vscode.workspace.registerFileSystemProvider(OVERLEAF_URI_SCHEME, this, { isCaseSensitive: true }),
             // register commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.remoteFileSystem.refreshLinkedFile`, (uri: vscode.Uri) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.remoteFileSystem.refreshLinkedFile`, (uri: vscode.Uri) => {
                 return this.prefetch(uri).then((vfs) => vfs.refreshLinkedFile(uri));
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.remoteFileSystem.createLinkedFile`, (uri?: vscode.Uri) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.remoteFileSystem.createLinkedFile`, (uri?: vscode.Uri) => {
                 uri = uri || vscode.workspace.workspaceFolders?.[0].uri;
                 if (uri) {
                     return this.prefetch(uri).then((vfs) => vfs.createLinkedFile(uri!));

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
-export const ROOT_NAME = 'overleaf-workshop';
+export const OVERLEAF_URI_SCHEME = 'overleaf-workshop';
+export const EXTENSION_NAMESPACE = 'leafrelay';
 export const ELEGANT_NAME = 'LeafRelay';
 
-export const OUTPUT_FOLDER_NAME = vscode.workspace.getConfiguration('overleaf-workshop').get('compileOutputFolderName', '.output') || '.output';
+export const OUTPUT_FOLDER_NAME = vscode.workspace.getConfiguration(EXTENSION_NAMESPACE).get('compileOutputFolderName', '.output') || '.output';

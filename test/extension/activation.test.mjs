@@ -11,7 +11,7 @@ suite('LeafRelay activation', () => {
 
         const commands = await vscode.commands.getCommands(true);
         assert.ok(
-            commands.includes('overleaf-workshop.projectManager.addServer'),
+            commands.includes('leafrelay.projectManager.addServer'),
             'the Add Server command is registered after activation',
         );
     });

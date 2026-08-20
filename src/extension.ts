@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ROOT_NAME, ELEGANT_NAME } from './consts';
+import { OVERLEAF_URI_SCHEME, ELEGANT_NAME, EXTENSION_NAMESPACE } from './consts';
 
 import { parseUri, RemoteFileSystemProvider, VirtualFileSystem } from './core/remoteFileSystemProvider';
 import { ProjectManagerProvider } from './core/projectManagerProvider';
@@ -43,7 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
             const setting = await LocalReplicaSCMProvider.readSettings();
             if (!setting?.uri) { return; }
             const uri = vscode.Uri.parse(setting.uri);
-            if (uri.scheme!==ROOT_NAME) { return; }
+            if (uri.scheme!==OVERLEAF_URI_SCHEME) { return; }
             const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
             if (workspaceRoot===undefined || workspaceRoot.scheme!=='file') { return; }
 
@@ -75,8 +75,8 @@ export function activate(context: vscode.ExtensionContext) {
             }
             const vfs = (await vscode.commands.executeCommand('remoteFileSystem.prefetch', uri)) as VirtualFileSystem;
             await vfs.init();
-            await vscode.commands.executeCommand('setContext', `${ROOT_NAME}.activate`, true);
-            await vscode.commands.executeCommand('setContext', `${ROOT_NAME}.activateCompile`, Boolean(setting.enableCompileNPreview));
+            await vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activate`, true);
+            await vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activateCompile`, Boolean(setting.enableCompileNPreview));
         })()
         .catch(error => {
             notifyError(
@@ -84,7 +84,7 @@ export function activate(context: vscode.ExtensionContext) {
                 error,
                 'local-replica-reconnect',
                 [
-                    {title:'Open LeafRelay', run:() => vscode.commands.executeCommand('workbench.view.extension.overleaf-workshop')},
+                    {title:'Open LeafRelay', run:() => vscode.commands.executeCommand('workbench.view.extension.leafrelay')},
                     {title:'Retry Connection', run:() => activateLocalReplica(true)},
                 ],
             );
@@ -93,13 +93,13 @@ export function activate(context: vscode.ExtensionContext) {
         return localReplicaActivation;
     };
 
-    context.subscriptions.push(vscode.commands.registerCommand(`${ROOT_NAME}.localReplica.activate`, (forceReset?: boolean) => {
+    context.subscriptions.push(vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, (forceReset?: boolean) => {
         return activateLocalReplica(forceReset===true);
     }));
     activateLocalReplica();
 }
 
 export function deactivate() {
-    vscode.commands.executeCommand('setContext', `${ROOT_NAME}.activate`, false);
-    vscode.commands.executeCommand('setContext', `${ROOT_NAME}.activateCompile`, false);
+    vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activate`, false);
+    vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activateCompile`, false);
 }
