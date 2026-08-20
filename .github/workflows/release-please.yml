@@ -63,6 +63,9 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      - name: Setup npm trusted publishing
+        run: npm install --global npm@latest
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -75,5 +78,3 @@ jobs:
           TARBALL="leafrelay-${VERSION}.tgz"
           pnpm --dir packages/cli pack --pack-destination ../..
           npm publish "$TARBALL" --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
