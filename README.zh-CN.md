@@ -22,8 +22,9 @@ LeafRelay 专门针对这些问题设计：
 - **外部修改自动同步**：终端、其他编辑器、脚本和 AI 工具修改文件后也能触发上传。
 - **增量启动和重连**：本地状态有效时只传输发生变化的文件。
 - **冲突先暂停**：本地和 Overleaf 同时修改同一路径时保留两边内容，不自动替用户选择。
-- **每个工作区只启用一个本地副本**：避免旧目录继续向项目推送过期内容。
+- **每个 Overleaf 项目只允许一个可写目录**：避免旧副本和当前目录竞争并上传过期内容。
 - **请求限流感知**：统一排队项目请求并遵守 Overleaf 的 `429` 冷却时间，减少请求突发。
+- **所有客户端共享一个后台服务**：多个 VS Code 窗口和 CLI 进程共用同一个 watcher、实时连接和上传队列。
 - **忽略点目录和软链接**：包括 `.output` 等生成目录，不会被误上传或删除。
 
 LeafRelay 保留 Overleaf Workshop 的虚拟项目和协作能力，同时把日常本地目录同步的可靠性放在首要位置。
@@ -60,7 +61,9 @@ cd /path/to/local-replica
 leafrelay serve
 ```
 
-`leafrelay login` 会按服务器把登录会话保存到 `~/.leafrelay/config.json`。可以用 `LEAFRELAY_CONFIG` 指定其他配置文件，或用 `LEAFRELAY_COOKIE` 仅覆盖当前进程使用的 cookie。
+第一个 VS Code 窗口或 CLI 命令会启动共享 daemon，后续客户端通过 `~/.leafrelay/daemon.sock` 连接。因此同时运行 VS Code 和 `leafrelay serve` 不会重复上传。
+
+`leafrelay login` 会按服务器把登录会话保存到 `~/.leafrelay/config.json`。使用 `leafrelay daemon status|stop|restart` 查看或控制后台进程。`LEAFRELAY_HOME` 可以移动全部用户状态，`LEAFRELAY_CONFIG` 只修改登录文件位置，`LEAFRELAY_COOKIE` 则仅覆盖当前进程使用的 cookie。
 
 ## 开发
 
@@ -73,7 +76,7 @@ pnpm run compile
 
 Pull Request 会运行 VS Code 激活测试和 ShareLaTeX 容器集成测试。发布由 Release Please 准备，并通过自动流水线发布 VS Code 扩展、npm 包和 GitHub Release 附件。
 
-pnpm monorepo 将可复用同步引擎放在 `packages/core`，后台 CLI 放在 `packages/cli`，VS Code 适配层放在 `apps/vscode`。
+pnpm monorepo 将协议、可复用同步核心、共享 daemon、CLI 和 VS Code 适配层分开维护。
 
 ## 项目背景
 

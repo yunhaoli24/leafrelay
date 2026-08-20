@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SocketIOAPI, ProjectMessageResponseSchema } from '@leafrelay/core';
+import { ProjectSocket, ProjectMessageResponseSchema } from '@leafrelay/core';
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
 import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
 import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
@@ -12,7 +12,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         private readonly vfs: VirtualFileSystem,
         private readonly publicId: string,
         private readonly extensionUri: vscode.Uri,
-        private readonly socket: SocketIOAPI,
+        private readonly socket: ProjectSocket,
     ) {
         this.socket.updateEventHandlers({
             onReceivedMessage: this.onReceivedMessage.bind(this)

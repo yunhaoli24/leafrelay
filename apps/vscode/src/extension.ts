@@ -9,13 +9,16 @@ import { LangIntellisenseProvider } from './intellisense';
 import { LocalReplicaSCMProvider } from './scm/localReplicaSCM';
 import { GlobalStateManager } from './utils/globalStateManager';
 import { initOutputChannel, log, notifyError } from './utils/outputChannel';
+import {DaemonService} from './utils/daemonService';
 
 let localReplicaActivation: Promise<void> | undefined;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     // Keep extension diagnostics in a selectable channel in the Output view.
     initOutputChannel(context);
     log(`${ELEGANT_NAME} ${context.extension.packageJSON.version} activated.`);
+    await DaemonService.initialize(context);
+    await GlobalStateManager.initialize(context);
 
     // Register: [core] RemoteFileSystemProvider
     const remoteFileSystemProvider = new RemoteFileSystemProvider(context);

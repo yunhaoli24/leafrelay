@@ -1,6 +1,7 @@
 export * from './api/base';
 export * from './api/extendedBase';
 export * from './api/overleafRealtimeSocket';
+export * from './api/requestScheduler';
 export * from './api/socketio';
 export * from './core/logger';
 export * from './core/projectTypes';

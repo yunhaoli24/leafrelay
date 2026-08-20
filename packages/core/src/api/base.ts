@@ -6,53 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { FileEntity, FileType, FolderEntity, OutputFileEntity } from '../core/projectTypes';
 import { log } from '../core/logger';
 import type { MemberEntity, ProjectSettingsSchema } from '../core/projectTypes';
+import {HttpRequestScheduler, sharedHttpRequestScheduler} from './requestScheduler';
 
 export type { MemberEntity, ProjectSettingsSchema } from '../core/projectTypes';
-
-// Overleaf rate limits are applied to the authenticated user, not to a single
-// BaseAPI instance. Keep every HTTP request in one process-wide queue so
-// several projects cannot collectively trigger a burst of 429 responses.
-let globalRequestChain: Promise<void> = Promise.resolve();
-let globalNextRequestAt = 0;
-let globalRateLimitedUntil = 0;
-const GLOBAL_MIN_REQUEST_INTERVAL_MS = 300;
-
-function retryAfterHeaderMs(response: any): number {
-    const retryAfter = response.headers?.get?.('retry-after');
-    if (retryAfter!==undefined && retryAfter!==null) {
-        const seconds = Number(retryAfter);
-        if (Number.isFinite(seconds)) {
-            return Math.max(1000, seconds*1000);
-        }
-        const retryAt = Date.parse(retryAfter);
-        if (Number.isFinite(retryAt)) { return Math.max(1000, retryAt-Date.now()); }
-    }
-    return 5000;
-}
-
-async function queuedFetch(url: string, init: any): Promise<any> {
-    const previous = globalRequestChain;
-    let release!: () => void;
-    globalRequestChain = new Promise<void>(resolve => { release = resolve; });
-    await previous;
-    try {
-        const delayMs = Math.max(
-            0,
-            globalNextRequestAt-Date.now(),
-            globalRateLimitedUntil-Date.now(),
-        );
-        if (delayMs>0) { await new Promise(resolve => setTimeout(resolve, delayMs)); }
-        globalNextRequestAt = Date.now() + GLOBAL_MIN_REQUEST_INTERVAL_MS;
-        const response = await fetch(url, init);
-        if (response.status===429) {
-            globalRateLimitedUntil = Math.max(globalRateLimitedUntil, Date.now() + retryAfterHeaderMs(response));
-            log(`Global HTTP request queue entered rate-limit cooldown until ${new Date(globalRateLimitedUntil).toISOString()}.`);
-        }
-        return response;
-    } finally {
-        release();
-    }
-}
 
 /** Extract set-cookie headers from an undici/Response object. */
 function getSetCookie(res: any): string[] {
@@ -239,29 +195,6 @@ export interface ResponseSchema {
 export class BaseAPI {
     private url: string;
     private identity?: Identity;
-    private historyRequestChain: Promise<void> = Promise.resolve();
-    private lastHistoryRequestAt = 0;
-
-    private isHistoryRoute(route: string): boolean {
-        return route.includes('/updates?') || route.includes('/filetree/diff?') || route.includes('/diff?');
-    }
-
-    private async waitForHistoryRequest() {
-        const previous = this.historyRequestChain;
-        let release!: () => void;
-        this.historyRequestChain = new Promise<void>(resolve => { release = resolve; });
-        await previous;
-        try {
-            const minimumIntervalMs = 3000;
-            const delayMs = Math.max(0, minimumIntervalMs - (Date.now() - this.lastHistoryRequestAt));
-            if (delayMs>0) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-            this.lastHistoryRequestAt = Date.now();
-        } finally {
-            release();
-        }
-    }
 
     private retryAfterMs(response: any, attempt: number): number {
         const retryAfter = response.headers?.get?.('retry-after');
@@ -278,12 +211,12 @@ export class BaseAPI {
         return 5000 * Math.pow(2, attempt);
     }
 
-    constructor(url:string) {
+    constructor(url:string, private readonly scheduler:HttpRequestScheduler=sharedHttpRequestScheduler) {
         this.url = url;
     }
 
     private async getCsrfToken(): Promise<Identity> {
-        const res = await queuedFetch(this.url+'login', {
+        const res = await this.scheduler.fetch(this.url+'login', {
             method: 'GET', redirect: 'manual',
         });
         const body = await res.text();
@@ -298,7 +231,7 @@ export class BaseAPI {
     }
 
     private async getUserId(cookies:string) {
-        const res = await queuedFetch(this.url+'project', {
+        const res = await this.scheduler.fetch(this.url+'project', {
             method: 'GET', redirect:'manual',
             headers: {
                 'Connection': 'keep-alive',
@@ -330,12 +263,13 @@ export class BaseAPI {
             reconnectionDelay:1000,
             reconnectionLimit:16000,
             maxReconnectionAttempts:10,
+            fetch:(input, init) => this.scheduler.fetch(input, init),
         });
     }
 
     async passportLogin(email:string, password:string): Promise<ResponseSchema> {
         const identity = await this.getCsrfToken();
-        const res = await queuedFetch(this.url+'login', {
+        const res = await this.scheduler.fetch(this.url+'login', {
             method: 'POST', redirect: 'manual',
             headers: {
                 'Accept': '*/*',
@@ -397,7 +331,7 @@ export class BaseAPI {
     }
 
     async updateCookies(identity: Identity) {
-        const res = await queuedFetch(this.url + 'socket.io/socket.io.js', {
+        const res = await this.scheduler.fetch(this.url + 'socket.io/socket.io.js', {
             method: 'GET',
             redirect: 'manual',
             headers: {
@@ -451,13 +385,10 @@ export class BaseAPI {
 
         for (let attempt = 0; attempt <= MAX_HTTP_RETRIES; attempt++) {
             try {
-                if (this.isHistoryRoute(route)) {
-                    await this.waitForHistoryRequest();
-                }
                 let res = undefined;
                 switch(type) {
                     case 'GET':
-                        res = await queuedFetch(this.url+route, {
+                        res = await this.scheduler.fetch(this.url+route, {
                             method: 'GET', redirect: 'manual',
                             headers: {
                                 'Connection': 'keep-alive',
@@ -472,7 +403,7 @@ export class BaseAPI {
                             _csrf: this.identity!.csrfToken,
                             ...body
                         });
-                        res = await queuedFetch(this.url+route, {
+                        res = await this.scheduler.fetch(this.url+route, {
                             method: 'POST', redirect: 'manual',
                             headers: {
                                 'Connection': 'keep-alive',
@@ -486,7 +417,7 @@ export class BaseAPI {
                     case 'PUT':
                         break;
                     case 'DELETE':
-                        res = await queuedFetch(this.url+route, {
+                        res = await this.scheduler.fetch(this.url+route, {
                             method: 'DELETE', redirect: 'manual',
                             headers: {
                                 'Connection': 'keep-alive',
@@ -551,7 +482,7 @@ export class BaseAPI {
 
         let content: Buffer[] = [];
         while(true) {
-            const res = await queuedFetch(this.url+route, {
+            const res = await this.scheduler.fetch(this.url+route, {
                 method: 'GET', redirect: 'manual',
                 headers: {
                     'Connection': 'keep-alive',
@@ -862,7 +793,7 @@ export class BaseAPI {
         }
         let content: Buffer[] = [];
         while (true) {
-            const res = await queuedFetch(absoluteUrl, {
+            const res = await this.scheduler.fetch(absoluteUrl, {
                 method: 'GET', redirect: 'manual',
                 headers
             });

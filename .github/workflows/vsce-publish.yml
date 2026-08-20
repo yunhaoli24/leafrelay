@@ -31,6 +31,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
 
     steps:
       - name: Checkout code

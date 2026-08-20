@@ -1,8 +1,8 @@
 import {mkdtemp, readFile, rm, stat} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {platform, tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
-import {getServerSession, readConfig, saveServerSession} from '../src/node/config';
+import {configPath, getServerSession, readConfig, saveServerSession} from '../src/node/config';
 
 const temporaryDirectories:string[] = [];
 
@@ -24,7 +24,9 @@ describe('LeafRelay user configuration', () => {
         }, path);
 
         expect((await readConfig(path)).servers['www.overleaf.com'].userId).toBe('user-1');
-        expect((await stat(path)).mode & 0o777).toBe(0o600);
+        if (platform()!=='win32') {
+            expect((await stat(path)).mode & 0o777).toBe(0o600);
+        }
         expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(1);
     });
 
@@ -46,5 +48,10 @@ describe('LeafRelay user configuration', () => {
         });
         expect(session?.identity.cookies).toBe('session=environment');
         expect((await readConfig(path)).servers['www.overleaf.com'].identity.cookies).toBe('session=stored');
+    });
+
+    it('stores the common config under LEAFRELAY_HOME', () => {
+        const home = join(tmpdir(), 'leafrelay-home');
+        expect(configPath({LEAFRELAY_HOME:home})).toBe(join(home, 'config.json'));
     });
 });

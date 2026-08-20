@@ -8,10 +8,10 @@ import makeFetchCookie from 'fetch-cookie';
 import {CookieJar} from 'tough-cookie';
 import {
     BaseAPI,
-    RemoteProject,
     saveServerSession,
-    startServe,
 } from '../../packages/core/dist/index.js';
+import {LeafRelayDaemonClient} from '../../packages/daemon/dist/index.js';
+import {startServe} from '../../packages/cli/dist/index.js';
 
 const baseUrl = new URL(process.env.OVERLEAF_URL ?? 'http://localhost:8080/');
 const sessionFetch = makeFetchCookie(fetch, new CookieJar());
@@ -65,6 +65,7 @@ assert.ok(projectId);
 
 const directory = await mkdtemp(join(tmpdir(), 'leafrelay-integration-'));
 const config = join(directory, 'leafrelay-config.json');
+const leafrelayHome = join(directory, 'home');
 const replica = join(directory, 'replica');
 await mkdir(join(replica, '.overleaf'), {recursive:true});
 const projectUri = `overleaf-workshop://${baseUrl.host}/LeafRelay%20Integration?${encodeURIComponent(`user=${login.userInfo.userId}&project=${projectId}`)}`;
@@ -83,10 +84,17 @@ await saveServerSession({
     updatedAt:new Date().toISOString(),
 }, config);
 process.env.LEAFRELAY_CONFIG = config;
+process.env.LEAFRELAY_HOME = leafrelayHome;
 
 const running = await startServe(replica);
-const observer = new RemoteProject(baseUrl.href, projectId, login.identity.cookies);
-await observer.connect();
+const secondClient = await LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'integration'});
+const sharedReplica = await secondClient.attachReplica({directory:replica});
+const observedProject = await secondClient.openProject(baseUrl.host, projectId);
+const observer = {
+    entry:path => secondClient.callProject(observedProject.projectKey, 'remote.entry', [path]),
+    read:path => secondClient.callProject(observedProject.projectKey, 'remote.read', [path]),
+    write:(path, content) => secondClient.callProject(observedProject.projectKey, 'remote.write', [path, content]),
+};
 
 async function waitFor(check, message) {
     for (let attempt = 0; attempt < 80; attempt++) {
@@ -96,10 +104,33 @@ async function waitFor(check, message) {
     throw new Error(message);
 }
 
+async function hasCheckpoint(path) {
+    try {
+        const state = JSON.parse(await readFile(join(replica, '.overleaf', 'sync-state.json'), 'utf8'));
+        return typeof state.files?.[path]==='string';
+    } catch {
+        return false;
+    }
+}
+
 try {
+    const initialStatus = await secondClient.status();
+    assert.equal(initialStatus.projects, 1, 'the daemon owns one project runtime');
+    assert.equal(initialStatus.replicas.length, 1, 'the daemon owns one local watcher');
+    assert.equal(initialStatus.replicas[0].clients, 2, 'both clients share the same replica');
+
+    const secondReplica = join(directory, 'second-replica');
+    await mkdir(join(secondReplica, '.overleaf'), {recursive:true});
+    await writeFile(join(secondReplica, '.overleaf', 'settings.json'), await readFile(join(replica, '.overleaf', 'settings.json')));
+    await assert.rejects(
+        secondClient.attachReplica({directory:secondReplica}),
+        /already synchronized/,
+        'a second writable root for one project must be rejected',
+    );
+
     await writeFile(join(replica, 'local.tex'), 'local to Overleaf\n');
     await waitFor(async () => {
-        if (!observer.entry('/local.tex')) { return false; }
+        if (!await observer.entry('/local.tex')) { return false; }
         return new TextDecoder().decode(await observer.read('/local.tex'))==='local to Overleaf\n';
     }, 'a local filesystem change was not uploaded by leafrelay serve');
 
@@ -108,9 +139,45 @@ try {
         try { return await readFile(join(replica, 'remote.tex'), 'utf8')==='Overleaf to local\n'; }
         catch { return false; }
     }, 'an Overleaf change was not downloaded by leafrelay serve');
+
+    await writeFile(join(replica, 'merge.tex'), 'first\nmiddle\nthird\n');
+    await waitFor(async () => await observer.entry('/merge.tex')!==undefined && await hasCheckpoint('/merge.tex'), 'merge fixture was not checkpointed');
+    await writeFile(join(replica, 'merge.tex'), 'FIRST\nmiddle\nthird\n');
+    await observer.write('/merge.tex', new TextEncoder().encode('first\nmiddle\nTHIRD\n'));
+    await waitFor(async () => {
+        const local = await readFile(join(replica, 'merge.tex'), 'utf8');
+        const remote = new TextDecoder().decode(await observer.read('/merge.tex'));
+        return local==='FIRST\nmiddle\nTHIRD\n' && remote===local;
+    }, 'non-overlapping local and Overleaf edits were not merged');
+
+    await writeFile(join(replica, 'conflict.tex'), 'base\n');
+    await waitFor(async () => await observer.entry('/conflict.tex')!==undefined && await hasCheckpoint('/conflict.tex'), 'conflict fixture was not checkpointed');
+    let conflictPath;
+    const conflictListener = secondClient.onReplicaConflict(event => { conflictPath = event.path; });
+    await writeFile(join(replica, 'conflict.tex'), 'local\n');
+    await observer.write('/conflict.tex', new TextEncoder().encode('remote\n'));
+    await waitFor(() => conflictPath==='/conflict.tex', 'an overlapping edit did not produce a path conflict');
+    await secondClient.resolveConflict({replicaId:sharedReplica.replicaId, path:'/conflict.tex', winner:'local'});
+    await waitFor(async () => new TextDecoder().decode(await observer.read('/conflict.tex'))==='local\n', 'local conflict resolution was not applied');
+    conflictListener.dispose();
+
+    const previousPid = (await secondClient.status()).pid;
+    process.kill(previousPid, 'SIGTERM');
+    await waitFor(async () => {
+        try { return (await secondClient.status()).pid!==previousPid; }
+        catch { return false; }
+    }, 'clients did not reconnect after the daemon restarted');
+    await writeFile(join(replica, 'after-restart.tex'), 'restored watcher\n');
+    await waitFor(async () => {
+        if (!await observer.entry('/after-restart.tex')) { return false; }
+        return new TextDecoder().decode(await observer.read('/after-restart.tex'))==='restored watcher\n';
+    }, 'the replica was not restored after daemon restart');
 } finally {
-    observer.disconnect();
     await running.stop();
+    await secondClient.detachReplica(sharedReplica.replicaId).catch(() => {});
+    await secondClient.closeProject(observedProject.projectKey).catch(() => {});
+    await secondClient.shutdownDaemon().catch(() => {});
+    secondClient.close();
     await api.deleteProject(login.identity, projectId);
     await rm(directory, {recursive:true, force:true});
 }

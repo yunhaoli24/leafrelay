@@ -14,12 +14,13 @@ export interface ServerSession {
 export interface LeafRelayConfig {
     version: 1;
     servers: Record<string, ServerSession>;
+    knownServers?:Record<string,{name:string; url:string}>;
 }
 
 export function configPath(environment: NodeJS.ProcessEnv = process.env): string {
     return environment.LEAFRELAY_CONFIG
         ? resolve(environment.LEAFRELAY_CONFIG)
-        : join(homedir(), '.leafrelay', 'config.json');
+        : join(environment.LEAFRELAY_HOME ? resolve(environment.LEAFRELAY_HOME) : join(homedir(), '.leafrelay'), 'config.json');
 }
 
 export function normalizeServerUrl(value: string): string {
@@ -43,7 +44,7 @@ export async function readConfig(path = configPath()): Promise<LeafRelayConfig> 
         return parsed as LeafRelayConfig;
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code==='ENOENT') {
-            return {version:1, servers:{}};
+            return {version:1, servers:{}, knownServers:{}};
         }
         throw error;
     }
@@ -57,7 +58,32 @@ export async function writeConfig(config: LeafRelayConfig, path = configPath()):
 
 export async function saveServerSession(session: ServerSession, path = configPath()): Promise<void> {
     const config = await readConfig(path);
-    config.servers[serverKey(session.url)] = session;
+    const key = serverKey(session.url);
+    config.servers[key] = session;
+    config.knownServers ??= {};
+    config.knownServers[key] ??= {name:key, url:session.url};
+    await writeConfig(config, path);
+}
+
+export async function saveKnownServer(name:string, url:string, path=configPath()):Promise<void> {
+    const config = await readConfig(path);
+    const key = serverKey(url);
+    config.knownServers ??= {};
+    config.knownServers[key] = {name, url:normalizeServerUrl(url)};
+    await writeConfig(config, path);
+}
+
+export async function removeKnownServer(server:string, path=configPath()):Promise<void> {
+    const config = await readConfig(path);
+    const key = serverKey(server);
+    delete config.servers[key];
+    delete config.knownServers?.[key];
+    await writeConfig(config, path);
+}
+
+export async function removeServerSession(server:string, path=configPath()):Promise<void> {
+    const config = await readConfig(path);
+    delete config.servers[serverKey(server)];
     await writeConfig(config, path);
 }
 

@@ -74,6 +74,20 @@ export interface EventsHandler {
     onRootDocUpdated?: (rootDocId:string) => void,
 }
 
+export interface ProjectSocket {
+    readonly needsReinit:boolean;
+    readonly connectionScheme:'Alt'|'realtime';
+    init():void;
+    disconnect():void;
+    updateEventHandlers(handlers:EventsHandler):void;
+    joinProject(projectId:string):Promise<ProjectEntity>;
+    joinDoc(docId:string):Promise<{docLines:string[]; version:number; updates:unknown[]; ranges:unknown}>;
+    leaveDoc(docId:string):Promise<void>;
+    applyOtUpdate(docId:string, update:UpdateSchema):Promise<void>;
+    getConnectedUsers():Promise<OnlineUserSchema[]>;
+    updatePosition(docId:string, row:number, column:number):Promise<void>;
+}
+
 type ConnectionScheme = 'Alt' | 'realtime';
 type AlternativeSocketFactory = (
     url:string,
@@ -83,7 +97,7 @@ type AlternativeSocketFactory = (
     record:Promise<ProjectEntity>,
 ) => any;
 
-export class SocketIOAPI {
+export class SocketIOAPI implements ProjectSocket {
     private static alternativeSocketFactory?: AlternativeSocketFactory;
     private scheme: ConnectionScheme;
     private record?: Promise<ProjectEntity>;

@@ -784,9 +784,9 @@
     "update-l10n": "pnpm exec l10n-dev export -o ./l10n ./src",
     "clean": "rimraf out views/chat-view/dist",
     "typecheck": "tsc -p ./ --noEmit",
-    "build:extension": "esbuild src/extension.ts --bundle --platform=node --format=esm --target=node24 --external:vscode --outfile=out/extension.js --sourcemap",
+    "build:extension": "node build.mjs",
     "build": "pnpm run clean && pnpm run typecheck && pnpm run build:extension && pnpm --dir views/chat-view run build",
-    "watch": "esbuild src/extension.ts --bundle --platform=node --format=esm --target=node24 --external:vscode --outfile=out/extension.js --sourcemap --watch"
+    "watch": "node build.mjs --watch"
   },
   "dependencies": {
     "@unified-latex/unified-latex-prettier": "^1.8.4",
@@ -799,7 +799,9 @@
     "prettier": "^3.9.6"
   },
   "devDependencies": {
-    "@leafrelay/core": "workspace:*"
+    "@leafrelay/core": "workspace:*",
+    "@leafrelay/daemon": "workspace:*",
+    "@leafrelay/protocol": "workspace:*"
   },
   "extensionKind": [
     "workspace",

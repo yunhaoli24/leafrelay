@@ -34,6 +34,7 @@ export interface OverleafRealtimeSocketOptions {
     reconnectionDelay?: number;
     reconnectionLimit?: number;
     maxReconnectionAttempts?: number;
+    fetch?:typeof fetch;
 }
 
 function encodePacket(packet: SocketPacket): string {
@@ -222,7 +223,7 @@ export class OverleafRealtimeSocket {
                 handshakeUrl.searchParams.set(name, value);
             }
             handshakeUrl.searchParams.set('t', String(Date.now()));
-            const response = await fetch(handshakeUrl, {
+            const response = await (this.options.fetch ?? fetch)(handshakeUrl, {
                 headers:{origin:this.origin, cookie:this.cookie},
                 redirect:'manual',
             });

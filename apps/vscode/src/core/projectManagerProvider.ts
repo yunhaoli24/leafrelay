@@ -180,7 +180,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
 
     addServer() {
         vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Overleaf server address, e.g. "https://www.overleaf.com"')})
-        .then((url) => {
+        .then(async (url) => {
             if (url) {
                 try {
                     // check if url is valid
@@ -188,7 +188,7 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
                     if (!(_url.protocol==='http:' || _url.protocol==='https:')) {
                         throw new Error( vscode.l10n.t('Invalid protocol.') );
                     }
-                    if (GlobalStateManager.addServer(this.context, _url.host, _url.href)) {
+                    if (await GlobalStateManager.addServer(this.context, _url.host, _url.href)) {
                         this.refresh();
                     }
                 } catch (e) {
@@ -200,9 +200,9 @@ export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem>
 
     removeServer(name:string) {
         vscode.window.showWarningMessage(vscode.l10n.t('Remove server "{name}" ?', {name}), "Yes", "No")
-        .then((answer) => {
+        .then(async (answer) => {
             if (answer === "Yes") {
-                if (GlobalStateManager.removeServer(this.context, name)) {
+                if (await GlobalStateManager.removeServer(this.context, name)) {
                     this.refresh();
                 }
             }

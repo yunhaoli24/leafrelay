@@ -13,6 +13,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
 
     steps:
       - name: Checkout code
@@ -78,3 +80,30 @@ jobs:
         with:
           name: leafrelay-pr-${{ github.event.number }}
           path: leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix
+
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.17.0
+          run_install: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:daemon
+      - run: pnpm exec vitest run packages/core/test packages/daemon/test --config vitest.config.mjs
