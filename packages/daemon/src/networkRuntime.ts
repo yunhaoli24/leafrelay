@@ -12,6 +12,7 @@ import {
     saveServerSession,
     serverKey,
     type Identity,
+    type ServeRemoteProject,
     type ServerSession,
 } from '@leafrelay/core';
 import type {
@@ -67,11 +68,12 @@ interface ProjectRuntime {
     ready:Promise<void>;
     owners:Set<string>;
     replicaReferences:number;
+    operationQueue:Promise<void>;
     idleTimer?:NodeJS.Timeout;
 }
 
 export interface ProjectLease {
-    remote:RemoteProject;
+    remote:ServeRemoteProject;
     release():void;
 }
 
@@ -188,7 +190,9 @@ export class NetworkRuntimeRegistry {
             }
             const method = (runtime.remote as unknown as Record<string,unknown>)[remoteOperation];
             if (typeof method!=='function') { throw new Error(`Remote project operation ${remoteOperation} is unavailable.`); }
-            return (method as (...values:unknown[]) => unknown).apply(runtime.remote, args);
+            return this.enqueueProjectOperation(runtime, () => (
+                (method as (...values:unknown[]) => unknown).apply(runtime.remote, args)
+            ));
         }
         if (!PROJECT_OPERATIONS.has(operation)) { throw new Error(`Unsupported project operation: ${operation}.`); }
         const method = (runtime.socket as unknown as Record<string,unknown>)[operation];
@@ -203,7 +207,7 @@ export class NetworkRuntimeRegistry {
         await runtime.ready;
         let released = false;
         return {
-            remote:runtime.remote,
+            remote:this.replicaRemote(runtime),
             release:() => {
                 if (released) { return; }
                 released = true;
@@ -259,6 +263,7 @@ export class NetworkRuntimeRegistry {
             ready:Promise.resolve(),
             owners:new Set(),
             replicaReferences:0,
+            operationQueue:Promise.resolve(),
         };
         runtime.ready = remote.connect().then(() => this.registerProjectEvents(runtime)).catch(error => {
             this.projects.delete(key);
@@ -296,6 +301,27 @@ export class NetworkRuntimeRegistry {
         const runtime = this.projects.get(projectKey);
         if (!runtime) { throw new Error(`Unknown project runtime ${projectKey}.`); }
         return runtime;
+    }
+
+    private replicaRemote(runtime:ProjectRuntime):ServeRemoteProject {
+        return {
+            connect:async () => {},
+            disconnect:() => {},
+            listEntries:() => runtime.remote.listEntries(),
+            entry:path => runtime.remote.entry(path),
+            read:path => this.enqueueProjectOperation(runtime, () => runtime.remote.read(path)),
+            write:(path, content) => this.enqueueProjectOperation(runtime, () => runtime.remote.write(path, content)),
+            remove:path => this.enqueueProjectOperation(runtime, () => runtime.remote.remove(path)),
+            getCurrentVersion:() => this.enqueueProjectOperation(runtime, () => runtime.remote.getCurrentVersion()),
+            getFileTreeDiff:(from, to) => this.enqueueProjectOperation(runtime, () => runtime.remote.getFileTreeDiff(from, to)),
+            onChange:handler => runtime.remote.onChange(handler),
+        };
+    }
+
+    private enqueueProjectOperation<T>(runtime:ProjectRuntime, operation:() => T|Promise<T>):Promise<T> {
+        const result = runtime.operationQueue.then(operation);
+        runtime.operationQueue = result.then(() => undefined, () => undefined);
+        return result;
     }
 
     private scheduleProjectStop(runtime:ProjectRuntime):void {

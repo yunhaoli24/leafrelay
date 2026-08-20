@@ -2,7 +2,7 @@ import {resolve} from 'node:path';
 import {log} from '../core/logger';
 import {createIgnoreMatcher} from '../sync/ignore';
 import {RemoteProject} from '../sync/remoteProject';
-import {SyncEngine} from '../sync/syncEngine';
+import {SyncEngine, type RemoteReplica} from '../sync/syncEngine';
 import {getServerSession} from './config';
 import {NodeReplicaFileSystem} from './localFileSystem';
 import {readProjectSettings} from './projectSettings';
@@ -23,7 +23,12 @@ export interface StartServeOptions {
     cookie?:string;
     log?:(message:string) => void;
     onConflict?:(path:string, reason:string) => void;
-    remote?:RemoteProject;
+    remote?:ServeRemoteProject;
+}
+
+export interface ServeRemoteProject extends RemoteReplica {
+    connect():Promise<void>;
+    disconnect():void;
 }
 
 export async function startServe(directory=process.cwd(), options:StartServeOptions={}):Promise<RunningServe> {
