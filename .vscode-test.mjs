@@ -1,7 +1,8 @@
 import { defineConfig } from '@vscode/test-cli';
 
 export default defineConfig({
-    files: 'test/extension/**/*.test.mjs',
+    files: 'apps/vscode/test/extension/**/*.test.mjs',
+    extensionDevelopmentPath: 'apps/vscode',
     version: 'stable',
     launchArgs: [
         '--disable-extensions',

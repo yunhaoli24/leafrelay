@@ -3,6 +3,8 @@
 ## Architecture
 
 - LeafRelay is a synchronization engine first. Keep protocol, request scheduling, checkpoints, reconciliation, and merge logic independent of VS Code APIs so the same core can later power `leafrelay serve`, background services, and other clients.
+- The pnpm monorepo is split into `packages/core` (VS Code-independent engine), `packages/cli` (the public `leafrelay` npm package), and `apps/vscode` (the Marketplace extension). Cross-runtime behavior belongs in core; product packages adapt it.
+- `leafrelay serve` reads the current directory's `.overleaf/settings.json`. User sessions are stored by server in `~/.leafrelay/config.json`; `LEAFRELAY_CONFIG` changes that location and `LEAFRELAY_COOKIE` overrides the stored cookie for the current process.
 - VS Code-specific modules are adapters for URI/file-system access, watchers, commands, notifications, and views. Do not put reusable synchronization decisions in the extension adapter layer.
 - Prefer maintained libraries for established algorithms and protocols. Wrap them behind small core interfaces and test the behavioral boundaries LeafRelay relies on.
 
@@ -34,7 +36,8 @@
 ## Toolchain
 
 - Use the pnpm workspace and the version declared in `package.json`; do not reintroduce npm lock files or per-package lock files.
-- The extension runtime is bundled with esbuild. Keep `vscode` external and package the VSIX with `--no-dependencies`.
+- The extension runtime is bundled with esbuild. Keep `vscode` external and package `apps/vscode` with `--no-dependencies`.
+- Use Node's stable WebSocket implementation for Overleaf realtime transport. Do not reintroduce the patched Socket.IO 0.9 client, copied CommonJS runtime, or `patch-package`.
 - Unit tests use Vitest and must run in GitHub Actions for pull requests.
 
 ## Release Process
@@ -46,4 +49,5 @@
 - A direct `v*` tag matching `package.json` may invoke the same pipeline as a recovery path. The pipeline attaches the VSIX and checksum to the release and attempts Marketplace publishing.
 - Retry an existing release with `gh workflow run vsce-publish.yml -f ref=vX.Y.Z`; do not use `gh run rerun`, because a rerun of the tag-triggered job reports `main` as its release ref. Asset uploads and Marketplace publication are idempotent.
 - The GitHub release and its VSIX must be created even when Marketplace publishing is temporarily unavailable.
+- Release Please uses the root package as the fixed-version source and updates `apps/vscode`, `packages/core`, and `packages/cli` together. Publish the pnpm-packed CLI tarball with npm trusted publishing and GitHub OIDC.
 - The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.

@@ -91,11 +91,18 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           VSIX="leafrelay-${VERSION}.vsix"
-          pnpm exec vsce package --no-dependencies --out "$VSIX"
+          test "$(node -p "require('./apps/vscode/package.json').version")" = "$VERSION"
+          test "$(node -p "require('./packages/cli/package.json').version")" = "$VERSION"
+          pnpm --dir apps/vscode exec vsce package \
+            --no-dependencies \
+            --out "../../$VSIX"
+          NPM_TARBALL="leafrelay-${VERSION}.tgz"
+          pnpm --dir packages/cli pack --pack-destination ../..
           sha256sum "$VSIX" > "$VSIX.sha256"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
+          echo "npm_tarball=$NPM_TARBALL" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Validate release version
@@ -123,6 +130,7 @@ jobs:
           path: |
             ${{ steps.package.outputs.vsix }}
             ${{ steps.package.outputs.vsix }}.sha256
+            ${{ steps.package.outputs.npm_tarball }}
 
       - name: Create GitHub Release
         if: steps.release.outputs.exists != 'true'
@@ -141,6 +149,7 @@ jobs:
           gh release upload "${{ steps.package.outputs.tag }}" \
             "${{ steps.package.outputs.vsix }}" \
             "${{ steps.package.outputs.vsix }}.sha256" \
+            "${{ steps.package.outputs.npm_tarball }}" \
             --clobber
 
       - name: Publish to VS Code Marketplace

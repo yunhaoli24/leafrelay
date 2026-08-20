@@ -3,10 +3,10 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
     {
-        ignores: ['out/**', 'dist/**', '**/*.d.ts'],
+        ignores: ['**/out/**', '**/dist/**', '**/*.d.ts'],
     },
     {
-        files: ['src/**/*.ts'],
+        files: ['apps/**/*.ts', 'packages/**/*.ts'],
         languageOptions: {
             parser: tsParser,
             ecmaVersion: 2022,
@@ -21,6 +21,12 @@ export default [
             eqeqeq: 'warn',
             'no-throw-literal': 'warn',
             semi: 'off',
+        },
+    },
+    {
+        files: ['**/*.config.ts', '**/test/**/*.ts'],
+        rules: {
+            '@typescript-eslint/naming-convention': 'off',
         },
     },
 ];

@@ -59,14 +59,17 @@ cd leafrelay
 # Enable the pnpm version declared by the repository
 corepack enable
 
-# Install the extension and chat-view workspace dependencies
+# Install every workspace dependency
 pnpm install --frozen-lockfile
 
-# Build the Extension
+# Build the core, VS Code extension, and CLI
 pnpm run compile
 
 # [Optional] Package the Extension
-pnpm exec vsce package --no-dependencies
+pnpm --dir apps/vscode exec vsce package --no-dependencies
+
+# [Optional] Package the npm CLI
+pnpm --dir packages/cli pack
 ```
 
 ### Testing

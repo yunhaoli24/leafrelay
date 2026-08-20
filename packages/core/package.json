@@ -1,0 +1,26 @@
+{
+  "name": "@leafrelay/core",
+  "version": "0.1.6",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "chokidar": "5.0.0",
+    "diff-match-patch": "^1.0.5",
+    "mime": "4.1.0",
+    "minimatch": "^10.2.6",
+    "node-diff3": "^3.2.1",
+    "uuid": "^14.0.1"
+  }
+}
