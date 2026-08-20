@@ -17,7 +17,7 @@ import {
     ProjectEntity,
     ProjectFileTreeDiffResponseSchema,
     ProjectUpdateResponseSchema,
-    SocketIOAPI,
+    ProjectSocket,
     UpdateSchema,
 } from '@leafrelay/core';
 import { EXTENSION_NAMESPACE, OUTPUT_FOLDER_NAME, OVERLEAF_URI_SCHEME } from '../consts';
@@ -77,7 +77,7 @@ export class VirtualFileSystem extends vscode.Disposable {
     private recentUpdates?: ProjectUpdateResponseSchema;
     private context: vscode.ExtensionContext;
     private api: BaseAPI;
-    private socket: SocketIOAPI;
+    private socket: ProjectSocket;
     private publicId?: string;
     private userId: string;
     private isDirty: boolean = true;
@@ -354,22 +354,6 @@ export class VirtualFileSystem extends vscode.Disposable {
         };
 
         return attemptReconnect();
-    }
-
-    get isInvisibleMode() {
-        return this.socket.isUsingAlternativeConnectionScheme;
-    }
-
-    toggleInvisibleMode() {
-        // Clear disconnect debounce to prevent false retry trigger during mode switch
-        this.lastDisconnectTime = 0;
-        this.handlersRegistered = false; // Will re-register on the new socket scheme
-        if (this.retryTimer) {
-            clearTimeout(this.retryTimer);
-            this.retryTimer = undefined;
-        }
-        this.socket.toggleAlternativeConnectionScheme(this.origin.toString(), this.root);
-        this.socket.disconnect(); // jump to `onDisconnected` handler
     }
 
     async _resolveUri(uri: vscode.Uri) {

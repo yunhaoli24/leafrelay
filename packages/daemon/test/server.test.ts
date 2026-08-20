@@ -57,8 +57,32 @@ describe('LeafRelay daemon IPC', () => {
             url:'http://localhost:8080/',
             loggedIn:false,
         });
+        second.close();
         await first.shutdownDaemon();
         first.close();
-        second.close();
     });
+
+    it.skipIf(process.platform==='win32')('restarts a crashed daemon and reconnects the existing client', async () => {
+        const home = await mkdtemp(join(tmpdir(), 'leafrelay-reconnect-'));
+        homes.push(home);
+        const environment = {...process.env, LEAFRELAY_HOME:home};
+        const client = await LeafRelayDaemonClient.connect({
+            clientName:'test',
+            clientVersion:'test',
+            environment,
+            daemonEntrypoint:new URL('../dist/daemon.js', import.meta.url),
+        });
+        const previousPid = (await client.status()).pid;
+        process.kill(previousPid, 'SIGTERM');
+
+        const deadline = Date.now()+7000;
+        let currentPid = previousPid;
+        while (Date.now()<deadline && currentPid===previousPid) {
+            try { currentPid = (await client.status()).pid; } catch {}
+            if (currentPid===previousPid) { await new Promise(resolve => setTimeout(resolve, 50)); }
+        }
+        expect(currentPid).not.toBe(previousPid);
+        await client.shutdownDaemon();
+        client.close();
+    }, 10_000);
 });

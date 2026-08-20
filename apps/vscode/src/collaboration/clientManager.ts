@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import * as vscode from 'vscode';
 import { ELEGANT_NAME, EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
-import { SocketIOAPI, UpdateUserSchema } from '@leafrelay/core';
+import { ProjectSocket, UpdateUserSchema } from '@leafrelay/core';
 import { VirtualFileSystem } from '../core/remoteFileSystemProvider';
 import { ChatViewProvider } from './chatViewProvider';
 import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
@@ -68,7 +68,7 @@ export class ClientManager {
         private readonly vfs: VirtualFileSystem,
         private readonly context: vscode.ExtensionContext,
         private readonly publicId: string,
-        private readonly socket: SocketIOAPI,
+        private readonly socket: ProjectSocket,
     ) {
         this.socket.updateEventHandlers({
             onClientUpdated: (user:UpdateUserSchema) => {
@@ -280,14 +280,7 @@ export class ClientManager {
             }
             this.status.command = this.chatViewer.hasUnread? `${EXTENSION_NAMESPACE}.collaboration.revealChatView` : `${EXTENSION_NAMESPACE}.collaboration.settings`;
             this.status.backgroundColor = this.chatViewer.hasUnread? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
-            // notify unSynced changes
-            const unSynced = this.socket.unSyncFileChanges;
-            if (unSynced) {
-                prefixText = prefixText.concat(`$(arrow-up) ${unSynced} `);
-            }
-
-            const isInvisible = this.socket.isUsingAlternativeConnectionScheme;
-            const onlineIcon = isInvisible ? '$(person)' : '$(organization)';
+            const onlineIcon = '$(organization)';
             switch (count) {
                 case 0:
                     this.status.color = undefined;
@@ -334,19 +327,9 @@ export class ClientManager {
     }
 
     collaborationSettings() {
-        const isInvisible = this.socket.isUsingAlternativeConnectionScheme;
-        const useAction = isInvisible ? 'Exit' : 'Enter';
         const quickPickItems = [
             {id:'jump', label:vscode.l10n.t('Jump to Collaborator ...'), detail:''},
-            // {id:'tether', label:'Tether to Collaborator ...',detail:''},
-            {label:'',kind:vscode.QuickPickItemKind.Separator},
         ];
-        if (isInvisible && this.socket.unSyncFileChanges) {
-            quickPickItems.push({id:'sync',label:vscode.l10n.t('Upload Unsaved {number} Change(s)', {number:this.socket.unSyncFileChanges}),detail:''});
-        } else {
-            const detail = !isInvisible ? vscode.l10n.t('Invisible Mode removes your presence from others\' view.') : vscode.l10n.t('Back to normal mode.');
-            quickPickItems.push({id:'toggle',label:`${useAction} Invisible Mode`,detail});
-        }
         // show quick pick
         vscode.window.showQuickPick(quickPickItems, {
             canPickMany: false,
@@ -355,24 +338,6 @@ export class ClientManager {
             switch (item.id) {
                 case 'jump':
                     this.jumpToUser();
-                    break;
-                case 'tether':
-                    this.tetherToUser();
-                    break;
-                case 'toggle':
-                    if (useAction==='Enter') {
-                        vscode.window.showWarningMessage( vscode.l10n.t('(Experimental Feature) By entering Invisible Mode, the current connection to the server will be lost. Continue?'), 'Yes', 'No').then(async selection => {
-                            if (selection === 'Yes') {
-                                this.vfs.toggleInvisibleMode();
-                            }
-                        });
-                    } else {
-                        this.vfs.toggleInvisibleMode();
-                    }
-                    break;
-                case 'sync':
-                    await this.socket.syncFileChanges();
-                    vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.compile`);
                     break;
             }
         });

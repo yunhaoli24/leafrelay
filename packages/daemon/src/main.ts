@@ -19,4 +19,7 @@ process.on('unhandledRejection', error => {
     void server.stop().finally(() => process.exit(1));
 });
 
-await server.start();
+void server.start().catch(error => {
+    console.error(error);
+    process.exit(1);
+});

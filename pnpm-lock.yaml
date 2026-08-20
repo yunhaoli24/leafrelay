@@ -111,6 +111,12 @@ importers:
       '@leafrelay/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@leafrelay/daemon':
+        specifier: workspace:*
+        version: link:../../packages/daemon
+      '@leafrelay/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
 
   apps/vscode/views/chat-view:
     dependencies:

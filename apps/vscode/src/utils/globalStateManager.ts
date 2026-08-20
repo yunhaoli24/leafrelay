@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
-import { Identity, BaseAPI, ProjectPersist, SocketIOAPI, ExtendedBaseAPI } from '@leafrelay/core';
-import { SocketIOAlt } from '../api/socketioAlt';
+import { Identity, BaseAPI, ProjectPersist } from '@leafrelay/core';
+import type {LeafRelayDaemonClient} from '@leafrelay/daemon';
+import {createDaemonApi, DaemonProjectSocket} from '../api/daemonAdapters';
+import {DaemonService} from './daemonService';
+import {warn} from './outputChannel';
 
 const keyServerPersists: string = 'overleaf-servers';
 const keyPdfViewPersists: string = 'overleaf-pdf-viewers';
@@ -32,65 +35,120 @@ type PdfViewPersist = {
 type PdfViewPersistMap = {[uri: string]: PdfViewPersist};
 
 export class GlobalStateManager {
+    private static daemon:LeafRelayDaemonClient;
+
+    static async initialize(context:vscode.ExtensionContext):Promise<void> {
+        this.daemon = DaemonService.current;
+        const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
+        let descriptors = await this.daemon.listServers();
+        const byName = new Map(descriptors.map(server => [server.name, server]));
+
+        for (const persist of Object.values(persists)) {
+            if (!byName.has(persist.name)) {
+                await this.daemon.addServer(persist.name, persist.url);
+            }
+            const descriptor = byName.get(persist.name);
+            if (persist.login?.identity.cookies && !descriptor?.loggedIn) {
+                try {
+                    const imported = await this.daemon.importSession({
+                        name:persist.name,
+                        url:persist.url,
+                        userId:persist.login.userId,
+                        userEmail:persist.login.username,
+                        identity:persist.login.identity,
+                    });
+                    persist.login.userId = imported.userId;
+                    persist.login.username = imported.userEmail || persist.login.username;
+                    persist.login.identity = {cookies:'', csrfToken:''};
+                } catch (error) {
+                    warn(`Could not import the previous ${persist.name} login: ${error instanceof Error ? error.message : String(error)}`);
+                    delete persist.login;
+                }
+            } else if (descriptor?.loggedIn && persist.login) {
+                persist.login.identity = {cookies:'', csrfToken:''};
+            }
+        }
+
+        descriptors = await this.daemon.listServers();
+        for (const descriptor of descriptors) {
+            const persist = persists[descriptor.name] ?? {name:descriptor.name, url:descriptor.url};
+            persist.url = descriptor.url;
+            if (descriptor.loggedIn) {
+                persist.login = {
+                    userId:descriptor.userId ?? persist.login?.userId ?? '',
+                    username:descriptor.userEmail ?? persist.login?.username ?? '',
+                    identity:{cookies:'', csrfToken:''},
+                    projects:persist.login?.projects,
+                };
+            } else {
+                delete persist.login;
+            }
+            persists[descriptor.name] = persist;
+        }
+        await context.globalState.update(keyServerPersists, persists);
+    }
 
     static getServers(context:vscode.ExtensionContext): {server:ServerPersist, api:BaseAPI}[] {
         const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
         const servers = Object.values(persists).map(persist => {
             return {
                 server: persist,
-                api: new BaseAPI(persist.url),
+                api:createDaemonApi(this.daemon, persist.name, persist.url),
             };
         });
 
         if (servers.length===0) {
             const url = new URL('https://www.overleaf.com');
-            this.addServer(context, url.host, url.href);
+            persists[url.host] = {name:url.host, url:url.href};
+            void context.globalState.update(keyServerPersists, persists);
+            void this.daemon.addServer(url.host, url.href);
             return this.getServers(context);
         } else {
             return servers;
         }
     }
 
-    static addServer(context:vscode.ExtensionContext, name:string, url:string): boolean {
+    static async addServer(context:vscode.ExtensionContext, name:string, url:string): Promise<boolean> {
         const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
         if ( persists[name]===undefined ) {
             persists[name] = { name, url };
-            context.globalState.update(keyServerPersists, persists);
+            await this.daemon.addServer(name, url);
+            await context.globalState.update(keyServerPersists, persists);
             return true;
         } else {
             return false;
         }
     }
 
-    static removeServer(context:vscode.ExtensionContext, name:string): boolean {
+    static async removeServer(context:vscode.ExtensionContext, name:string): Promise<boolean> {
         const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
         if ( persists[name]!==undefined ) {
+            const url = persists[name].url;
             delete persists[name];
-            context.globalState.update(keyServerPersists, persists);
+            await this.daemon.removeServer(url);
+            await context.globalState.update(keyServerPersists, persists);
             return true;
         } else {
             return false;
         }
     }
 
-    static async loginServer(context:vscode.ExtensionContext, api:BaseAPI, name:string, auth:{[key:string]:string}): Promise<boolean> {
+    static async loginServer(context:vscode.ExtensionContext, _api:BaseAPI, name:string, auth:{[key:string]:string}): Promise<boolean> {
         const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
         const server   = persists[name];
 
         if (server.login===undefined) {
-            const res = auth.cookies ? await api.cookiesLogin(auth.cookies) : await api.passportLogin(auth.email, auth.password);
-            if (res.type==='success' && res.identity!==undefined && res.userInfo!==undefined) {
+            try {
+                const user = await this.daemon.login({server:server.url, cookie:auth.cookies, email:auth.email, password:auth.password});
                 server.login = {
-                    userId: res.userInfo.userId,
-                    username: auth.email || res.userInfo.userEmail,
-                    identity: res.identity
+                    userId:user.userId,
+                    username:auth.email || user.userEmail,
+                    identity:{cookies:'', csrfToken:''},
                 };
-                context.globalState.update(keyServerPersists, persists);
+                await context.globalState.update(keyServerPersists, persists);
                 return true;
-            } else {
-                if (res.message!==undefined) {
-                    vscode.window.showErrorMessage(res.message);
-                }
+            } catch (error) {
+                vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error));
                 return false;
             }
         } else {
@@ -98,12 +156,12 @@ export class GlobalStateManager {
         }
     }
 
-    static async logoutServer(context:vscode.ExtensionContext, api:BaseAPI, name:string): Promise<boolean> {
+    static async logoutServer(context:vscode.ExtensionContext, _api:BaseAPI, name:string): Promise<boolean> {
         const persists = context.globalState.get<ServerPersistMap>(keyServerPersists, {});
         const server   = persists[name];
 
         if (server.login!==undefined) {
-            await api.logout(server.login.identity);
+            await this.daemon.logout(server.url);
             delete server.login;
             context.globalState.update(keyServerPersists, persists);
             return true;
@@ -167,11 +225,8 @@ export class GlobalStateManager {
         const server   = persists[name];
 
         if (server.login!==undefined) {
-            SocketIOAPI.setAlternativeSocketFactory((url, api, identity, id, record) => {
-                return new SocketIOAlt(url, api, identity, id, record);
-            });
-            const api = new ExtendedBaseAPI(server.url);
-            const socket = new SocketIOAPI(server.url, api, server.login.identity, projectId);
+            const api = createDaemonApi(this.daemon, name, server.url);
+            const socket = new DaemonProjectSocket(this.daemon, server.url, projectId);
             return {api, socket};
         }
     }

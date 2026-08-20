@@ -472,7 +472,7 @@ export class CompileManager {
                 const vfs = uri && await this.vfsm.prefetch(uri);
                 const compileCondition = vscode.workspace.getConfiguration(`${EXTENSION_NAMESPACE}.compileOnSave`).get('enabled', true);
                 const postfixCondition = e.fileName.match(/\.tex$|\.sty$|\.cls$|\.bib$/i);
-                if (compileCondition && postfixCondition && vfs?.isInvisibleMode===false) {
+                if (compileCondition && postfixCondition && vfs) {
                     this.compile();
                 }
             }),
