@@ -245,7 +245,7 @@ export class LeafRelayDaemonServer {
         notification:ReplicaStatusNotification|ReplicaConflictNotification|ProjectEventNotification,
     ):void {
         for (const client of this.clients) {
-            if (client.clientId && owners.has(client.clientId)) { void client.rpc.sendNotification(method, notification); }
+            if (client.clientId && owners.has(client.clientId)) { this.notifyClient(client, method, notification); }
         }
     }
 
@@ -253,8 +253,13 @@ export class LeafRelayDaemonServer {
         const notification:LogNotification = {timestamp:new Date().toISOString(), level, message};
         await appendFile(this.paths.logPath, `${notification.timestamp} [${level}] ${message}\n`, {encoding:'utf8', mode:0o600});
         for (const client of this.clients) {
-            if (client.initialized) { void client.rpc.sendNotification(RPC_NOTIFICATION.log, notification); }
+            if (client.initialized) { this.notifyClient(client, RPC_NOTIFICATION.log, notification); }
         }
+    }
+
+    private notifyClient(client:ClientConnection, method:string, notification:unknown):void {
+        if (!this.clients.has(client) || client.socket.destroyed) { return; }
+        void client.rpc.sendNotification(method, notification).catch(() => this.closeClient(client));
     }
 
     private scheduleIdleExit():void {
