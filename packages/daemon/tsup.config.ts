@@ -12,5 +12,6 @@ export default defineConfig({
     dts:{entry:{index:'src/index.ts'}},
     clean:true,
     noExternal:['@leafrelay/core', '@leafrelay/protocol'],
+    external:['vscode-jsonrpc'],
     define:{LEAFRELAY_DAEMON_VERSION:JSON.stringify(packageJson.version)},
 });

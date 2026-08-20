@@ -33,4 +33,21 @@ describe('LeafRelay daemon IPC', () => {
         second.close();
         await server.stop();
     });
+
+    it('elects one detached daemon when clients start concurrently', async () => {
+        const home = await mkdtemp(join(tmpdir(), 'leafrelay-election-'));
+        homes.push(home);
+        const environment = {...process.env, LEAFRELAY_HOME:home};
+        const daemonEntrypoint = new URL('../dist/daemon.js', import.meta.url);
+        const [first, second] = await Promise.all([
+            LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'test', environment, daemonEntrypoint}),
+            LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'test', environment, daemonEntrypoint}),
+        ]);
+
+        expect(first.initializeResult.pid).toBe(second.initializeResult.pid);
+        expect((await first.status()).clients).toBe(2);
+        await first.shutdownDaemon();
+        first.close();
+        second.close();
+    });
 });

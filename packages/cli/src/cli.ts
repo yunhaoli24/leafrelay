@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {Command} from 'commander';
 import {login} from './login';
-import {serve} from './serve';
+import {daemonRestart, daemonStatus, daemonStop, serve} from './serve';
 
 declare const LEAFRELAY_VERSION: string;
 
@@ -22,6 +22,13 @@ program.command('serve')
     .description('Synchronize the current directory with its configured Overleaf project.')
     .argument('[directory]', 'Local replica directory', process.cwd())
     .action(serve);
+
+const daemon = program.command('daemon')
+    .description('Inspect or control the shared LeafRelay daemon.');
+
+daemon.command('status').description('Show daemon clients and replicas.').action(daemonStatus);
+daemon.command('stop').description('Stop the daemon and its active replicas.').action(daemonStop);
+daemon.command('restart').description('Restart the daemon.').action(daemonRestart);
 
 program.parseAsync().catch(error => {
     console.error(error instanceof Error ? error.message : String(error));

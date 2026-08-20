@@ -112,7 +112,7 @@ export class LeafRelayDaemonServer {
         rpc.onRequest(RPC_METHOD.initialize, (params:InitializeParams) => this.initialize(client, params));
         rpc.onRequest(RPC_METHOD.daemonStatus, () => this.authorized(client, () => this.status()));
         rpc.onRequest(RPC_METHOD.daemonShutdown, () => this.authorized(client, async () => {
-            setImmediate(() => void this.stop());
+            setTimeout(() => void this.stop(), 25);
             return null;
         }));
         rpc.onRequest(RPC_METHOD.replicaAttach, (params:ReplicaAttachParams) => this.authorized(client, async () => {
