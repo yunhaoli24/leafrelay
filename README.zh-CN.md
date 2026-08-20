@@ -1,6 +1,7 @@
 # LeafRelay
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/yunhaoli24.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+[![npm](https://img.shields.io/npm/v/leafrelay?label=npm)](https://www.npmjs.com/package/leafrelay)
 [![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
 [![许可证](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
 
@@ -29,7 +30,17 @@ LeafRelay 保留 Overleaf Workshop 的虚拟项目和协作能力，同时把日
 
 ## 安装
 
+### VS Code 扩展
+
 从 VS Code Marketplace 安装 **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)**。后续版本由 VS Code 按正常扩展更新机制自动更新。
+
+### npm CLI
+
+从 **[npm](https://www.npmjs.com/package/leafrelay)** 安装独立同步服务，需要 Node.js 24 或更高版本。
+
+```bash
+npm install --global leafrelay
+```
 
 ## 开始同步
 
@@ -44,7 +55,6 @@ LeafRelay 保留 Overleaf Workshop 的虚拟项目和协作能力，同时把日
 LeafRelay 同时提供 Node.js CLI。VS Code 扩展创建的本地副本可以直接交给 CLI 使用，因为两者读取同一份 `.overleaf/settings.json` 项目关联配置。
 
 ```bash
-npm install --global leafrelay
 leafrelay login https://www.overleaf.com
 cd /path/to/local-replica
 leafrelay serve

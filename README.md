@@ -1,6 +1,7 @@
 # LeafRelay
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/yunhaoli24.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+[![npm](https://img.shields.io/npm/v/leafrelay?label=npm)](https://www.npmjs.com/package/leafrelay)
 [![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
 [![License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
 
@@ -29,7 +30,17 @@ LeafRelay keeps the original Overleaf Workshop virtual-project and collaboration
 
 ## Install
 
+### VS Code extension
+
 Install **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)** from the VS Code Marketplace. VS Code will receive future releases through its normal extension update mechanism.
+
+### npm CLI
+
+Install the standalone sync service from **[npm](https://www.npmjs.com/package/leafrelay)**. Node.js 24 or later is required.
+
+```bash
+npm install --global leafrelay
+```
 
 ## Start syncing
 
@@ -44,7 +55,6 @@ For project details, login options, self-hosted Overleaf, and troubleshooting, s
 LeafRelay also ships as a Node.js CLI. A local replica created by the VS Code extension can be served directly because both clients use the same `.overleaf/settings.json` project association.
 
 ```bash
-npm install --global leafrelay
 leafrelay login https://www.overleaf.com
 cd /path/to/local-replica
 leafrelay serve
