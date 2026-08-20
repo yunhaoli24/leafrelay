@@ -67,7 +67,11 @@ jobs:
         run: docker compose -f test/integration/docker-compose.yml down -v
 
       - name: Package extension
-        run: pnpm exec vsce package --no-dependencies --out leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix
+        run: |
+          npm pack ./packages/cli --dry-run
+          pnpm --dir apps/vscode exec vsce package \
+            --no-dependencies \
+            --out ../../leafrelay-pr-${{ github.event.number }}-${{ github.sha }}.vsix
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7

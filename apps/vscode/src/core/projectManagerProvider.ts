@@ -1,0 +1,826 @@
+import * as vscode from 'vscode';
+import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
+import { ProjectTagsResponseSchema } from '@leafrelay/core';
+import { GlobalStateManager } from '../utils/globalStateManager';
+import { VirtualFileSystem, parseUri } from './remoteFileSystemProvider';
+import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
+import { log, notifyError } from '../utils/outputChannel';
+
+class DataItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        collapsibleState: vscode.TreeItemCollapsibleState,
+    ) {
+        super(label, collapsibleState);
+    }
+}
+
+class ServerItem extends DataItem {
+    tags?: {name:string, tid:string}[];
+    constructor(
+        readonly api: any,
+        public readonly name: string,
+        public readonly username: string,
+        collapsibleState: vscode.TreeItemCollapsibleState,
+    ) {
+        super(name, collapsibleState);
+        this.iconPath = new vscode.ThemeIcon('vm');
+        this.contextValue = collapsibleState===vscode.TreeItemCollapsibleState.None ? 'server_no_login' : 'server_login';
+        this.description = username;
+        this.tooltip = api.url;
+    }
+}
+
+class TagItem extends DataItem {
+    constructor(
+        readonly api: any,
+        public readonly serverName: string,
+        public readonly tid: string,
+        public readonly name: string,
+        readonly projects: ProjectItem[],
+    ) {
+        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+        this.iconPath = new vscode.ThemeIcon('folder');
+        this.contextValue = 'tag';
+    }
+}
+
+class ProjectItem extends DataItem {
+    tag?: {name:string, tid:string};
+    constructor(
+        readonly api: any,
+        readonly uri: string,
+        readonly parent: ServerItem,
+        readonly pid: string,
+        readonly label: string,
+        readonly status: 'normal' | 'archived' | 'trashed',
+    ) {
+        const _label = status==='normal' ? label : `[${status}] ${label}`;
+        super(_label, vscode.TreeItemCollapsibleState.None);
+        this.tooltip = _label;
+        this.setStatus(status);
+    }
+
+    static clone(project: ProjectItem) {
+        return new ProjectItem(project.api, project.uri, project.parent, project.pid, project.label, project.status);
+    }
+
+    setStatus(status:'normal' | 'archived' | 'trashed') {
+        switch (status) {
+            case 'normal':
+                this.contextValue = 'project';
+                this.iconPath = new vscode.ThemeIcon('notebook');
+                break;
+            case 'archived':
+                this.contextValue = 'archived_project';
+                this.iconPath = new vscode.ThemeIcon('archive');
+                break;
+            case 'trashed':
+                this.contextValue = 'trashed_project';
+                this.iconPath = new vscode.ThemeIcon('trash');
+        }
+    }
+}
+
+export class ProjectManagerProvider implements vscode.TreeDataProvider<DataItem> {
+    constructor(
+        private context:vscode.ExtensionContext) {
+        this.context = context;
+    }
+
+    private _onDidChangeTreeData: vscode.EventEmitter<DataItem | undefined | void> = new vscode.EventEmitter<DataItem | undefined | void>();
+
+    readonly onDidChangeTreeData: vscode.Event<DataItem | undefined | void> = this._onDidChangeTreeData.event;
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element: DataItem): vscode.TreeItem {
+        return element;
+    }
+
+    getChildren(element?: DataItem): Thenable<DataItem[]> {
+        if (element) {
+            if (element instanceof ServerItem) {
+                return GlobalStateManager.fetchServerProjects(this.context, element.api, element.name)
+                .catch(() => {
+                    // Direct logout if cookie expired
+                    GlobalStateManager.logoutServer(this.context, element.api, element.name)
+                    .then(success => {
+                        if (success) {
+                            this.refresh();
+                        }
+                    });
+                    return Promise.reject();
+                })
+                .then(projects => {
+                    return GlobalStateManager.authenticate(this.context, element.name)
+                    .then(identity => element.api.getAllTags(identity))
+                    .then(res => 
+                        res.type==='success' ? res.tags as ProjectTagsResponseSchema[] : []
+                    )
+                    .then(tags => {
+                        return {projects, tags};
+                    });
+                })
+                .then(({projects, tags}) => {
+                    const allTags:{name:string, tid:string}[] = [];
+                    // get project items
+                    const normalProjects = [], trashedProjects = [], archivedProjects = [];
+                    for (const project of projects) {
+                        const uri = `${OVERLEAF_URI_SCHEME}://${element.name}/${encodeURIComponent(project.name)}?user=${project.userId}&project=${project.id}`;
+                        const status = project.archived ? 'archived' : project.trashed ? 'trashed' : 'normal';
+                        const item = new ProjectItem(element.api, uri, element, project.id, project.name, status);
+                        switch (status) {
+                            case 'normal': normalProjects.push(item); break;
+                            case 'archived': archivedProjects.push(item); break;
+                            case 'trashed': trashedProjects.push(item); break;
+                        }
+                    }
+                    const allProjectItems = [...normalProjects, ...archivedProjects, ...trashedProjects];
+                    // create tag items
+                    const tagProjectItems:TagItem[] = tags.map(tag => {
+                        const _tag = {name:tag.name, tid:tag._id};
+                        allTags.push( _tag );
+                        const _projects:ProjectItem[] = tag.project_ids.map(pid => {
+                            const item = allProjectItems.find(project => project.pid===pid);
+                            if (item) {
+                                const _item = ProjectItem.clone(item);
+                                item.tag = _tag; // for filter purpose
+                                _item.contextValue = 'project_in_tag';
+                                _item.tag = _tag;
+                                return _item;
+                            }
+                        }).filter(item => item) as ProjectItem[];
+                        return new TagItem(element.api, element.name, tag._id, tag.name, _projects);
+                    });
+                    // get remaining projects
+                    const remainingProjects = allProjectItems.filter(project => !project.tag);
+                    // return all items
+                    element.tags = allTags;
+                    return [...tagProjectItems, ...remainingProjects];
+                });
+            } else if (element instanceof TagItem) {
+                return Promise.resolve(element.projects);
+            } else {
+                return Promise.resolve([]);
+            }
+        } else {
+            const persists = GlobalStateManager.getServers(this.context);
+            const serverItems = Object.values(persists).map(persist => new ServerItem(
+                persist.api,
+                persist.server.name,
+                persist.server.login?.username || '',
+                persist.server.login? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+            ));
+            return Promise.resolve(serverItems);
+        }
+    }
+
+    addServer() {
+        vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Overleaf server address, e.g. "https://www.overleaf.com"')})
+        .then((url) => {
+            if (url) {
+                try {
+                    // check if url is valid
+                    const _url = new URL(url);
+                    if (!(_url.protocol==='http:' || _url.protocol==='https:')) {
+                        throw new Error( vscode.l10n.t('Invalid protocol.') );
+                    }
+                    if (GlobalStateManager.addServer(this.context, _url.host, _url.href)) {
+                        this.refresh();
+                    }
+                } catch (e) {
+                    vscode.window.showErrorMessage( vscode.l10n.t('Invalid server address.') );
+                }
+            }
+        });
+    }
+
+    removeServer(name:string) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Remove server "{name}" ?', {name}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                if (GlobalStateManager.removeServer(this.context, name)) {
+                    this.refresh();
+                }
+            }
+        });
+    }
+
+    loginServer(server: ServerItem) {
+        const loginMethods:Record<string, ()=>void> = {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Login with Password': () => {
+                vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Email')})
+                .then(email => email ? Promise.resolve(email) : Promise.reject())
+                .then(email =>
+                    vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Password'), 'password': true})
+                    .then(password => {
+                        return password ? Promise.resolve([email,password]) : Promise.reject();
+                    })
+                )
+                .then(([email,password]) =>
+                    GlobalStateManager.loginServer(this.context, server.api, server.name, {email, password})
+                )
+                .then(success => {
+                    if (success) {
+                        this.refresh();
+                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, true);
+                    } else {
+                        vscode.window.showErrorMessage( vscode.l10n.t('Login failed.') );
+                    }
+                });
+            },
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Login with Cookies': () => {
+                vscode.window.showInputBox({
+                    'placeHolder': vscode.l10n.t('Cookies, e.g., "sharelatex.sid=..." or "overleaf_session2=..."'),
+                    'prompt': vscode.l10n.t('README: [How to Login with Cookies](https://github.com/yunhaoli24/leafrelay#how-to-login-with-cookies)'),
+                })
+                .then(cookies => cookies ? Promise.resolve(cookies) : Promise.reject())
+                .then(cookies =>
+                    GlobalStateManager.loginServer(this.context, server.api, server.name, {cookies})
+                )
+                .then(success => {
+                    if (success) {
+                        this.refresh();
+                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, true);
+                    } else {
+                        vscode.window.showErrorMessage( vscode.l10n.t('Login failed.') );
+                    }
+                });
+            },
+        };
+
+        //NOTE: temporarily disable password-based login for `www.overleaf.com`
+        if (server.name==='www.overleaf.com') {
+            delete loginMethods['Login with Password'];
+        }
+
+        vscode.window.showQuickPick(Object.keys(loginMethods), {
+            canPickMany:false, placeHolder:vscode.l10n.t('Select the login method below.')})
+        .then(selection => {
+            if (selection===undefined) { return Promise.reject(); }
+            return Promise.resolve( (loginMethods as any)[selection] );
+        })
+        .then(method => method());
+    }
+
+    logoutServer(server: ServerItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Logout server "{name}" ?', {name:server.name}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.logoutServer(this.context, server.api, server.name)
+                .then(success => {
+                    if (success) {
+                        this.refresh();
+                    }
+                });
+            }
+        });
+    }
+
+    refreshServer(server: ServerItem) {
+        this.refresh();
+    }
+
+    newProject(server: ServerItem) {
+        // 'Blank Project', 'Example Project', 'Upload Project'
+        vscode.window.showQuickPick([vscode.l10n.t('Blank Project'), vscode.l10n.t('Example Project'), vscode.l10n.t('Upload Project')])
+        .then((answer) => {
+            switch (answer) {
+                case vscode.l10n.t('Blank Project'):
+                case vscode.l10n.t('Example Project'):
+                    const template = answer===vscode.l10n.t('Example Project') ? 'example' : 'none';
+                    vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Project name')})
+                    .then(name => {
+                        if (name) {
+                            GlobalStateManager.authenticate(this.context, server.name)
+                            .then(identity => server.api.newProject(identity, name, template))
+                            .then(res => {
+                                if (res.type==='success') {
+                                    this.refresh();
+                                } else {
+                                    vscode.window.showErrorMessage(res.message);
+                                }
+                            });
+                        }
+                    });
+                    break;
+                case vscode.l10n.t('Upload Project'):
+                    vscode.window.showOpenDialog({
+                        canSelectFiles: true,
+                        canSelectFolders: false,
+                        canSelectMany: false,
+                        filters: {
+                            // eslint-disable-next-line @typescript-eslint/naming-convention
+                            'Archive File': ['zip'],
+                        },
+                        title: vscode.l10n.t('Upload Zipped Project'),
+                    }).then((uri) => {
+                        if (!uri) { return; }
+                        vscode.workspace.fs.readFile(uri[0])
+                        .then(fileContent => {
+                            const filename = uri[0].path.split('/').pop();
+                            if (filename) {
+                                GlobalStateManager.authenticate(this.context, server.name)
+                                .then(identity => server.api.uploadProject(identity, filename, fileContent))
+                                .then(res => {
+                                    if (res.type==='success') {
+                                        this.refresh();
+                                    } else {
+                                        vscode.window.showErrorMessage(res.message);
+                                    }
+                                });
+                            }
+                        });
+                    });
+                    break;
+            }
+        });
+    }
+
+    copyProject(project: ProjectItem) {
+        vscode.window.showInputBox({
+            'placeHolder': vscode.l10n.t('New Project Name'),
+            'value': `${project.label} (Copy)`,
+            'title': vscode.l10n.t('Copy Project'),
+        }).then(name => {
+            if (name) {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.cloneProject(identity, project.pid, name))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    renameProject(project: ProjectItem) {
+        vscode.window.showInputBox({
+            'placeHolder': vscode.l10n.t('New Project Name'),
+            'value': project.label,
+        })
+        .then(newName => {
+            if (newName && newName!==project.label) {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.renameProject(identity, project.pid, newName))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    deleteProject(project: ProjectItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Permanently delete project "{label}" ?', {label:project.label}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.deleteProject(identity, project.pid))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    archiveProject(project: ProjectItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Archive project "{label}" ?', {label:project.label}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.archiveProject(identity, project.pid))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    unarchiveProject(project: ProjectItem) {
+        GlobalStateManager.authenticate(this.context, project.parent.name)
+        .then(identity => project.api.unarchiveProject(identity, project.pid))
+        .then(res => {
+            if (res.type==='success') {
+                this.refresh();
+            } else {
+                vscode.window.showErrorMessage(res.message);
+            }
+        });
+    }
+
+    trashProject(project: ProjectItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Move project "{label}" to trash ?', {label:project.label}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.trashProject(identity, project.pid))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    untrashProject(project: ProjectItem) {
+        GlobalStateManager.authenticate(this.context, project.parent.name)
+        .then(identity => project.api.untrashProject(identity, project.pid))
+        .then(res => {
+            if (res.type==='success') {
+                this.refresh();
+            } else {
+                vscode.window.showErrorMessage(res.message);
+            }
+        });
+    }
+
+    createTag(server: ServerItem) {
+        vscode.window.showInputBox({'placeHolder': vscode.l10n.t('Tag name')})
+        .then(name => {
+            if (name) {
+                GlobalStateManager.authenticate(this.context, server.name)
+                .then(identity => server.api.createTag(identity, name))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    renameTag(tag: TagItem) {
+        vscode.window.showInputBox({
+            'placeHolder': vscode.l10n.t('New tag name'),
+            'value': tag.label,
+        })
+        .then(newName => {
+            if (newName && newName!==tag.label) {
+                GlobalStateManager.authenticate(this.context, tag.serverName)
+                .then(identity => tag.api.renameTag(identity, tag.tid, newName))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    deleteTag(tag: TagItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Delete tag "{label}" ?', {label:tag.label}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.authenticate(this.context, tag.serverName)
+                .then(identity => tag.api.deleteTag(identity, tag.tid))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    addProjectToTag(project: ProjectItem) {
+        const tagNames = project.parent.tags?.map(tag => tag.name) || [];
+        vscode.window.showQuickPick(tagNames, {
+            canPickMany:false, placeHolder:vscode.l10n.t('Select the tag below.')})
+        .then(selection => {
+            if (selection===undefined) { return Promise.reject(); }
+            return Promise.resolve(selection);
+        })
+        .then(tagName => {
+            const tagId = project.parent.tags?.find(tag => tag.name===tagName)?.tid;
+            GlobalStateManager.authenticate(this.context, project.parent.name)
+            .then(identity => project.api.addProjectToTag(identity, tagId, project.pid))
+            .then(res => {
+                if (res.type==='success') {
+                    this.refresh();
+                } else {
+                    vscode.window.showErrorMessage(res.message);
+                }
+            });
+        });
+    }
+
+    removeProjectFromTag(project: ProjectItem) {
+        vscode.window.showWarningMessage(vscode.l10n.t('Remove project "{label}" from tag "{name}" ?', {label:project.label,name:project.tag?.name ?? ''}), "Yes", "No")
+        .then((answer) => {
+            if (answer === "Yes") {
+                GlobalStateManager.authenticate(this.context, project.parent.name)
+                .then(identity => project.api.removeProjectFromTag(identity, project.tag?.tid, project.pid))
+                .then(res => {
+                    if (res.type==='success') {
+                        this.refresh();
+                    } else {
+                        vscode.window.showErrorMessage(res.message);
+                    }
+                });
+            }
+        });
+    }
+
+    openProjectInCurrentWindow(project: ProjectItem) {
+        const uri = vscode.Uri.parse(project.uri);
+        vscode.commands.executeCommand('remoteFileSystem.prefetch', uri)
+        .then(() => {
+            vscode.commands.executeCommand('vscode.openFolder', uri, false);
+            vscode.commands.executeCommand('workbench.view.explorer');
+        });
+    }
+
+    openProjectInNewWindow(project: ProjectItem) {
+        const uri = vscode.Uri.parse(project.uri);
+        vscode.commands.executeCommand('remoteFileSystem.prefetch', uri)
+        .then(() => {
+            vscode.commands.executeCommand('vscode.openFolder', uri, true);
+            vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+            vscode.commands.executeCommand('workbench.view.explorer');
+        });
+    }
+
+    private async promptForLocalReplicaPath(projectName: string): Promise<vscode.Uri | undefined> {
+        const inputBox = LocalReplicaSCMProvider.baseUriInputBox;
+        inputBox.ignoreFocusOut = true;
+        inputBox.title = vscode.l10n.t('Create Source Control: {scm}', {scm:LocalReplicaSCMProvider.label});
+        inputBox.buttons = [{iconPath: new vscode.ThemeIcon('check')}];
+
+        const selectedPath = await new Promise<string | undefined>(resolve => {
+            let settled = false;
+            const finish = (value?: string) => {
+                if (settled) { return; }
+                settled = true;
+                resolve(value);
+                inputBox.hide();
+            };
+            inputBox.onDidTriggerButton(() => finish(inputBox.value));
+            inputBox.onDidAccept(() => {
+                if (inputBox.activeItems.length===0) {
+                    finish(inputBox.value);
+                }
+            });
+            inputBox.onDidHide(() => finish());
+            inputBox.show();
+        });
+        inputBox.dispose();
+        if (!selectedPath) { return undefined; }
+
+        log('ProjectManager: validating local replica path', {projectName, path:selectedPath});
+        return LocalReplicaSCMProvider.validateBaseUri(selectedPath, projectName);
+    }
+
+    private async createLocalReplica(vfs: VirtualFileSystem): Promise<boolean> {
+        const baseUri = await this.promptForLocalReplicaPath(vfs.projectName);
+        if (baseUri===undefined) { return false; }
+
+        const scm = new LocalReplicaSCMProvider(vfs, baseUri);
+        vfs.setProjectSCMPersist(scm.scmKey, {
+            enabled: true,
+            label: LocalReplicaSCMProvider.label,
+            baseUri: scm.baseUri.path,
+            settings: {} as JSON,
+        });
+
+        let triggers: vscode.Disposable[] = [];
+        try {
+            triggers = await scm.triggers;
+            log('ProjectManager: local replica created', {
+                projectId: vfs.projectId,
+                baseUri: baseUri.toString(),
+                triggerCount: triggers.length,
+            });
+            vscode.window.showInformationMessage(vscode.l10n.t('"{scm}" created: {uri}.', {
+                scm: LocalReplicaSCMProvider.label,
+                uri: decodeURI(baseUri.toString()),
+            }));
+            return true;
+        } catch (error) {
+            vfs.setProjectSCMPersist(scm.scmKey, undefined);
+            throw error;
+        } finally {
+            triggers.forEach(trigger => trigger.dispose());
+        }
+    }
+
+    async openProjectLocalReplica(project: ProjectItem) {
+        log('ProjectManager: Open Project Locally started', {projectId: project.pid, projectName: project.label, uri: project.uri});
+        let openInNewWindow = false;
+        // A remote Overleaf folder cannot share the same workspace with a local
+        // replica. Offer a new window instead of silently returning before the
+        // local-replica creation prompt is reached.
+        const vfsFolder = vscode.workspace.workspaceFolders?.find(folder => folder.uri.scheme===OVERLEAF_URI_SCHEME);
+        if (vfsFolder) {
+            const answer = await vscode.window.showWarningMessage(
+                vscode.l10n.t('An Overleaf project is already open in this window.'),
+                vscode.l10n.t('Open Local Replica in New Window'),
+                vscode.l10n.t('Cancel')
+            );
+            if (answer!==vscode.l10n.t('Open Local Replica in New Window')) { return; }
+            openInNewWindow = true;
+        }
+
+        const uri = vscode.Uri.parse(project.uri);
+        const {serverName,projectId} = parseUri(uri);
+        // fetch existing local replica scm
+        let scmPersists = GlobalStateManager.getServerProjectSCMPersists(this.context, serverName, projectId);
+        let replicas = Object.values(scmPersists).filter(scmPersist => scmPersist.label===LocalReplicaSCMProvider.label);
+        const replicaUri = (scmPersist: typeof replicas[number]) => {
+            const parsed = vscode.Uri.parse(scmPersist.baseUri);
+            return parsed.scheme==='' ? vscode.Uri.file(scmPersist.baseUri) : parsed;
+        };
+        const usableReplicaRecords = async (candidates: typeof replicas) => {
+            const usable = [] as typeof replicas;
+            for (const replica of candidates) {
+                try {
+                    const stat = await vscode.workspace.fs.stat(replicaUri(replica));
+                    if (stat.type===vscode.FileType.Directory) { usable.push(replica); }
+                } catch {
+                    // Keep the persisted entry untouched; the user may recreate it.
+                }
+            }
+            return usable;
+        };
+        // A persisted SCM entry can outlive its directory. Treat that as no
+        // usable replica so the normal create-local-folder prompt is shown.
+        replicas = await usableReplicaRecords(replicas);
+        // if not exist, create new one
+        if (replicas.length===0) {
+            const vfs = (await (await vscode.commands.executeCommand('remoteFileSystem.prefetch', uri))) as VirtualFileSystem;
+            try {
+                await vfs.init({activateWorkspaceFeatures:false});
+                log('ProjectManager: remote project initialized for local replica creation', {projectId, projectName: project.label});
+                const answer = await vscode.window.showWarningMessage( vscode.l10n.t('No local replica found, create one for project "{label}" ?', {label:project.label}), "Yes", "No");
+                if (answer === "Yes") {
+                    const created = await this.createLocalReplica(vfs);
+                    if (!created) { return; }
+                    // fetch local replica scm again
+                    scmPersists = GlobalStateManager.getServerProjectSCMPersists(this.context, serverName, projectId);
+                    replicas = Object.values(scmPersists).filter(scmPersist => scmPersist.label===LocalReplicaSCMProvider.label);
+                    replicas = await usableReplicaRecords(replicas);
+                    if (replicas.length===0) {
+                        notifyError('Local replica creation did not produce a usable SCM record. See the LeafRelay output for details.', undefined, 'local-replica-create-empty');
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            } finally {
+                await vscode.commands.executeCommand('remoteFileSystem.reset', uri);
+            }
+        }
+
+        // open local replica
+        const replicasPath = replicas.map(replicaUri).map(uri => uri.fsPath);
+        if (replicasPath.length===0) { return; }
+        const quickPickItems = replicasPath.map(path => {
+            let label = path;
+            let buttons = [{
+                id: "removal",
+                iconPath: new vscode.ThemeIcon('trash'),
+                tooltip: vscode.l10n.t('Remove local replica'),
+            }];
+            return {label, buttons};
+        });
+
+        // select local replica via quick pick
+        new Promise(resolve => {
+            const quickPick = vscode.window.createQuickPick();
+            quickPick.placeholder = vscode.l10n.t('Select the local replica below.');
+            quickPick.items = quickPickItems;
+            quickPick.onDidTriggerItemButton(({button,item}) => {
+                if ((button as any).id === "removal") {
+                    vscode.window.showWarningMessage( vscode.l10n.t('Remove local replica "{label}" ?', {label:item.label}), 'Yes', 'No')
+                    .then(answer => {
+                        if (answer === 'Yes') {
+                            // remove local replica from scm persists
+                            const scmKey = Object.keys(scmPersists).find(key => vscode.Uri.parse(scmPersists[key].baseUri).fsPath===item.label)!;
+                            GlobalStateManager.updateServerProjectSCMPersist(this.context, serverName, projectId, scmKey);
+                            // remove entry from quick pick
+                            quickPick.items = quickPick.items.filter(quickPickItem => quickPickItem.label!==item.label);
+                        }
+                    });
+                }
+            });
+            quickPick.onDidAccept(() => {
+                const path = quickPick.selectedItems[0]?.label;
+                if (path) {
+                    quickPick.dispose();
+                    resolve(path);
+                }
+            });
+            quickPick.show();
+        })
+        .then(path => {
+            const uri = vscode.Uri.file(path as string);
+            // always open in current window
+            vscode.commands.executeCommand('vscode.openFolder', uri, openInNewWindow);
+            vscode.commands.executeCommand('workbench.view.explorer');
+        });
+    }
+
+    get triggers() {
+        return [
+            // register tree data provider
+            vscode.window.registerTreeDataProvider(`${EXTENSION_NAMESPACE}.projectManager`, this),
+            // register server-related commands
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.addServer`, () => {
+                this.addServer();
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.removeServer`, (item) => {
+                this.removeServer(item.name);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.loginServer`, (item) => {
+                this.loginServer(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.logoutServer`, (item) => {
+                this.logoutServer(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.refreshServer`, (item) => {
+                this.refreshServer(item);
+            }),
+            // register project-related commands
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.newProject`, (item) => {
+                this.newProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.copyProject`, (item) => {
+                this.copyProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.renameProject`, (item) => {
+                this.renameProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.deleteProject`, (item) => {
+                this.deleteProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.archiveProject`, (item) => {
+                this.archiveProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.unarchiveProject`, (item) => {
+                this.unarchiveProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.trashProject`, (item) => {
+                this.trashProject(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.untrashProject`, (item) => {
+                this.untrashProject(item);
+            }),
+            // register tag-related commands
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.createTag`, (item) => {
+                this.createTag(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.renameTag`, (item) => {
+                this.renameTag(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.deleteTag`, (item) => {
+                this.deleteTag(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.addProjectToTag`, (item) => {
+                this.addProjectToTag(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.removeProjectFromTag`, (item) => {
+                this.removeProjectFromTag(item);
+            }),
+            // register open project commands
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectInCurrentWindow`, (item) => {
+                this.openProjectInCurrentWindow(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectInNewWindow`, (item) => {
+                this.openProjectInNewWindow(item);
+            }),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectManager.openProjectLocalReplica`, (item) => {
+                return this.openProjectLocalReplica(item).catch(error => {
+                    notifyError('Open Project Locally failed. See the LeafRelay output for details.', error, 'open-project-locally-failed');
+                });
+            }),
+        ];
+    }
+}

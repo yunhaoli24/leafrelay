@@ -8,7 +8,24 @@
   "pull-request-title-pattern": "chore: release ${version}",
   "packages": {
     ".": {
-      "package-name": "leafrelay"
+      "package-name": "leafrelay",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "apps/vscode/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "packages/core/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "packages/cli/package.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   }
 }

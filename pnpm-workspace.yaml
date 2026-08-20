@@ -1,5 +1,7 @@
 packages:
-  - views/chat-view
+  - apps/*
+  - apps/vscode/views/*
+  - packages/*
 
 overrides:
   default-browser: 5.5.0
@@ -8,3 +10,19 @@ allowBuilds:
   '@vscode/vsce-sign': true
   esbuild: true
   keytar: true
+
+minimumReleaseAgeExclude:
+  - '@inquirer/checkbox@5.2.2'
+  - '@inquirer/confirm@6.2.0'
+  - '@inquirer/core@12.0.0'
+  - '@inquirer/editor@5.3.0'
+  - '@inquirer/expand@5.1.2'
+  - '@inquirer/external-editor@3.0.4'
+  - '@inquirer/figures@2.0.8'
+  - '@inquirer/input@5.1.3'
+  - '@inquirer/number@4.2.0'
+  - '@inquirer/password@5.1.2'
+  - '@inquirer/prompts@8.6.0'
+  - '@inquirer/rawlist@5.3.2'
+  - '@inquirer/search@4.3.0'
+  - '@inquirer/select@5.2.2'
