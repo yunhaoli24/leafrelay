@@ -23,9 +23,10 @@ import {
     type ServerImportParams,
     type ServerLoginParams,
 } from '@leafrelay/protocol';
-import {createMessageConnection, type MessageConnection} from 'vscode-jsonrpc/node';
+import type {MessageConnection} from 'vscode-jsonrpc/node';
 import {decodeRpcValue, encodeRpcValue} from './codec';
 import {daemonPaths, type DaemonPaths} from './paths';
+import {createSocketRpcConnection} from './transport';
 
 const START_TIMEOUT_MS = 15_000;
 const START_POLL_MS = 75;
@@ -227,7 +228,7 @@ export class LeafRelayDaemonClient {
         const metadata = await this.findOrStartDaemon();
         const socket = await tryConnect(metadata);
         if (!socket) { throw new Error(`LeafRelay daemon is not running at ${this.paths.socketPath}.`); }
-        const rpc = createMessageConnection(socket, socket);
+        const rpc = createSocketRpcConnection(socket);
         let signalClosed!:() => void;
         this.connectionClosed = new Promise(resolveClosed => { signalClosed = resolveClosed; });
         this.socket = socket;
