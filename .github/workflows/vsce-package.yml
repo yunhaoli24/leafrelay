@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      LEAFRELAY_HOME: ${{ runner.temp }}/leafrelay
+      LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
 
     steps:
       - name: Checkout code
@@ -89,7 +89,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
-      LEAFRELAY_HOME: ${{ runner.temp }}/leafrelay
+      LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
 
     steps:
       - uses: actions/checkout@v7
