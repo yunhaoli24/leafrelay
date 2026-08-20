@@ -1,0 +1,25 @@
+{
+  "name": "@leafrelay/daemon",
+  "version": "0.1.7",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "9.0.1"
+  },
+  "devDependencies": {
+    "@leafrelay/core": "workspace:*",
+    "@leafrelay/protocol": "workspace:*"
+  }
+}

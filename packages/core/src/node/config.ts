@@ -19,7 +19,7 @@ export interface LeafRelayConfig {
 export function configPath(environment: NodeJS.ProcessEnv = process.env): string {
     return environment.LEAFRELAY_CONFIG
         ? resolve(environment.LEAFRELAY_CONFIG)
-        : join(homedir(), '.leafrelay', 'config.json');
+        : join(environment.LEAFRELAY_HOME ? resolve(environment.LEAFRELAY_HOME) : join(homedir(), '.leafrelay'), 'config.json');
 }
 
 export function normalizeServerUrl(value: string): string {

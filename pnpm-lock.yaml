@@ -216,6 +216,21 @@ importers:
         specifier: ^14.0.1
         version: 14.0.1
 
+  packages/daemon:
+    dependencies:
+      vscode-jsonrpc:
+        specifier: 9.0.1
+        version: 9.0.1
+    devDependencies:
+      '@leafrelay/core':
+        specifier: workspace:*
+        version: link:../core
+      '@leafrelay/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/protocol: {}
+
 packages:
 
   '@azu/format-text@1.0.2':
@@ -4030,6 +4045,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  vscode-jsonrpc@9.0.1:
+    resolution: {integrity: sha512-rfuA6T75H6m5EkbhtEPzre9pT0HPcDI2MMy4+nPFIBks5J8JBAUHD4tRYSgaBOijIEC7SRkC1kKyXTLqbmh9jw==}
+    engines: {node: '>=14.0.0'}
 
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
@@ -8091,6 +8110,8 @@ snapshots:
       '@types/node': 26.2.0
     transitivePeerDependencies:
       - msw
+
+  vscode-jsonrpc@9.0.1: {}
 
   vscode-uri@3.1.0: {}
 

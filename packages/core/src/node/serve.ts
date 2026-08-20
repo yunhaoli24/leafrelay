@@ -9,17 +9,30 @@ import {readProjectSettings} from './projectSettings';
 import {FileSyncStateStore} from './syncStateStore';
 
 export interface RunningServe {
+    readonly root:string;
+    readonly serverName:string;
+    readonly projectId:string;
+    readonly projectName:string;
+    conflicts():string[];
+    resolveConflict(path:string, winner:'local'|'remote'):Promise<void>;
+    retry(path:string):Promise<void>;
     stop():Promise<void>;
 }
 
-export async function startServe(directory=process.cwd()):Promise<RunningServe> {
+export interface StartServeOptions {
+    cookie?:string;
+    log?:(message:string) => void;
+    onConflict?:(path:string, reason:string) => void;
+}
+
+export async function startServe(directory=process.cwd(), options:StartServeOptions={}):Promise<RunningServe> {
     const root = resolve(directory);
     const settings = await readProjectSettings(root);
     const session = await getServerSession(settings.serverName);
     if (!session) {
         throw new Error(`No login is stored for ${settings.serverName}. Run: leafrelay login ${settings.serverName}`);
     }
-    const cookie = process.env.LEAFRELAY_COOKIE || session.identity.cookies;
+    const cookie = options.cookie || process.env.LEAFRELAY_COOKIE || session.identity.cookies;
     const remote = new RemoteProject(session.url || settings.serverUrl, settings.projectId, cookie);
     await remote.connect();
 
@@ -32,10 +45,10 @@ export async function startServe(directory=process.cwd()):Promise<RunningServe> 
         remote,
         stateStore:new FileSyncStateStore(root, settings.uri),
         ignore,
-        log,
-        onConflict:(path, reason) => {
-            log(`Conflict paused for ${path}: ${reason}`);
-        },
+        log:options.log ?? log,
+        onConflict:options.onConflict ?? ((path, reason) => {
+            (options.log ?? log)(`Conflict paused for ${path}: ${reason}`);
+        }),
     });
     try {
         await engine.start();
@@ -43,8 +56,15 @@ export async function startServe(directory=process.cwd()):Promise<RunningServe> 
         remote.disconnect();
         throw error;
     }
-    log(`LeafRelay is serving ${root} (${settings.projectName}).`);
+    (options.log ?? log)(`LeafRelay is serving ${root} (${settings.projectName}).`);
     return {
+        root,
+        serverName:settings.serverName,
+        projectId:settings.projectId,
+        projectName:settings.projectName,
+        conflicts:() => engine.getConflicts(),
+        resolveConflict:(path, winner) => engine.resolveConflict(path, winner),
+        retry:path => engine.retry(path),
         stop:async () => {
             await engine.stop();
             remote.disconnect();

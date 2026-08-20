@@ -100,6 +100,50 @@ export class SyncEngine {
         await this.queue;
     }
 
+    getConflicts():string[] {
+        return [...this.conflicts].sort();
+    }
+
+    async resolveConflict(path:string, winner:'local'|'remote'):Promise<void> {
+        const normalized = normalizePath(path);
+        if (!this.conflicts.has(normalized)) {
+            throw new Error(`No unresolved conflict exists for ${normalized}.`);
+        }
+        await this.enqueue(async () => {
+            const remoteEntry = this.options.remote.entry(normalized);
+            if (winner==='local') {
+                const localContent = await this.options.local.read(normalized);
+                if (localContent) {
+                    await this.options.remote.write(normalized, localContent);
+                    const synchronized = await this.options.remote.read(normalized);
+                    if (sha256(synchronized)!==sha256(localContent)) {
+                        await this.options.local.write(normalized, synchronized);
+                    }
+                    updateSyncCheckpoint(this.state!, normalized, synchronized);
+                } else {
+                    if (remoteEntry) { await this.options.remote.remove(normalized); }
+                    removeSyncCheckpoint(this.state!, normalized);
+                }
+            } else if (isRemoteFile(remoteEntry)) {
+                const remoteContent = await this.options.remote.read(normalized);
+                await this.options.local.write(normalized, remoteContent);
+                updateSyncCheckpoint(this.state!, normalized, remoteContent);
+            } else {
+                await this.options.local.remove(normalized);
+                removeSyncCheckpoint(this.state!, normalized);
+            }
+            await this.options.stateStore.save(this.state!);
+            this.conflicts.delete(normalized);
+            this.options.log(`Resolved ${normalized} using ${winner==='local' ? 'local' : 'Overleaf'} content.`);
+        });
+    }
+
+    async retry(path:string):Promise<void> {
+        const normalized = normalizePath(path);
+        this.conflicts.delete(normalized);
+        await this.enqueue(() => this.reconcilePath(normalized, 'local'));
+    }
+
     private async startupReconcile(currentVersion:number, localFiles:string[], remoteFiles:string[]) {
         const state = this.state!;
         if (state.remoteVersion>currentVersion) {
@@ -147,11 +191,14 @@ export class SyncEngine {
                 this.options.log(`Failed to synchronize ${path}: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
-        if (failed || this.conflicts.size!==0) {
-            throw new Error(`Synchronization paused for ${failed ? 'failed' : 'conflicting'} paths; successful paths were checkpointed.`);
+        if (failed) {
+            throw new Error('Synchronization paused for failed paths; successful paths were checkpointed.');
         }
         state.remoteVersion = currentVersion;
         await this.options.stateStore.save(state);
+        if (this.conflicts.size!==0) {
+            this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
+        }
     }
 
     private schedule(path:string, source:ChangeSource) {
@@ -165,6 +212,12 @@ export class SyncEngine {
                 this.options.log(`Failed to synchronize ${normalized}: ${error instanceof Error ? error.message : String(error)}`);
             });
         }, 250));
+    }
+
+    private enqueue<T>(operation:() => Promise<T>):Promise<T> {
+        const result = this.queue.then(operation);
+        this.queue = result.then(() => undefined, () => undefined);
+        return result;
     }
 
     private async reconcilePath(path:string, source:ChangeSource):Promise<void> {

@@ -94,10 +94,17 @@ describe('SyncEngine', () => {
             ignore:()=>false, log:()=>{}, onConflict:path=>conflicts.push(path),
         });
 
-        await expect(engine.start()).rejects.toThrow('conflicting paths');
+        await engine.start();
         expect(conflicts).toEqual(['/a.tex']);
+        expect(engine.getConflicts()).toEqual(['/a.tex']);
         expect(text(remote.files.get('/b.tex'))).toBe('updated\n');
         expect(store.saves.at(-1)?.files['/b.tex']).toBeDefined();
-        expect(store.saves.at(-1)?.remoteVersion).toBe(1);
+        expect(store.saves.at(-1)?.remoteVersion).toBe(2);
+
+        await engine.resolveConflict('/a.tex', 'local');
+        expect(engine.getConflicts()).toEqual([]);
+        expect(text(remote.files.get('/a.tex'))).toBe('local\n');
+        expect(store.saves.at(-1)?.files['/a.tex']).toBeDefined();
+        await engine.stop();
     });
 });
