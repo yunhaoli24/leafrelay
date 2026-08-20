@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import fuzzysearch from 'fuzzysearch';
-import { ROOT_NAME } from '../consts';
+import { OVERLEAF_URI_SCHEME } from '../consts';
 import { RemoteFileSystemProvider } from '../core/remoteFileSystemProvider';
 
 export function fuzzyFilter<T extends object>(list: T[], target: string, keys?: (keyof T)[]) {
@@ -13,7 +13,7 @@ export function fuzzyFilter<T extends object>(list: T[], target: string, keys?: 
 }
 
 export abstract class IntellisenseProvider {
-    protected selector = {scheme: ROOT_NAME};
+    protected selector = {scheme: OVERLEAF_URI_SCHEME};
     protected abstract readonly contextPrefix: string[][];
 
     constructor(protected readonly vfsm: RemoteFileSystemProvider) {}

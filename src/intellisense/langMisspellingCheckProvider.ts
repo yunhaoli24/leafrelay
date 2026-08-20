@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { IntellisenseProvider } from './intellisenseProvider';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OVERLEAF_URI_SCHEME } from '../consts';
 import { VirtualFileSystem } from '../core/remoteFileSystemProvider';
 import { EventBus } from '../utils/eventBus';
 
@@ -13,7 +13,7 @@ function* sRange(start:number, end:number) {
 export class MisspellingCheckProvider extends IntellisenseProvider implements vscode.CodeActionProvider {
     private learnedWords?: Set<string>;
     private suggestionCache: Map<string, string[]> = new Map();
-    private diagnosticCollection = vscode.languages.createDiagnosticCollection(ROOT_NAME);
+    private diagnosticCollection = vscode.languages.createDiagnosticCollection(EXTENSION_NAMESPACE);
     protected readonly contextPrefix = [];
 
     private splitText(text: string) {
@@ -215,7 +215,7 @@ export class MisspellingCheckProvider extends IntellisenseProvider implements vs
             }),
             // update diagnostics on document open
             vscode.workspace.onDidOpenTextDocument(async doc => {
-                if (doc.uri.scheme === ROOT_NAME) {
+                if (doc.uri.scheme === OVERLEAF_URI_SCHEME) {
                     const uri = doc.uri;
                     await this.check( uri, doc.getText() );
                     this.updateDiagnostics(uri);
@@ -223,7 +223,7 @@ export class MisspellingCheckProvider extends IntellisenseProvider implements vs
             }),
             // update diagnostics on text changed
             vscode.workspace.onDidChangeTextDocument(async e => {
-                if (e.document.uri.scheme === ROOT_NAME) {
+                if (e.document.uri.scheme === OVERLEAF_URI_SCHEME) {
                     const uri = e.document.uri;
                     for (const event of e.contentChanges) {
                         // extract changed text

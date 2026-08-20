@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
+import { OUTPUT_FOLDER_NAME, OVERLEAF_URI_SCHEME } from '../consts';
 import { SnippetItemSchema } from '../api/base';
 import { fuzzyFilter, IntellisenseProvider } from './intellisenseProvider';
 import { RemoteFileSystemProvider, VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
@@ -150,7 +150,7 @@ export class CommandCompletionProvider extends IntellisenseProvider implements v
             vscode.languages.registerCompletionItemProvider(this.selector, this, '\\'),
             // trigger on document save
             vscode.workspace.onDidSaveTextDocument(async doc => {
-                if (doc.uri.scheme === ROOT_NAME && doc.uri.path.endsWith('.tex')) {
+                if (doc.uri.scheme === OVERLEAF_URI_SCHEME && doc.uri.path.endsWith('.tex')) {
                     const {identifier} = parseUri(doc.uri);
                     const commands = await this.loadCommands(doc.uri);
                     this.customData[identifier]?.commands.set(doc.uri.path, commands);

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ROOT_NAME } from '../consts';
+import { OVERLEAF_URI_SCHEME } from '../consts';
 import { RemoteFileSystemProvider } from '../core/remoteFileSystemProvider';
 
 import { IntellisenseProvider } from './intellisenseProvider';
@@ -31,7 +31,7 @@ export class LangIntellisenseProvider {
         // Enable CSpell
         const config = vscode.workspace.getConfiguration("cSpell");
         const enabledSchemes = config.get<Record<string, boolean>>("enabledSchemes") || {}; 
-        enabledSchemes[ROOT_NAME] = true; 
+        enabledSchemes[OVERLEAF_URI_SCHEME] = true;
         config.update("enabledSchemes", enabledSchemes, vscode.ConfigurationTarget.Global);
         
         this.activate();
@@ -39,7 +39,7 @@ export class LangIntellisenseProvider {
 
     async activate() {
         const uri = vscode.workspace.workspaceFolders?.[0].uri;
-        if (uri?.scheme!==ROOT_NAME) { return; }
+        if (uri?.scheme!==OVERLEAF_URI_SCHEME) { return; }
 
         const vfs = uri && await this.vfsm.prefetch(uri);
         const languageItem = vfs?.getSpellCheckLanguage();

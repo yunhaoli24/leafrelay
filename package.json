@@ -120,282 +120,282 @@
     ],
     "commands": [
       {
-        "command": "overleaf-workshop.remoteFileSystem.refreshLinkedFile",
+        "command": "leafrelay.remoteFileSystem.refreshLinkedFile",
         "title": "%commands.remoteFileSystem.refreshLinkedFile.title%",
         "icon": "$(refresh)",
-        "enablement": "focusedView == 'workbench.explorer.fileView' && (resourceScheme == overleaf-workshop || overleaf-workshop.activate)",
+        "enablement": "focusedView == 'workbench.explorer.fileView' && (resourceScheme == overleaf-workshop || leafrelay.activate)",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.remoteFileSystem.createLinkedFile",
+        "command": "leafrelay.remoteFileSystem.createLinkedFile",
         "title": "%commands.remoteFileSystem.createLinkedFile.title%",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activate",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activate",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.addServer",
+        "command": "leafrelay.projectManager.addServer",
         "title": "%commands.projectManager.addServer.title%",
         "icon": "$(add)",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.removeServer",
+        "command": "leafrelay.projectManager.removeServer",
         "title": "%commands.projectManager.removeServer.title%",
         "icon": "$(trash)",
         "enablement": "viewItem == server_login || viewItem == server_no_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.loginServer",
+        "command": "leafrelay.projectManager.loginServer",
         "title": "%commands.projectManager.loginServer.title%",
         "icon": "$(log-in)",
         "enablement": "viewItem == server_no_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.logoutServer",
+        "command": "leafrelay.projectManager.logoutServer",
         "title": "%commands.projectManager.logoutServer.title%",
         "icon": "$(debug-disconnect)",
         "enablement": "viewItem == server_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.refreshServer",
+        "command": "leafrelay.projectManager.refreshServer",
         "title": "%commands.projectManager.refreshServer.title%",
         "icon": "$(refresh)",
         "enablement": "viewItem == server_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.newProject",
+        "command": "leafrelay.projectManager.newProject",
         "title": "%commands.projectManager.newProject.title%",
         "icon": "$(add)",
         "enablement": "viewItem == server_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.copyProject",
+        "command": "leafrelay.projectManager.copyProject",
         "title": "%commands.projectManager.copyProject.title%",
         "enablement": "viewItem =~ /^(?!archived).*project/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.renameProject",
+        "command": "leafrelay.projectManager.renameProject",
         "title": "%commands.projectManager.renameProject.title%",
         "icon": "$(edit)",
         "enablement": "viewItem =~ /^(?!archived).*project/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.deleteProject",
+        "command": "leafrelay.projectManager.deleteProject",
         "title": "%commands.projectManager.deleteProject.title%",
         "icon": "$(circle-slash)",
         "enablement": "viewItem == trashed_project",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.archiveProject",
+        "command": "leafrelay.projectManager.archiveProject",
         "title": "%commands.projectManager.archiveProject.title%",
         "icon": "$(archive)",
         "enablement": "viewItem =~ /^(?!archived).*project/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.unarchiveProject",
+        "command": "leafrelay.projectManager.unarchiveProject",
         "title": "%commands.projectManager.unarchiveProject.title%",
         "icon": "$(reply)",
         "enablement": "viewItem == archived_project",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.trashProject",
+        "command": "leafrelay.projectManager.trashProject",
         "title": "%commands.projectManager.trashProject.title%",
         "icon": "$(trash)",
         "enablement": "viewItem =~ /^(?!trashed).*project/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.untrashProject",
+        "command": "leafrelay.projectManager.untrashProject",
         "title": "%commands.projectManager.untrashProject.title%",
         "icon": "$(reply)",
         "enablement": "viewItem == trashed_project",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.createTag",
+        "command": "leafrelay.projectManager.createTag",
         "title": "%commands.projectManager.createTag.title%",
         "icon": "$(tag)",
         "enablement": "viewItem == server_login",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.renameTag",
+        "command": "leafrelay.projectManager.renameTag",
         "title": "%commands.projectManager.renameTag.title%",
         "icon": "$(edit)",
         "enablement": "viewItem == tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.deleteTag",
+        "command": "leafrelay.projectManager.deleteTag",
         "title": "%commands.projectManager.deleteTag.title%",
         "icon": "$(close-all)",
         "enablement": "viewItem == tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.addProjectToTag",
+        "command": "leafrelay.projectManager.addProjectToTag",
         "title": "%commands.projectManager.addProjectToTag.title%",
         "icon": "$(tag)",
         "enablement": "viewItem == project",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.removeProjectFromTag",
+        "command": "leafrelay.projectManager.removeProjectFromTag",
         "title": "%commands.projectManager.removeProjectFromTag.title%",
         "enablement": "viewItem == project_in_tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.openProjectInCurrentWindow",
+        "command": "leafrelay.projectManager.openProjectInCurrentWindow",
         "title": "%commands.projectManager.openProjectInCurrentWindow.title%",
         "icon": "$(arrow-right)",
         "enablement": "viewItem == project || viewItem == project_in_tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.openProjectInNewWindow",
+        "command": "leafrelay.projectManager.openProjectInNewWindow",
         "title": "%commands.projectManager.openProjectInNewWindow.title%",
         "icon": "$(empty-window)",
         "enablement": "viewItem == project || viewItem == project_in_tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectManager.openProjectLocalReplica",
+        "command": "leafrelay.projectManager.openProjectLocalReplica",
         "title": "%commands.projectManager.openProjectLocalReplica.title%",
         "icon": "$(file-directory)",
         "enablement": "viewItem == project || viewItem == project_in_tag",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.refresh",
+        "command": "leafrelay.projectHistory.refresh",
         "title": "%commands.projectHistory.refresh.title%",
         "icon": "$(refresh)",
         "enablement": "resourceScheme == overleaf-workshop",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.clearSelection",
+        "command": "leafrelay.projectHistory.clearSelection",
         "title": "%commands.projectHistory.clearSelection.title%",
         "icon": "$(clear-all)",
-        "enablement": "view == overleaf-workshop.projectHistory",
+        "enablement": "view == leafrelay.projectHistory",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.createLabel",
+        "command": "leafrelay.projectHistory.createLabel",
         "title": "%commands.projectHistory.createLabel.title%",
         "icon": "$(tag)",
         "enablement": "viewItem =~ /historyItem(Labelled)?/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.deleteLabel",
+        "command": "leafrelay.projectHistory.deleteLabel",
         "title": "%commands.projectHistory.deleteLabel.title%",
         "icon": "$(close-all)",
         "enablement": "viewItem == historyItemLabelled",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.comparePrevious",
+        "command": "leafrelay.projectHistory.comparePrevious",
         "title": "%commands.projectHistory.comparePrevious.title%",
         "enablement": "viewItem =~ /historyItem(Labelled)?/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.compareCurrent",
+        "command": "leafrelay.projectHistory.compareCurrent",
         "title": "%commands.projectHistory.compareCurrent.title%",
         "enablement": "viewItem =~ /historyItem(Labelled)?/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.compareOthers",
+        "command": "leafrelay.projectHistory.compareOthers",
         "title": "%commands.projectHistory.compareOthers.title%",
         "enablement": "viewItem =~ /historyItem(Labelled)?/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.downloadProject",
+        "command": "leafrelay.projectHistory.downloadProject",
         "title": "%commands.projectHistory.downloadProject.title%",
         "icon": "$(cloud-download)",
         "enablement": "viewItem =~ /historyItem(Labelled)?/",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectHistory.revealHistoryView",
+        "command": "leafrelay.projectHistory.revealHistoryView",
         "title": "%commands.projectHistory.revealHistoryView.title%",
         "enablement": "resourceScheme == overleaf-workshop",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.projectSCM.configSCM",
+        "command": "leafrelay.projectSCM.configSCM",
         "title": "%commands.projectSCM.configSCM.title%",
         "icon": "$(gear)",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activate",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activate",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.compileManager.compile",
+        "command": "leafrelay.compileManager.compile",
         "title": "%commands.compileManager.compile.title%",
         "icon": "$(debug-start)",
-        "enablement": "(resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex",
+        "enablement": "(resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.compileManager.viewPdf",
+        "command": "leafrelay.compileManager.viewPdf",
         "title": "%commands.compileManager.viewPdf.title%",
         "icon": "$(open-preview)",
-        "enablement": "(resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex",
+        "enablement": "(resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.compileManager.syncCode",
+        "command": "leafrelay.compileManager.syncCode",
         "title": "%commands.compileManager.syncCode.title%",
-        "enablement": "editorTextFocus && (resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex",
+        "enablement": "editorTextFocus && (resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.compileManager.setCompiler",
+        "command": "leafrelay.compileManager.setCompiler",
         "title": "%commands.compileManager.setCompiler.title%",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activateCompile",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.compileManager.setRootDoc",
+        "command": "leafrelay.compileManager.setRootDoc",
         "title": "%commands.compileManager.setRootDoc.title%",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activateCompile",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.collaboration.copyLineRef",
+        "command": "leafrelay.collaboration.copyLineRef",
         "title": "%commands.collaboration.copyLineRef.title%",
         "enablement": "editorTextFocus && resourceScheme == overleaf-workshop",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.collaboration.insertLineRef",
+        "command": "leafrelay.collaboration.insertLineRef",
         "title": "%commands.collaboration.insertLineRef.title%",
         "enablement": "editorTextFocus && resourceScheme == overleaf-workshop",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.collaboration.revealChatView",
+        "command": "leafrelay.collaboration.revealChatView",
         "title": "%commands.collaboration.revealChatView.title%",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activate",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activate",
         "category": "%extension.displayName%"
       },
       {
-        "command": "overleaf-workshop.collaboration.jumpToUser",
+        "command": "leafrelay.collaboration.jumpToUser",
         "title": "%commands.collaboration.jumpToUser.title%",
-        "enablement": "resourceScheme == overleaf-workshop || overleaf-workshop.activate",
+        "enablement": "resourceScheme == overleaf-workshop || leafrelay.activate",
         "category": "%extension.displayName%"
       }
     ],
@@ -403,45 +403,45 @@
       {
         "key": "ctrl+alt+b",
         "mac": "cmd+alt+b",
-        "command": "overleaf-workshop.compileManager.compile",
-        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex"
+        "command": "leafrelay.compileManager.compile",
+        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex"
       },
       {
         "key": "ctrl+alt+v",
         "mac": "cmd+alt+v",
-        "command": "overleaf-workshop.compileManager.viewPdf",
-        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex"
+        "command": "leafrelay.compileManager.viewPdf",
+        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex"
       },
       {
         "key": "ctrl+alt+j",
         "mac": "cmd+alt+j",
-        "command": "overleaf-workshop.compileManager.syncCode",
-        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex"
+        "command": "leafrelay.compileManager.syncCode",
+        "when": "editorTextFocus && (resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex"
       },
       {
         "key": "ctrl+shift+c",
         "mac": "cmd+shift+c",
-        "command": "overleaf-workshop.collaboration.copyLineRef",
+        "command": "leafrelay.collaboration.copyLineRef",
         "when": "editorTextFocus && resourceScheme == overleaf-workshop"
       }
     ],
     "configuration": {
       "title": "%extension.displayName%",
       "properties": {
-        "overleaf-workshop.compileOnSave.enabled": {
+        "leafrelay.compileOnSave.enabled": {
           "type": "boolean",
           "default": true,
           "scope": "machine",
           "markdownDescription": "%configuration.compileOnSave.enabled.markdownDescription%"
         },
-        "overleaf-workshop.compileOutputFolderName": {
+        "leafrelay.compileOutputFolderName": {
           "type": "string",
           "default": ".output",
           "scope": "machine",
           "pattern": "^[^\\\\/:*?\"<>|]+$",
           "markdownDescription": "%configuration.compileOutputFolderName.markdownDescription%"
         },
-        "overleaf-workshop.pdfViewer.themes": {
+        "leafrelay.pdfViewer.themes": {
           "type": "object",
           "default": {
             "default": {
@@ -479,7 +479,7 @@
           "scope": "machine",
           "markdownDescription": "%configuration.pdfViewer.themes.markdownDescription%"
         },
-        "overleaf-workshop.pdfViewer.defaultScrollMode": {
+        "leafrelay.pdfViewer.defaultScrollMode": {
           "type": "string",
           "enum": [
             "vertical",
@@ -491,7 +491,7 @@
           "scope": "machine",
           "markdownDescription": "%configuration.pdfViewer.defaultScrollMode.markdownDescription%"
         },
-        "overleaf-workshop.pdfViewer.defaultSpreadMode": {
+        "leafrelay.pdfViewer.defaultSpreadMode": {
           "type": "string",
           "enum": [
             "none",
@@ -502,7 +502,7 @@
           "scope": "machine",
           "markdownDescription": "%configuration.pdfViewer.defaultSpreadMode.markdownDescription%"
         },
-        "overleaf-workshop.invisibleMode.historyRefreshInterval": {
+        "leafrelay.invisibleMode.historyRefreshInterval": {
           "type": "number",
           "default": 3,
           "scope": "machine",
@@ -510,7 +510,7 @@
           "maximum": 60,
           "markdownDescription": "%configuration.invisibleMode.historyRefreshInterval.markdownDescription%"
         },
-        "overleaf-workshop.invisibleMode.chatMessageRefreshInterval": {
+        "leafrelay.invisibleMode.chatMessageRefreshInterval": {
           "type": "number",
           "default": 3,
           "scope": "machine",
@@ -518,7 +518,7 @@
           "maximum": 60,
           "markdownDescription": "%configuration.invisibleMode.chatMessageRefreshInterval.markdownDescription%"
         },
-        "overleaf-workshop.invisibleMode.inactiveTimeout": {
+        "leafrelay.invisibleMode.inactiveTimeout": {
           "type": "number",
           "default": 180,
           "scope": "machine",
@@ -526,7 +526,7 @@
           "maximum": 3600,
           "markdownDescription": "%configuration.invisibleMode.inactiveTimeout.markdownDescription%"
         },
-        "overleaf-workshop.formatWithLineBreak.enabled": {
+        "leafrelay.formatWithLineBreak.enabled": {
           "type": "boolean",
           "default": true,
           "scope": "machine",
@@ -537,237 +537,237 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "overleaf-workshop",
+          "id": "leafrelay",
           "title": "%extension.displayName%",
-          "icon": "resources/icons/overleaf_bw.svg"
+          "icon": "resources/icons/leafrelay.svg"
         }
       ]
     },
     "views": {
-      "overleaf-workshop": [
+      "leafrelay": [
         {
-          "id": "overleaf-workshop.projectManager",
-          "name": "%views.overleaf-workshop.projectManager.name%"
+          "id": "leafrelay.projectManager",
+          "name": "%views.leafrelay.projectManager.name%"
         }
       ],
       "explorer": [
         {
-          "id": "overleaf-workshop.projectHistory",
+          "id": "leafrelay.projectHistory",
           "icon": "$(history)",
-          "name": "%views.explorer.overleaf-workshop.projectHistory%",
-          "contextualTitle": "%views.explorer.overleaf-workshop.contextualTitle%",
+          "name": "%views.explorer.leafrelay.projectHistory%",
+          "contextualTitle": "%views.explorer.leafrelay.contextualTitle%",
           "when": "resourceScheme == overleaf-workshop"
         },
         {
           "type": "webview",
-          "id": "overleaf-workshop.chatWebview",
+          "id": "leafrelay.chatWebview",
           "icon": "$(feedback)",
-          "name": "%views.explorer.overleaf-workshop.chatWebview.name%",
-          "contextualTitle": "%views.explorer.overleaf-workshop.chatWebview.contextualTitle%",
-          "when": "resourceScheme == overleaf-workshop || overleaf-workshop.activate"
+          "name": "%views.explorer.leafrelay.chatWebview.name%",
+          "contextualTitle": "%views.explorer.leafrelay.chatWebview.contextualTitle%",
+          "when": "resourceScheme == overleaf-workshop || leafrelay.activate"
         }
       ]
     },
     "menus": {
       "explorer/context": [
         {
-          "command": "overleaf-workshop.remoteFileSystem.refreshLinkedFile",
-          "when": "(resourceScheme == overleaf-workshop || overleaf-workshop.activate) && !explorerResourceIsFolder"
+          "command": "leafrelay.remoteFileSystem.refreshLinkedFile",
+          "when": "(resourceScheme == overleaf-workshop || leafrelay.activate) && !explorerResourceIsFolder"
         },
         {
-          "command": "overleaf-workshop.remoteFileSystem.createLinkedFile",
-          "when": "(resourceScheme == overleaf-workshop || overleaf-workshop.activate) && explorerResourceIsFolder"
+          "command": "leafrelay.remoteFileSystem.createLinkedFile",
+          "when": "(resourceScheme == overleaf-workshop || leafrelay.activate) && explorerResourceIsFolder"
         }
       ],
       "editor/context": [
         {
-          "command": "overleaf-workshop.collaboration.copyLineRef",
-          "when": "resourceScheme == overleaf-workshop || overleaf-workshop.activate"
+          "command": "leafrelay.collaboration.copyLineRef",
+          "when": "resourceScheme == overleaf-workshop || leafrelay.activate"
         },
         {
-          "command": "overleaf-workshop.collaboration.insertLineRef",
-          "when": "resourceScheme == overleaf-workshop || overleaf-workshop.activate"
+          "command": "leafrelay.collaboration.insertLineRef",
+          "when": "resourceScheme == overleaf-workshop || leafrelay.activate"
         }
       ],
       "view/title": [
         {
-          "command": "overleaf-workshop.projectManager.addServer",
-          "when": "view == overleaf-workshop.projectManager",
+          "command": "leafrelay.projectManager.addServer",
+          "when": "view == leafrelay.projectManager",
           "group": "navigation"
         },
         {
-          "command": "overleaf-workshop.projectSCM.configSCM",
-          "when": "view == overleaf-workshop.projectHistory",
+          "command": "leafrelay.projectSCM.configSCM",
+          "when": "view == leafrelay.projectHistory",
           "group": "navigation@1"
         },
         {
-          "command": "overleaf-workshop.projectHistory.refresh",
-          "when": "view == overleaf-workshop.projectHistory",
+          "command": "leafrelay.projectHistory.refresh",
+          "when": "view == leafrelay.projectHistory",
           "group": "navigation@2"
         },
         {
-          "command": "overleaf-workshop.projectHistory.clearSelection",
-          "when": "view == overleaf-workshop.projectHistory",
+          "command": "leafrelay.projectHistory.clearSelection",
+          "when": "view == leafrelay.projectHistory",
           "group": "navigation@3"
         }
       ],
       "editor/title": [
         {
-          "command": "overleaf-workshop.compileManager.compile",
-          "when": "(resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex",
+          "command": "leafrelay.compileManager.compile",
+          "when": "(resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex",
           "group": "navigation@1"
         },
         {
-          "command": "overleaf-workshop.compileManager.viewPdf",
-          "when": "(resourceScheme == overleaf-workshop || overleaf-workshop.activateCompile) && resourceExtname == .tex",
+          "command": "leafrelay.compileManager.viewPdf",
+          "when": "(resourceScheme == overleaf-workshop || leafrelay.activateCompile) && resourceExtname == .tex",
           "group": "navigation@2"
         }
       ],
       "view/item/context": [
         {
-          "command": "overleaf-workshop.projectManager.loginServer",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_no_login",
+          "command": "leafrelay.projectManager.loginServer",
+          "when": "view == leafrelay.projectManager && viewItem == server_no_login",
           "group": "inline"
         },
         {
-          "command": "overleaf-workshop.projectManager.newProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_login",
+          "command": "leafrelay.projectManager.newProject",
+          "when": "view == leafrelay.projectManager && viewItem == server_login",
           "group": "inline@1"
         },
         {
-          "command": "overleaf-workshop.projectManager.refreshServer",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_login",
+          "command": "leafrelay.projectManager.refreshServer",
+          "when": "view == leafrelay.projectManager && viewItem == server_login",
           "group": "inline@2"
         },
         {
-          "command": "overleaf-workshop.projectManager.logoutServer",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_login",
+          "command": "leafrelay.projectManager.logoutServer",
+          "when": "view == leafrelay.projectManager && viewItem == server_login",
           "group": "inline@3"
         },
         {
-          "command": "overleaf-workshop.projectManager.removeServer",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_login || viewItem == server_no_login"
+          "command": "leafrelay.projectManager.removeServer",
+          "when": "view == leafrelay.projectManager && viewItem == server_login || viewItem == server_no_login"
         },
         {
-          "command": "overleaf-workshop.projectManager.copyProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem =~ /^(?!archived).*project/",
+          "command": "leafrelay.projectManager.copyProject",
+          "when": "view == leafrelay.projectManager && viewItem =~ /^(?!archived).*project/",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.renameProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem =~ /^(?!archived).*project/",
+          "command": "leafrelay.projectManager.renameProject",
+          "when": "view == leafrelay.projectManager && viewItem =~ /^(?!archived).*project/",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.deleteProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem == trashed_project",
+          "command": "leafrelay.projectManager.deleteProject",
+          "when": "view == leafrelay.projectManager && viewItem == trashed_project",
           "group": "inline@2"
         },
         {
-          "command": "overleaf-workshop.projectManager.archiveProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem =~ /^(?!archived).*project/",
+          "command": "leafrelay.projectManager.archiveProject",
+          "when": "view == leafrelay.projectManager && viewItem =~ /^(?!archived).*project/",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.unarchiveProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem == archived_project",
+          "command": "leafrelay.projectManager.unarchiveProject",
+          "when": "view == leafrelay.projectManager && viewItem == archived_project",
           "group": "inline@1"
         },
         {
-          "command": "overleaf-workshop.projectManager.trashProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem =~ /^(?!trashed).*project/",
+          "command": "leafrelay.projectManager.trashProject",
+          "when": "view == leafrelay.projectManager && viewItem =~ /^(?!trashed).*project/",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.untrashProject",
-          "when": "view == overleaf-workshop.projectManager && viewItem == trashed_project",
+          "command": "leafrelay.projectManager.untrashProject",
+          "when": "view == leafrelay.projectManager && viewItem == trashed_project",
           "group": "inline@1"
         },
         {
-          "command": "overleaf-workshop.projectManager.createTag",
-          "when": "view == overleaf-workshop.projectManager && viewItem == server_login"
+          "command": "leafrelay.projectManager.createTag",
+          "when": "view == leafrelay.projectManager && viewItem == server_login"
         },
         {
-          "command": "overleaf-workshop.projectManager.renameTag",
-          "when": "view == overleaf-workshop.projectManager && viewItem == tag",
+          "command": "leafrelay.projectManager.renameTag",
+          "when": "view == leafrelay.projectManager && viewItem == tag",
           "group": "inline@1"
         },
         {
-          "command": "overleaf-workshop.projectManager.deleteTag",
-          "when": "view == overleaf-workshop.projectManager && viewItem == tag",
+          "command": "leafrelay.projectManager.deleteTag",
+          "when": "view == leafrelay.projectManager && viewItem == tag",
           "group": "inline@2"
         },
         {
-          "command": "overleaf-workshop.projectManager.addProjectToTag",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project",
+          "command": "leafrelay.projectManager.addProjectToTag",
+          "when": "view == leafrelay.projectManager && viewItem == project",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.removeProjectFromTag",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.removeProjectFromTag",
+          "when": "view == leafrelay.projectManager && viewItem == project_in_tag",
           "group": "1_editActions"
         },
         {
-          "command": "overleaf-workshop.projectManager.openProjectInCurrentWindow",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project || viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.openProjectInCurrentWindow",
+          "when": "view == leafrelay.projectManager && viewItem == project || viewItem == project_in_tag",
           "group": "inline@3"
         },
         {
-          "command": "overleaf-workshop.projectManager.openProjectInNewWindow",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project || viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.openProjectInNewWindow",
+          "when": "view == leafrelay.projectManager && viewItem == project || viewItem == project_in_tag",
           "group": "inline@4"
         },
         {
-          "command": "overleaf-workshop.projectManager.openProjectInCurrentWindow",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project || viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.openProjectInCurrentWindow",
+          "when": "view == leafrelay.projectManager && viewItem == project || viewItem == project_in_tag",
           "group": "1_openActions@1"
         },
         {
-          "command": "overleaf-workshop.projectManager.openProjectInNewWindow",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project || viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.openProjectInNewWindow",
+          "when": "view == leafrelay.projectManager && viewItem == project || viewItem == project_in_tag",
           "group": "1_openActions@2"
         },
         {
-          "command": "overleaf-workshop.projectManager.openProjectLocalReplica",
-          "when": "view == overleaf-workshop.projectManager && viewItem == project || viewItem == project_in_tag",
+          "command": "leafrelay.projectManager.openProjectLocalReplica",
+          "when": "view == leafrelay.projectManager && viewItem == project || viewItem == project_in_tag",
           "group": "1_openActions@3"
         },
         {
-          "command": "overleaf-workshop.projectHistory.createLabel",
-          "when": "view == overleaf-workshop.projectHistory && viewItem =~ /historyItem(Labelled)?/",
+          "command": "leafrelay.projectHistory.createLabel",
+          "when": "view == leafrelay.projectHistory && viewItem =~ /historyItem(Labelled)?/",
           "group": "1_labelActions@0"
         },
         {
-          "command": "overleaf-workshop.projectHistory.deleteLabel",
-          "when": "view == overleaf-workshop.projectHistory && viewItem == historyItemLabelled",
+          "command": "leafrelay.projectHistory.deleteLabel",
+          "when": "view == leafrelay.projectHistory && viewItem == historyItemLabelled",
           "group": "1_labelActions@1"
         },
         {
-          "command": "overleaf-workshop.projectHistory.comparePrevious",
-          "when": "view == overleaf-workshop.projectHistory && viewItem =~ /historyItem(Labelled)?/",
+          "command": "leafrelay.projectHistory.comparePrevious",
+          "when": "view == leafrelay.projectHistory && viewItem =~ /historyItem(Labelled)?/",
           "group": "2_scmActions@1"
         },
         {
-          "command": "overleaf-workshop.projectHistory.compareCurrent",
-          "when": "view == overleaf-workshop.projectHistory && viewItem =~ /historyItem(Labelled)?/",
+          "command": "leafrelay.projectHistory.compareCurrent",
+          "when": "view == leafrelay.projectHistory && viewItem =~ /historyItem(Labelled)?/",
           "group": "2_scmActions@0"
         },
         {
-          "command": "overleaf-workshop.projectHistory.compareOthers",
-          "when": "view == overleaf-workshop.projectHistory && viewItem =~ /historyItem(Labelled)?/",
+          "command": "leafrelay.projectHistory.compareOthers",
+          "when": "view == leafrelay.projectHistory && viewItem =~ /historyItem(Labelled)?/",
           "group": "2_scmActions@2"
         },
         {
-          "command": "overleaf-workshop.projectHistory.downloadProject",
-          "when": "view == overleaf-workshop.projectHistory && viewItem =~ /historyItem(Labelled)?/",
+          "command": "leafrelay.projectHistory.downloadProject",
+          "when": "view == leafrelay.projectHistory && viewItem =~ /historyItem(Labelled)?/",
           "group": "z_downloadAction"
         }
       ]
     },
     "customEditors": [
       {
-        "viewType": "overleaf-workshop.pdfViewer",
-        "displayName": "%customEditors.overleaf-workshop.pdfViewer.displayName%",
+        "viewType": "leafrelay.pdfViewer",
+        "displayName": "%customEditors.leafrelay.pdfViewer.displayName%",
         "selector": [
           {
             "filenamePattern": "overleaf-workshop:/**/{*.pdf, .PDF}"

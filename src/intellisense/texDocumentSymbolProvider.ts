@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
 import { IntellisenseProvider } from './intellisenseProvider';
 import { TeXElement, TeXElementType, genTexElements } from './texDocumentParseUtility';
-import { ROOT_NAME } from '../consts';
+import { OVERLEAF_URI_SCHEME } from '../consts';
 
 type TexFileStruct = {
     texElements: TeXElement[],
@@ -282,7 +282,7 @@ export class TexDocumentSymbolProvider extends IntellisenseProvider implements v
     get currentBibPathArray(): string[] {
         // check if supported vfs
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (uri?.scheme !== ROOT_NAME) { return []; }
+        if (uri?.scheme !== OVERLEAF_URI_SCHEME) { return []; }
         // get bib file paths
         const {projectName} = parseUri(uri);
         const projectRecord = this.projectRecordMap.get(projectName);

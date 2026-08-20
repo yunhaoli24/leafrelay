@@ -7,7 +7,7 @@ import { LocalGitBridgeSCMProvider } from './localGitBridgeSCM';
 import { HistoryViewProvider } from './historyViewProvider';
 import { GlobalStateManager } from '../utils/globalStateManager';
 import { EventBus } from '../utils/eventBus';
-import { ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE } from '../consts';
 import { error as logError, log, notifyError } from '../utils/outputChannel';
 import { partitionLocalReplicas } from './localReplicaSelection';
 
@@ -77,7 +77,7 @@ export class SCMCollectionProvider extends vscode.Disposable {
         });
 
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-        this.statusBarItem.command = `${ROOT_NAME}.projectSCM.configSCM`;
+        this.statusBarItem.command = `${EXTENSION_NAMESPACE}.projectSCM.configSCM`;
         this.statusListener = EventBus.on('scmStatusChangeEvent', () => {this.updateStatus();});
     }
 
@@ -170,7 +170,7 @@ export class SCMCollectionProvider extends vscode.Disposable {
                 'Open LeafRelay',
             );
             if (choice==='Open LeafRelay') {
-                await vscode.commands.executeCommand('workbench.view.extension.overleaf-workshop');
+                await vscode.commands.executeCommand('workbench.view.extension.leafrelay');
             }
         }
     }
@@ -364,10 +364,10 @@ export class SCMCollectionProvider extends vscode.Disposable {
             this.statusBarItem,
             this.statusListener,
             // register commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectSCM.configSCM`, () => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectSCM.configSCM`, () => {
                 return this.showSCMConfiguration();
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectSCM.newSCM`, (scmProto) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectSCM.newSCM`, (scmProto) => {
                 return this.createNewSCM(scmProto);
             }),
             this as vscode.Disposable,

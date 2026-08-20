@@ -8,7 +8,7 @@
 
 LeafRelay is a VS Code extension for Overleaf and LaTeX users who edit the same project with a local IDE, terminal, scripts, or AI coding tools. It keeps the local folder and Overleaf synchronized while making conflicts visible instead of silently choosing a winner.
 
-> Already using Overleaf Workshop? LeafRelay is an independent extension with a new Marketplace ID: `yunhaoli24.leafrelay`. Existing `.overleaf/settings.json` project associations remain reusable.
+> LeafRelay is an independent, community-maintained fork of Overleaf Workshop. It is not affiliated with Overleaf or the Overleaf Workshop maintainers. Existing `.overleaf/settings.json` project associations remain reusable.
 
 [中文说明](./README.zh-CN.md)
 

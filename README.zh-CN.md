@@ -8,7 +8,7 @@
 
 LeafRelay 是面向 Overleaf、LaTeX 和 VS Code 用户的本地同步扩展，适合在本地编辑器、终端、脚本或 AI 编程工具中修改项目，同时继续和 Overleaf 协作。它会同步两端变化，并在发生冲突时停下来让用户决定，而不是悄悄覆盖其中一份内容。
 
-> 你正在使用 Overleaf Workshop？LeafRelay 是独立发布的扩展，Marketplace ID 为 `yunhaoli24.leafrelay`。已有的 `.overleaf/settings.json` 项目配置可以继续使用。
+> LeafRelay 是由社区独立维护的 Overleaf Workshop 分支，与 Overleaf 及 Overleaf Workshop 维护者没有隶属或合作关系。已有的 `.overleaf/settings.json` 项目配置可以继续使用。
 
 [English README](./README.md)
 

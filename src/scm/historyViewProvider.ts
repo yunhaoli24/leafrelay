@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import { EventBus } from '../utils/eventBus';
 import { VirtualFileSystem, parseUri } from '../core/remoteFileSystemProvider';
-import { OUTPUT_FOLDER_NAME, ROOT_NAME } from '../consts';
+import { EXTENSION_NAMESPACE, OUTPUT_FOLDER_NAME } from '../consts';
 import { ProjectLabelResponseSchema } from '../api/base';
 
 interface HistoryRecord {
@@ -104,8 +104,8 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
             for (const change of diff) {
                 if (change.operation===undefined) { continue; }
                 const newPathname = change.newPathname || change.pathname;
-                let originUri: vscode.Uri | undefined = vscode.Uri.parse(`${ROOT_NAME}-diff:${change.pathname}?${originVersion}`);
-                let targetUri: vscode.Uri | undefined = vscode.Uri.parse(`${ROOT_NAME}-diff:${newPathname}?${targetVersion}`);
+                let originUri: vscode.Uri | undefined = vscode.Uri.parse(`${EXTENSION_NAMESPACE}-diff:${change.pathname}?${originVersion}`);
+                let targetUri: vscode.Uri | undefined = vscode.Uri.parse(`${EXTENSION_NAMESPACE}-diff:${newPathname}?${targetVersion}`);
                 let labelUri = targetUri;
                 // handle removed/added files
                 switch (change.operation) {
@@ -127,8 +127,8 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
             vscode.commands.executeCommand('vscode.changes', `v${originVersion} vs v${targetVersion}`, args);
         } else {
             vscode.commands.executeCommand('vscode.diff',
-                vscode.Uri.parse(`${ROOT_NAME}-diff:${this._path}?${originVersion}`),
-                vscode.Uri.parse(`${ROOT_NAME}-diff:${this._path}?${targetVersion}`),
+                vscode.Uri.parse(`${EXTENSION_NAMESPACE}-diff:${this._path}?${originVersion}`),
+                vscode.Uri.parse(`${EXTENSION_NAMESPACE}-diff:${this._path}?${targetVersion}`),
                 `${this._path} (v${originVersion} vs v${targetVersion})`,
             );
         }
@@ -178,7 +178,7 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
             const item = new HistoryItem(vscode.l10n.t('Load More ...'), NaN,NaN);
             item.iconPath = undefined;
             item.command = {
-                command: `${ROOT_NAME}.projectHistory.loadMore`,
+                command: `${EXTENSION_NAMESPACE}.projectHistory.loadMore`,
                 title: vscode.l10n.t('Load More ...'),
                 arguments: [this],
             };
@@ -201,16 +201,16 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
 
     get triggers() {
         return [
-            vscode.workspace.registerTextDocumentContentProvider(`${ROOT_NAME}-diff`, this),
+            vscode.workspace.registerTextDocumentContentProvider(`${EXTENSION_NAMESPACE}-diff`, this),
             // register commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.refresh`, async () => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.refresh`, async () => {
                 await this.refreshData(this._path, true);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.loadMore`, async (provider: HistoryDataProvider) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.loadMore`, async (provider: HistoryDataProvider) => {
                 await provider.getHistory(provider._history?.before);
                 provider.refresh();
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.createLabel`, async (item: HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.createLabel`, async (item: HistoryItem) => {
                 const label = await vscode.window.showInputBox({
                     prompt: vscode.l10n.t('Create a new label'),
                     placeHolder: vscode.l10n.t('Enter a label name'),
@@ -226,7 +226,7 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
                     this.refresh();
                 }
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.deleteLabel`, async (item: HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.deleteLabel`, async (item: HistoryItem) => {
                 const label = await vscode.window.showQuickPick(
                     item.tags?.map(t=>t.comment) || [],
                     { placeHolder: vscode.l10n.t('Select a label to delete') }
@@ -247,15 +247,15 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
                 }
             }),
             vscode.commands.registerCommand('projectHistory.comparePrevious', async (item: HistoryItem) => {
-                vscode.commands.executeCommand(`${ROOT_NAME}.projectHistory.comparePrevious`, item);
+                vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.projectHistory.comparePrevious`, item);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.comparePrevious`, async (item: HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.comparePrevious`, async (item: HistoryItem) => {
                 this.openDiffEditor(item.prevVersion, item.version);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.compareCurrent`, async (item: HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.compareCurrent`, async (item: HistoryItem) => {
                 this.openDiffEditor(item.version, this._history?.currentVersion || NaN);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.compareOthers`, async (item: HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.compareOthers`, async (item: HistoryItem) => {
                 const otherVersions = this._history?.keyVersions.filter(v=>v!==item.version);
                 if (!otherVersions) { return; }
 
@@ -272,7 +272,7 @@ class HistoryDataProvider implements vscode.TreeDataProvider<HistoryItem>, vscod
                     this.openDiffEditor(item.version, select.version);
                 });
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.downloadProject`, async (item:HistoryItem) => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.downloadProject`, async (item:HistoryItem) => {
                 const uri = vscode.workspace.workspaceFolders?.[0].uri;
                 if (!uri) { return; }
                 const version = item.version;
@@ -352,7 +352,7 @@ export class HistoryViewProvider {
 
     constructor(vfs: VirtualFileSystem) {
         const treeDataProvider = new HistoryDataProvider(vfs);
-        this.historyView = vscode.window.createTreeView(`${ROOT_NAME}.projectHistory`, {treeDataProvider});
+        this.historyView = vscode.window.createTreeView(`${EXTENSION_NAMESPACE}.projectHistory`, {treeDataProvider});
         this.treeDataProvider = treeDataProvider;
         this.updateView();
     }
@@ -367,11 +367,11 @@ export class HistoryViewProvider {
             // register tree view
             ...this.treeDataProvider.triggers,
             // register commands
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.clearSelection`, async() => {
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.clearSelection`, async() => {
                 this.updateView(undefined);
             }),
-            vscode.commands.registerCommand(`${ROOT_NAME}.projectHistory.revealHistoryView`, async() => {
-                vscode.commands.executeCommand(`${ROOT_NAME}.projectHistory.focus`);
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.projectHistory.revealHistoryView`, async() => {
+                vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.projectHistory.focus`);
             }),
             // on vfs file open
             EventBus.on('fileWillOpenEvent', async ({uri}) => {
