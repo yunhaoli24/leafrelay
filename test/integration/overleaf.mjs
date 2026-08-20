@@ -8,7 +8,6 @@ import makeFetchCookie from 'fetch-cookie';
 import {CookieJar} from 'tough-cookie';
 import {
     BaseAPI,
-    RemoteProject,
     saveServerSession,
 } from '../../packages/core/dist/index.js';
 import {LeafRelayDaemonClient} from '../../packages/daemon/dist/index.js';
@@ -90,8 +89,12 @@ process.env.LEAFRELAY_HOME = leafrelayHome;
 const running = await startServe(replica);
 const secondClient = await LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'integration'});
 const sharedReplica = await secondClient.attachReplica({directory:replica});
-const observer = new RemoteProject(baseUrl.href, projectId, login.identity.cookies);
-await observer.connect();
+const observedProject = await secondClient.openProject(baseUrl.host, projectId);
+const observer = {
+    entry:path => secondClient.callProject(observedProject.projectKey, 'remote.entry', [path]),
+    read:path => secondClient.callProject(observedProject.projectKey, 'remote.read', [path]),
+    write:(path, content) => secondClient.callProject(observedProject.projectKey, 'remote.write', [path, content]),
+};
 
 async function waitFor(check, message) {
     for (let attempt = 0; attempt < 80; attempt++) {
@@ -127,7 +130,7 @@ try {
 
     await writeFile(join(replica, 'local.tex'), 'local to Overleaf\n');
     await waitFor(async () => {
-        if (!observer.entry('/local.tex')) { return false; }
+        if (!await observer.entry('/local.tex')) { return false; }
         return new TextDecoder().decode(await observer.read('/local.tex'))==='local to Overleaf\n';
     }, 'a local filesystem change was not uploaded by leafrelay serve');
 
@@ -138,7 +141,7 @@ try {
     }, 'an Overleaf change was not downloaded by leafrelay serve');
 
     await writeFile(join(replica, 'merge.tex'), 'first\nmiddle\nthird\n');
-    await waitFor(async () => observer.entry('/merge.tex')!==undefined && await hasCheckpoint('/merge.tex'), 'merge fixture was not checkpointed');
+    await waitFor(async () => await observer.entry('/merge.tex')!==undefined && await hasCheckpoint('/merge.tex'), 'merge fixture was not checkpointed');
     await writeFile(join(replica, 'merge.tex'), 'FIRST\nmiddle\nthird\n');
     await observer.write('/merge.tex', new TextEncoder().encode('first\nmiddle\nTHIRD\n'));
     await waitFor(async () => {
@@ -148,7 +151,7 @@ try {
     }, 'non-overlapping local and Overleaf edits were not merged');
 
     await writeFile(join(replica, 'conflict.tex'), 'base\n');
-    await waitFor(async () => observer.entry('/conflict.tex')!==undefined && await hasCheckpoint('/conflict.tex'), 'conflict fixture was not checkpointed');
+    await waitFor(async () => await observer.entry('/conflict.tex')!==undefined && await hasCheckpoint('/conflict.tex'), 'conflict fixture was not checkpointed');
     let conflictPath;
     const conflictListener = secondClient.onReplicaConflict(event => { conflictPath = event.path; });
     await writeFile(join(replica, 'conflict.tex'), 'local\n');
@@ -166,13 +169,13 @@ try {
     }, 'clients did not reconnect after the daemon restarted');
     await writeFile(join(replica, 'after-restart.tex'), 'restored watcher\n');
     await waitFor(async () => {
-        if (!observer.entry('/after-restart.tex')) { return false; }
+        if (!await observer.entry('/after-restart.tex')) { return false; }
         return new TextDecoder().decode(await observer.read('/after-restart.tex'))==='restored watcher\n';
     }, 'the replica was not restored after daemon restart');
 } finally {
-    observer.disconnect();
     await running.stop();
     await secondClient.detachReplica(sharedReplica.replicaId).catch(() => {});
+    await secondClient.closeProject(observedProject.projectKey).catch(() => {});
     await secondClient.shutdownDaemon().catch(() => {});
     secondClient.close();
     await api.deleteProject(login.identity, projectId);

@@ -46,6 +46,11 @@ const PROJECT_OPERATIONS = new Set([
     'getConnectedUsers', 'updatePosition', 'syncFileChanges',
 ]);
 
+const REMOTE_PROJECT_OPERATIONS = new Set([
+    'entry', 'listEntries', 'read', 'write', 'mkdir', 'remove',
+    'getCurrentVersion', 'getFileTreeDiff',
+]);
+
 interface ServerRuntime {
     key:string;
     session:ServerSession;
@@ -174,9 +179,18 @@ export class NetworkRuntimeRegistry {
     }
 
     async callProject(projectKey:string, operation:string, args:unknown[]):Promise<unknown> {
-        if (!PROJECT_OPERATIONS.has(operation)) { throw new Error(`Unsupported project operation: ${operation}.`); }
         const runtime = this.requireProject(projectKey);
         await runtime.ready;
+        if (operation.startsWith('remote.')) {
+            const remoteOperation = operation.slice('remote.'.length);
+            if (!REMOTE_PROJECT_OPERATIONS.has(remoteOperation)) {
+                throw new Error(`Unsupported remote project operation: ${remoteOperation}.`);
+            }
+            const method = (runtime.remote as unknown as Record<string,unknown>)[remoteOperation];
+            if (typeof method!=='function') { throw new Error(`Remote project operation ${remoteOperation} is unavailable.`); }
+            return (method as (...values:unknown[]) => unknown).apply(runtime.remote, args);
+        }
+        if (!PROJECT_OPERATIONS.has(operation)) { throw new Error(`Unsupported project operation: ${operation}.`); }
         const method = (runtime.socket as unknown as Record<string,unknown>)[operation];
         if (typeof method!=='function') { throw new Error(`Project operation ${operation} is unavailable.`); }
         return (method as (...values:unknown[]) => unknown).apply(runtime.socket, args);
