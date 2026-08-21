@@ -249,7 +249,7 @@ export class SyncEngine {
                     await this.options.remote.write(normalized, merged.content);
                     updateSyncCheckpoint(this.state!, normalized, merged.content);
                     await this.options.stateStore.save(this.state!);
-                    this.options.log(`Merged non-overlapping local and Overleaf changes in ${normalized}.`);
+                    this.logChange('merge', 'update', normalized);
                     return;
                 }
             }
@@ -261,7 +261,9 @@ export class SyncEngine {
 
         if (localChanged || (!remoteChanged && source==='local')) {
             if (!localContent) {
-                if (remoteEntry) { await this.options.remote.remove(normalized); }
+                if (remoteEntry) {
+                    await this.options.remote.remove(normalized);
+                }
                 removeSyncCheckpoint(this.state!, normalized);
             } else {
                 await this.options.remote.write(normalized, localContent);
@@ -272,17 +274,33 @@ export class SyncEngine {
                 updateSyncCheckpoint(this.state!, normalized, synchronized);
             }
             await this.options.stateStore.save(this.state!);
+            if (!localContent && remoteEntry) {
+                this.logChange('push', 'delete', normalized);
+            } else if (localContent) {
+                this.logChange('push', remoteEntry ? 'update' : 'add', normalized);
+            }
             return;
         }
 
         if (!remoteContent) {
-            if (localContent) { await this.options.local.remove(normalized); }
+            if (localContent) {
+                await this.options.local.remove(normalized);
+            }
             removeSyncCheckpoint(this.state!, normalized);
         } else {
             await this.options.local.write(normalized, remoteContent);
             updateSyncCheckpoint(this.state!, normalized, remoteContent);
         }
         await this.options.stateStore.save(this.state!);
+        if (!remoteContent && localContent) {
+            this.logChange('pull', 'delete', normalized);
+        } else if (remoteContent) {
+            this.logChange('pull', localContent ? 'update' : 'add', normalized);
+        }
+    }
+
+    private logChange(direction:'push'|'pull'|'merge', operation:'add'|'update'|'delete', path:string):void {
+        this.options.log(`[${direction}] ${operation} ${JSON.stringify(path)}`);
     }
 
     private remoteFilePaths():string[] {

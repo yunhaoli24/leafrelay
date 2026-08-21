@@ -89,9 +89,10 @@ describe('SyncEngine', () => {
         ]), 2, {diff:[{pathname:'/a.tex', operation:'edited'}]});
         const store = new MemoryState(state);
         const conflicts:string[] = [];
+        const logs:string[] = [];
         const engine = new SyncEngine({
             projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:path=>conflicts.push(path),
+            ignore:()=>false, log:message=>logs.push(message), onConflict:path=>conflicts.push(path),
         });
 
         await engine.start();
@@ -100,11 +101,43 @@ describe('SyncEngine', () => {
         expect(text(remote.files.get('/b.tex'))).toBe('updated\n');
         expect(store.saves.at(-1)?.files['/b.tex']).toBeDefined();
         expect(store.saves.at(-1)?.remoteVersion).toBe(2);
+        expect(logs).toContain('[push] update "/b.tex"');
 
         await engine.resolveConflict('/a.tex', 'local');
         expect(engine.getConflicts()).toEqual([]);
         expect(text(remote.files.get('/a.tex'))).toBe('local\n');
         expect(store.saves.at(-1)?.files['/a.tex']).toBeDefined();
+        await engine.stop();
+    });
+
+    it('logs successful remote updates and deletions by path', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/updated.tex', bytes('base\n'));
+        updateSyncCheckpoint(state, '/deleted.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([
+            ['/updated.tex', bytes('base\n')],
+            ['/deleted.tex', bytes('base\n')],
+        ]));
+        const remote = new MemoryRemote(
+            new Map([['/updated.tex', bytes('remote\n')]]),
+            2,
+            {diff:[
+                {pathname:'/updated.tex', operation:'edited'},
+                {pathname:'/deleted.tex', operation:'removed'},
+            ]},
+        );
+        const logs:string[] = [];
+        const engine = new SyncEngine({
+            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
+            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+        });
+
+        await engine.start();
+
+        expect(text(local.files.get('/updated.tex'))).toBe('remote\n');
+        expect(local.files.has('/deleted.tex')).toBe(false);
+        expect(logs).toContain('[pull] update "/updated.tex"');
+        expect(logs).toContain('[pull] delete "/deleted.tex"');
         await engine.stop();
     });
 });

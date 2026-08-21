@@ -5,7 +5,7 @@ import type {ReplicaAttachResult, ReplicaConflictNotification, ReplicaStatusNoti
 import {BaseSCM, CommitItem, SettingItem} from '.';
 import {VirtualFileSystem} from '../core/remoteFileSystemProvider';
 import {DaemonService} from '../utils/daemonService';
-import {error, log} from '../utils/outputChannel';
+import {log, warn} from '../utils/outputChannel';
 
 const IGNORE_SETTING_KEY = 'ignore-patterns';
 
@@ -129,10 +129,19 @@ export class LocalReplicaSCMProvider extends BaseSCM {
     }
 
     get settingItems():SettingItem[] {
-        return [{
+        const items:SettingItem[] = [];
+        if (this.conflicts.size!==0) {
+            items.push({
+                label:vscode.l10n.t('Resolve Sync Conflicts ...'),
+                description:vscode.l10n.t('{count} unresolved', {count:this.conflicts.size}),
+                callback:() => this.selectConflict(),
+            });
+        }
+        items.push({
             label:vscode.l10n.t('Configure sync ignore patterns ...'),
             callback:() => this.configureIgnorePatterns(),
-        }];
+        });
+        return items;
     }
 
     private async attach():Promise<vscode.Disposable[]> {
@@ -145,13 +154,23 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             this.conflicts = new Set(this.replica.conflicts);
             this.status = this.replica.status.state==='active'
                 ? {status:'idle', message:vscode.l10n.t('Synced')}
-                : {status:'need-attention', message:this.replica.status.message};
+                : {
+                    status:'need-attention',
+                    message:this.conflicts.size!==0
+                        ? vscode.l10n.t('{count} conflict(s)', {count:this.conflicts.size})
+                        : this.replica.status.message,
+                };
             log('Local replica attached to daemon', {
                 replicaId:this.replica.replicaId,
                 projectId:this.replica.projectId,
                 baseUri:this.replica.root,
                 shared:this.replica.shared,
             });
+            if (this.conflicts.size!==0) {
+                const path = this.conflicts.values().next().value as string;
+                warn(`Local replica attached with ${this.conflicts.size} unresolved conflict(s): ${[...this.conflicts].join(', ')}`);
+                void this.promptConflict(path);
+            }
             return [
                 statusListener,
                 conflictListener,
@@ -170,6 +189,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
     private handleStatus(event:ReplicaStatusNotification):void {
         if (event.replicaId!==this.replica?.replicaId) { return; }
         if (event.status.state==='active') {
+            this.conflicts.clear();
             this.status = {status:'idle', message:vscode.l10n.t('Synced')};
         } else if (event.status.state==='starting' || event.status.state==='syncing') {
             this.status = {status:'pull', message:event.status.message};
@@ -182,16 +202,36 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         if (event.replicaId!==this.replica?.replicaId) { return; }
         const isNew = !this.conflicts.has(event.path);
         this.conflicts = new Set(event.conflicts);
-        this.status = {status:'need-attention', message:`${this.conflicts.size} conflict(s)`};
-        error(`Synchronization conflict in ${event.path}: ${event.reason}`);
+        this.status = {
+            status:'need-attention',
+            message:vscode.l10n.t('{count} conflict(s)', {count:this.conflicts.size}),
+        };
+        warn(`Synchronization conflict in ${event.path}: ${event.reason}`);
         if (isNew) {
-            void vscode.window.showWarningMessage(
-                `LeafRelay paused ${event.path} because both local and Overleaf changed.`,
-                'Review Difference',
-                'Use Local',
-                'Use Overleaf',
-            ).then(choice => this.handleConflictChoice(event.path, choice));
+            void this.promptConflict(event.path);
         }
+    }
+
+    private async selectConflict():Promise<void> {
+        const paths = [...this.conflicts].sort();
+        if (paths.length===0) { return; }
+        const path = paths.length===1
+            ? paths[0]
+            : await vscode.window.showQuickPick(paths, {
+                title:vscode.l10n.t('Resolve Sync Conflict'),
+                placeHolder:vscode.l10n.t('Select a conflicting path'),
+            });
+        if (path) { await this.promptConflict(path); }
+    }
+
+    private async promptConflict(path:string):Promise<void> {
+        const choice = await vscode.window.showWarningMessage(
+            `LeafRelay paused ${path} because both local and Overleaf changed.`,
+            'Review Difference',
+            'Use Local',
+            'Use Overleaf',
+        );
+        await this.handleConflictChoice(path, choice);
     }
 
     private async handleConflictChoice(path:string, choice:string|undefined):Promise<void> {
@@ -212,6 +252,12 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         if (!this.replica) { return; }
         await DaemonService.current.resolveConflict({replicaId:this.replica.replicaId, path, winner});
         this.conflicts.delete(path);
+        this.status = this.conflicts.size===0
+            ? {status:'idle', message:vscode.l10n.t('Synced')}
+            : {
+                status:'need-attention',
+                message:vscode.l10n.t('{count} conflict(s)', {count:this.conflicts.size}),
+            };
     }
 
     private async configureIgnorePatterns():Promise<void> {
