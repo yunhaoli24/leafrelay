@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
-* **vscode:** surface existing sync conflicts ([224acaa](https://github.com/yunhaoli24/leafrelay/commit/224acaa55ba0d469f4cc0af4a2b26992036c8d83))
 * **vscode:** surface existing sync conflicts ([231aa6f](https://github.com/yunhaoli24/leafrelay/commit/231aa6f11962f0b6c5c00093e52a1179ecaa5e2e))
 
 ## [0.2.0](https://github.com/yunhaoli24/leafrelay/compare/v0.1.7...v0.2.0) (2026-08-20)
