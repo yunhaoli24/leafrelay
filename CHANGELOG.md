@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/yunhaoli24/leafrelay/compare/v0.1.7...v0.2.0) (2026-08-20)
+
+
+### Features
+
+* **cli:** connect serve commands to daemon ([f624e67](https://github.com/yunhaoli24/leafrelay/commit/f624e672aeaa2fe3802300d58d1d716d96b3f434))
+* **daemon:** add shared IPC foundation ([2fac877](https://github.com/yunhaoli24/leafrelay/commit/2fac877672ecac5b9277143ac8f4453ed9f07a1d))
+* **daemon:** centralize network runtimes ([1b908c2](https://github.com/yunhaoli24/leafrelay/commit/1b908c2475c4fd8f3407f641d3e92a1e63bf45ed))
+* unify LeafRelay behind a local daemon ([b045f5d](https://github.com/yunhaoli24/leafrelay/commit/b045f5d81154f2c58d398cf4713e11359726572a))
+
+
+### Bug Fixes
+
+* **ci:** use job-safe daemon test home ([ff87b03](https://github.com/yunhaoli24/leafrelay/commit/ff87b0343a9c0b076cf7480a3d8d81a4032d4e0b))
+* **daemon:** close IPC cleanly and prepare 0.2.0 ([16c7f74](https://github.com/yunhaoli24/leafrelay/commit/16c7f742e8e9bcbe3706dc272c94b1ae89600679))
+* **daemon:** close IPC writes without unhandled errors ([6dd322a](https://github.com/yunhaoli24/leafrelay/commit/6dd322a794c662e9c663c8a3b15624d6c4d1b13d))
+* **daemon:** handle notification disconnect races ([4068eeb](https://github.com/yunhaoli24/leafrelay/commit/4068eeb745b0c4b2fc67be78a6fb5f0d362b73ec))
+* **daemon:** serialize project file operations ([76766c9](https://github.com/yunhaoli24/leafrelay/commit/76766c98df2274e69223e1759e39d2ae01e62c19))
+
+
+### Miscellaneous Chores
+
+* **release:** prepare 0.2.0 ([6fbf3fa](https://github.com/yunhaoli24/leafrelay/commit/6fbf3fac49c73a3718421902b21a9d30b30f0a38))
+
 ## [0.1.7](https://github.com/yunhaoli24/leafrelay/compare/v0.1.6...v0.1.7) (2026-08-20)
 
 
