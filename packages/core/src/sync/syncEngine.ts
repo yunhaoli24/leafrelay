@@ -28,6 +28,7 @@ export interface RemoteReplica {
     getCurrentVersion(): Promise<number>;
     getFileTreeDiff(from:number, to:number): Promise<ProjectFileTreeDiffResponseSchema | undefined>;
     onChange(handler:(change:{path:string; previousPath?:string}) => void): void;
+    onReconnect?(handler:() => void): void;
 }
 
 export interface SyncStateStore {
@@ -89,6 +90,11 @@ export class SyncEngine {
         this.options.remote.onChange(change => {
             if (change.previousPath) { this.schedule(change.previousPath, 'remote'); }
             this.schedule(change.path, 'remote');
+        });
+        this.options.remote.onReconnect?.(() => {
+            this.queue = this.queue.then(() => this.reconcileAfterReconnect()).catch(error => {
+                this.options.log(`Failed to reconcile after reconnecting: ${error instanceof Error ? error.message : String(error)}`);
+            });
         });
         this.options.log(`Synchronization active at Overleaf version ${this.state.remoteVersion}.`);
     }
@@ -199,6 +205,16 @@ export class SyncEngine {
         if (this.conflicts.size!==0) {
             this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
         }
+    }
+
+    private async reconcileAfterReconnect() {
+        const currentVersion = await this.options.remote.getCurrentVersion();
+        await this.startupReconcile(
+            currentVersion,
+            await this.options.local.listFiles(),
+            this.remoteFilePaths(),
+        );
+        this.options.log(`Realtime connection restored at Overleaf version ${currentVersion}.`);
     }
 
     private schedule(path:string, source:ChangeSource) {

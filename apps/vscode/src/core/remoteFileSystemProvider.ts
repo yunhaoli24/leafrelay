@@ -492,18 +492,13 @@ export class VirtualFileSystem extends vscode.Disposable {
                 }
                 // Delay reconnection attempt slightly to allow transient issues to resolve
                 this.retryTimer = setTimeout(() => {
+                    this.retryTimer = undefined;
                     this.retryConnection += 1;
                     this.initializing = this.initializingPromise;
                 }, 1000);
             },
             onConnectionAccepted: (publicId:string) => {
-                this.retryConnection = 0;
-                this.reconnectingNotification = false;
                 this.lastDisconnectTime = 0;
-                if (this.retryTimer) {
-                    clearTimeout(this.retryTimer);
-                    this.retryTimer = undefined;
-                }
                 this.publicId = publicId;
             },
             onFileCreated: (parentFolderId:string, type:FileType, entity:FileEntity) => {

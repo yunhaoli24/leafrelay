@@ -52,6 +52,7 @@ export class RemoteProject {
     private readonly entries = new Map<string, RemoteEntry>();
     private readonly idToPath = new Map<string, string>();
     private changeHandler?: (change:RemoteChange) => void;
+    private reconnectHandler?: () => void;
     private readonly externalTransport?:RemoteProjectTransport;
 
     constructor(
@@ -87,6 +88,10 @@ export class RemoteProject {
 
     onChange(handler: (change:RemoteChange) => void) {
         this.changeHandler = handler;
+    }
+
+    onReconnect(handler:() => void) {
+        this.reconnectHandler = handler;
     }
 
     listEntries(): RemoteEntry[] {
@@ -294,6 +299,11 @@ export class RemoteProject {
 
     private registerEvents() {
         this.socket.updateEventHandlers({
+            onProjectJoined:project => {
+                this.project = project;
+                this.reindex();
+                this.reconnectHandler?.();
+            },
             onFileCreated:(parentId, type, entity) => {
                 const parent = this.folderById(parentId);
                 if (!parent || type==='outputs') { return; }

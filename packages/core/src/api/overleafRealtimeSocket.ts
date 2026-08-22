@@ -145,6 +145,7 @@ export class OverleafRealtimeSocket {
     private cookie: string;
     private socket?: WebSocket;
     private connected = false;
+    private projectJoined = false;
     private explicitlyDisconnected = false;
     private reconnectEnabled: boolean;
     private reconnectAttempts = 0;
@@ -153,7 +154,6 @@ export class OverleafRealtimeSocket {
     private closeTimeoutMs = 60_000;
     private acknowledgementId = 0;
     private readonly acknowledgements = new Map<string, (...args:unknown[]) => void>();
-    private readonly sendBuffer: string[] = [];
 
     readonly io = {
         reconnect:(enabled:boolean) => {
@@ -197,14 +197,22 @@ export class OverleafRealtimeSocket {
         const callback = typeof args.at(-1)==='function' ? args.pop() as (...values:unknown[]) => void : undefined;
         const id = callback ? String(++this.acknowledgementId) : undefined;
         if (id && callback) { this.acknowledgements.set(id, callback); }
-        this.send(encodePacket({
+        const packet = encodePacket({
             type:'event',
             id,
             ack:callback ? 'data' : undefined,
             name:event,
             args,
-        }));
+        });
+        if (!this.sendApplicationEvent(packet) && callback) {
+            if (id) { this.acknowledgements.delete(id); }
+            queueMicrotask(() => callback(new Error('The Overleaf project session is not connected.')));
+        }
         return this;
+    }
+
+    markProjectJoined():void {
+        this.projectJoined = true;
     }
 
     disconnect(): this {
@@ -218,6 +226,7 @@ export class OverleafRealtimeSocket {
 
     private async connect(): Promise<void> {
         try {
+            this.projectJoined = false;
             const handshakeUrl = new URL('/socket.io/1/', this.endpoint.origin);
             for (const [name, value] of this.endpoint.searchParams) {
                 handshakeUrl.searchParams.set(name, value);
@@ -247,7 +256,7 @@ export class OverleafRealtimeSocket {
             this.socket.addEventListener('open', () => this.events.emit('connecting', 'websocket'));
             this.socket.addEventListener('message', event => void this.receive(event.data));
             this.socket.addEventListener('error', error => this.events.emit('error', error));
-            this.socket.addEventListener('close', () => this.handleClose());
+            this.socket.addEventListener('close', event => this.handleClose(event));
         } catch (error) {
             this.events.emit('connect_failed', error);
             this.events.emit('error', error);
@@ -271,7 +280,6 @@ export class OverleafRealtimeSocket {
                 const wasReconnecting = this.reconnectAttempts>0;
                 this.connected = true;
                 this.events.emit('connect');
-                this.flush();
                 if (wasReconnecting) {
                     this.events.emit('reconnect', 'websocket', this.reconnectAttempts);
                     this.reconnectAttempts = 0;
@@ -316,17 +324,17 @@ export class OverleafRealtimeSocket {
     }
 
     private send(packet: string) {
-        if (!this.connected || this.socket?.readyState!==WebSocket.OPEN) {
-            this.sendBuffer.push(packet);
-            return;
+        if (this.connected && this.socket?.readyState===WebSocket.OPEN) {
+            this.socket.send(packet);
         }
-        this.socket.send(packet);
     }
 
-    private flush() {
-        while (this.sendBuffer.length>0 && this.socket?.readyState===WebSocket.OPEN) {
-            this.socket.send(this.sendBuffer.shift()!);
+    private sendApplicationEvent(packet:string):boolean {
+        if (!this.connected || !this.projectJoined || this.socket?.readyState!==WebSocket.OPEN) {
+            return false;
         }
+        this.socket.send(packet);
+        return true;
     }
 
     private resetInactivityTimer() {
@@ -334,23 +342,39 @@ export class OverleafRealtimeSocket {
         this.inactivityTimer = setTimeout(() => this.closeSocket('timeout'), this.closeTimeoutMs);
     }
 
-    private handleClose() {
+    private handleClose(event:CloseEvent) {
         const wasConnected = this.connected;
         this.connected = false;
+        this.projectJoined = false;
         if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
-        if (wasConnected) { this.events.emit('disconnect', 'transport close'); }
+        if (wasConnected) {
+            const detail = event.reason ? `: ${event.reason}` : '';
+            const reason = `transport close (code ${event.code})${detail}`;
+            this.failAcknowledgements(reason);
+            this.events.emit('disconnect', reason);
+        }
         this.scheduleReconnect();
     }
 
     private closeSocket(reason: string) {
         const wasConnected = this.connected;
         this.connected = false;
+        this.projectJoined = false;
         if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
         const socket = this.socket;
         this.socket = undefined;
         socket?.close();
-        if (wasConnected) { this.events.emit('disconnect', reason); }
+        if (wasConnected) {
+            this.failAcknowledgements(reason);
+            this.events.emit('disconnect', reason);
+        }
         if (!this.explicitlyDisconnected) { this.scheduleReconnect(); }
+    }
+
+    private failAcknowledgements(reason:string) {
+        const error = new Error(`Overleaf realtime connection closed: ${reason}`);
+        for (const callback of this.acknowledgements.values()) { callback(error); }
+        this.acknowledgements.clear();
     }
 
     private scheduleReconnect() {

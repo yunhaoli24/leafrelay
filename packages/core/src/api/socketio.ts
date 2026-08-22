@@ -62,7 +62,8 @@ export interface EventsHandler {
     onFileMoved?: (entityId:string, newParentFolderId:string) => void,
     onFileChanged?: (update:UpdateSchema) => void,
     //
-    onDisconnected?: () => void,
+    onDisconnected?: (reason?:unknown) => void,
+    onProjectJoined?: (project:ProjectEntity) => void,
     onConnectionAccepted?: (publicId:string) => void,
     onClientUpdated?: (user:UpdateUserSchema) => void,
     onClientDisconnected?: (id:string) => void,
@@ -101,6 +102,12 @@ export class SocketIOAPI implements ProjectSocket {
     private static alternativeSocketFactory?: AlternativeSocketFactory;
     private scheme: ConnectionScheme;
     private record?: Promise<ProjectEntity>;
+    private joinedProject?: ProjectEntity;
+    private pendingProjectJoin?: {
+        promise:Promise<ProjectEntity>;
+        resolve:(project:ProjectEntity) => void;
+        reject:(reason?:unknown) => void;
+    };
     private _handlers: Array<EventsHandler> = [];
     private connectedPublicId?: string;
 
@@ -155,6 +162,8 @@ export class SocketIOAPI implements ProjectSocket {
                 break;
             case 'realtime':
                 this.record = undefined;
+                this.joinedProject = undefined;
+                this.resetProjectJoin(new Error('The realtime connection was replaced.'));
                 const query = `?projectId=${this.projectId}&t=${Date.now()}`;
                 this.socket = this.api._initSocketV0(this.identity, query);
                 break;
@@ -204,6 +213,11 @@ export class SocketIOAPI implements ProjectSocket {
         });
         this.socket.on('disconnect', (reason:any) => {
             log('SocketIOAPI: disconnect event', {scheme: this.scheme, projectId: this.projectId, reason});
+            if (this.scheme==='realtime') {
+                this.joinedProject = undefined;
+                this.connectedPublicId = undefined;
+                this.resetProjectJoin(new Error(`Overleaf realtime connection closed: ${String(reason ?? 'unknown')}`));
+            }
         });
         this.socket.on('reconnecting', (delay:any, attempt:any) => {
             log('SocketIOAPI: reconnecting', {scheme: this.scheme, projectId: this.projectId, delay, attempt});
@@ -233,21 +247,51 @@ export class SocketIOAPI implements ProjectSocket {
         });
 
         if (this.scheme==='realtime') {
-            this.record = new Promise((resolve, reject) => {
-                this.socket.on('joinProjectResponse', (res:any) => {
-                    const publicId = res.publicId as string;
-                    const project = res.project as ProjectEntity;
-                    this.connectedPublicId = publicId;
-                    for (const handler of this._handlers) {
-                        handler.onConnectionAccepted?.(publicId);
-                    }
-                    resolve(project);
-                });
-                this.socket.on('connectionRejected', (err:any) => {
-                    reject(err?.message || err);
-                });
+            this.pendingProjectJoin ??= this.createProjectJoin();
+            this.socket.on('joinProjectResponse', (res:any) => {
+                const publicId = res.publicId as string;
+                const project = res.project as ProjectEntity;
+                this.socket.markProjectJoined?.();
+                log('SocketIOAPI: project joined', {scheme:this.scheme, projectId:this.projectId, publicId});
+                this.connectedPublicId = publicId;
+                this.joinedProject = project;
+                this.pendingProjectJoin?.resolve(project);
+                for (const handler of this._handlers) {
+                    handler.onProjectJoined?.(project);
+                    handler.onConnectionAccepted?.(publicId);
+                }
+            });
+            this.socket.on('connectionRejected', (err:any) => {
+                this.pendingProjectJoin?.reject(err?.message || err);
             });
         }
+    }
+
+    private createProjectJoin() {
+        let resolve!:(project:ProjectEntity) => void;
+        let reject!:(reason?:unknown) => void;
+        const promise = new Promise<ProjectEntity>((resolveProject, rejectProject) => {
+            resolve = resolveProject;
+            reject = rejectProject;
+        });
+        void promise.catch(() => undefined);
+        return {promise, resolve, reject};
+    }
+
+    private resetProjectJoin(reason?:unknown) {
+        if (reason!==undefined) { this.pendingProjectJoin?.reject(reason); }
+        this.pendingProjectJoin = this.createProjectJoin();
+    }
+
+    private waitForRealtimeProject():Promise<ProjectEntity> {
+        return this.joinedProject
+            ? Promise.resolve(this.joinedProject)
+            : this.pendingProjectJoin!.promise;
+    }
+
+    private async emitProjectEvent(event:string, ...args:any[]) {
+        if (this.scheme==='realtime') { await this.waitForRealtimeProject(); }
+        return this.emit(event, ...args);
     }
 
     disconnect() {
@@ -313,9 +357,11 @@ export class SocketIOAPI implements ProjectSocket {
                     });
                     break;
                 case handlers.onDisconnected:
-                    this.socket.on('disconnect', () => {
-                        handler();
+                    this.socket.on('disconnect', (reason:unknown) => {
+                        handler(reason);
                     });
+                    break;
+                case handlers.onProjectJoined:
                     break;
                 case handlers.onConnectionAccepted:
                     this.socket.on('connectionAccepted', (_:any, publicId:any) => {
@@ -390,7 +436,7 @@ export class SocketIOAPI implements ProjectSocket {
                     timeoutPromise,
                 ]);
             case 'realtime':
-                return Promise.race([this.record!, timeoutPromise]);
+                return Promise.race([this.waitForRealtimeProject(), timeoutPromise]);
         }
     }
 
@@ -400,7 +446,7 @@ export class SocketIOAPI implements ProjectSocket {
      * @returns {Promise}
      */
     async joinDoc(docId:string) {
-        return this.emit('joinDoc', docId, { encodeRanges: true })
+        return this.emitProjectEvent('joinDoc', docId, { encodeRanges: true })
             .then((returns: [Array<string>, number, Array<any>, any]) => {
                 const [docLinesAscii, version, updates, ranges] = returns;
                 const docLines = docLinesAscii.map((line) => decodePackedUtf8(line));
@@ -414,7 +460,7 @@ export class SocketIOAPI implements ProjectSocket {
      * @returns {Promise}
      */
     async leaveDoc(docId:string) {
-        return this.emit('leaveDoc', docId)
+        return this.emitProjectEvent('leaveDoc', docId)
             .then(() => {
                 return;
             });
@@ -428,7 +474,7 @@ export class SocketIOAPI implements ProjectSocket {
      */
     async applyOtUpdate(docId:string, update:UpdateSchema) {
         try {
-            await this.emit('applyOtUpdate', docId, update);
+            await this.emitProjectEvent('applyOtUpdate', docId, update);
         } catch (error) {
             let detail: string;
             if (error instanceof Error) {
@@ -447,7 +493,7 @@ export class SocketIOAPI implements ProjectSocket {
      * @returns {Promise}
      */
     async getConnectedUsers(): Promise<OnlineUserSchema[]> {
-        return this.emit('clientTracking.getConnectedUsers')
+        return this.emitProjectEvent('clientTracking.getConnectedUsers')
             .then((returns:[OnlineUserSchema[]]) => {
                 const [connectedUsers] = returns;
                 return connectedUsers;
@@ -460,7 +506,7 @@ export class SocketIOAPI implements ProjectSocket {
      * @returns {Promise}
      */
     async updatePosition(doc_id:string, row:number, column:number) {
-        return this.emit('clientTracking.updatePosition', {row, column, doc_id})
+        return this.emitProjectEvent('clientTracking.updatePosition', {row, column, doc_id})
             .then(() => {
                 return;
             });

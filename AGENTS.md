@@ -19,6 +19,7 @@
 - Reuse recent history updates for both version discovery and changed-path collection. Serialize unavoidable history requests and honor `Retry-After` instead of issuing immediate parallel probes.
 - Route every HTTP request and Socket.IO handshake through the daemon scheduler for its `{server,user}`. A 429 response pauses all projects for that user for `Retry-After`; local watcher bursts are debounced before upload.
 - Each `{server,projectId}` has one daemon project runtime and realtime connection. The same real local path may have multiple clients, but another path cannot become a second writable replica of that project.
+- After a realtime transport reconnects, wait for that connection's fresh `joinProjectResponse` before reporting recovery or releasing queued project operations, then reconcile changes missed while disconnected.
 - A failed path must make incremental startup sync fail explicitly; never log completion or advance `remoteVersion` after partial failure.
 - Report final user-actionable failures through a deduplicated VS Code notification with access to the Output log; individual retries remain log-only.
 - Connection and SCM creation logs must include project ID, connection scheme, retry attempt, local base URI, and the original structured error. Never swallow `joinProject` or trigger-initialization errors behind a generic reconnecting message.

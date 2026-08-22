@@ -16,8 +16,8 @@ const CLOSED_SOCKET_ERRORS = new Set([
 ]);
 
 class LeafRelaySocketWriter extends SocketMessageWriter {
-    constructor(private readonly socket:Socket) {
-        super(socket);
+    constructor(private readonly transportSocket:Socket) {
+        super(transportSocket);
     }
 
     override async write(message:Message):Promise<void> {
@@ -25,7 +25,7 @@ class LeafRelaySocketWriter extends SocketMessageWriter {
             await super.write(message);
         } catch (error) {
             const code = (error as NodeJS.ErrnoException).code;
-            if (this.socket.destroyed || this.socket.writableEnded || (code && CLOSED_SOCKET_ERRORS.has(code))) { return; }
+            if (this.transportSocket.destroyed || this.transportSocket.writableEnded || (code && CLOSED_SOCKET_ERRORS.has(code))) { return; }
             throw error;
         }
     }
