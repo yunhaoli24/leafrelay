@@ -5,6 +5,7 @@ import { ProjectSocket, UpdateUserSchema } from '@leafrelay/core';
 import { VirtualFileSystem } from '../core/remoteFileSystemProvider';
 import { ChatViewProvider } from './chatViewProvider';
 import { LocalReplicaSCMProvider } from '../scm/localReplicaSCM';
+import { isCurrentCollaborator } from './collaboratorIdentity';
 
 interface ExtendedUpdateUserSchema extends UpdateUserSchema {
     selection?: {
@@ -67,12 +68,17 @@ export class ClientManager {
     constructor(
         private readonly vfs: VirtualFileSystem,
         private readonly context: vscode.ExtensionContext,
-        private readonly publicId: string,
+        private publicId: string,
         private readonly socket: ProjectSocket,
     ) {
+        this.chatViewer = new ChatViewProvider(this.vfs, this.publicId, this.context.extensionUri, this.socket);
         this.socket.updateEventHandlers({
             onClientUpdated: (user:UpdateUserSchema) => {
-                if (user.id !== this.publicId) { this.setStatusActive(user.id); }
+                if (this.isCurrentUser(user.id, user.user_id)) {
+                    void this.removePosition(user.id);
+                    return;
+                }
+                this.setStatusActive(user.id);
                 this.updatePosition(user.id, user.doc_id, user.row, user.column, user);
             },
             onClientDisconnected: (id:string) => {
@@ -83,8 +89,13 @@ export class ClientManager {
                 this.disconnectedAt = Date.now();
             },
             onConnectionAccepted: (publicId:string) => {
+                this.publicId = publicId;
+                this.chatViewer.updatePublicId(publicId);
                 this.connectedFlag = true;
                 this.disconnectedAt = 0;
+                Object.values(this.onlineUsers)
+                    .filter(user => this.isCurrentUser(user.id, user.user_id))
+                    .forEach(user => void this.removePosition(user.id));
             }
         });
         this.socket.getConnectedUsers().then(users => {
@@ -99,16 +110,19 @@ export class ClientManager {
                     column: user.cursorData?.column || 0,
                     last_updated_at: Number(user.last_updated_at),
                 };
-                if (user.client_id !== this.publicId) {
+                if (!this.isCurrentUser(user.client_id, user.user_id)) {
                     this.onlineUsers[user.client_id] = onlineUser;
                     this.updatePosition(user.client_id, onlineUser.doc_id, onlineUser.row, onlineUser.column, onlineUser);
                 }
             });
         });
 
-        this.chatViewer = new ChatViewProvider(this.vfs, this.publicId, this.context.extensionUri, this.socket);
         this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
         this.updateStatus();
+    }
+
+    private isCurrentUser(clientId:string, userId?:string) {
+        return isCurrentCollaborator(clientId, userId, this.publicId, this.vfs._userId);
     }
 
     private async jumpToUser(id?: string) {
@@ -167,7 +181,10 @@ export class ClientManager {
     }
 
     private async updatePosition(clientId:string, docId: string, row: number, column: number, details?:UpdateUserSchema) {
-        if (clientId === this.publicId) { return; }
+        if (this.isCurrentUser(clientId, details?.user_id ?? this.onlineUsers[clientId]?.user_id)) {
+            await this.removePosition(clientId);
+            return;
+        }
 
         // update record
         if (this.onlineUsers[clientId]===undefined) {
@@ -231,17 +248,17 @@ export class ClientManager {
     }
 
     private async removePosition(clientId:string) {
-        const doc = this.vfs._resolveById(this.onlineUsers[clientId]?.doc_id);
-        if (doc === undefined) { return; }
-        // const uri = this.vfs.pathToUri(doc.path);
-        const uri = (vscode.workspace.workspaceFolders?.[0].uri.scheme===OVERLEAF_URI_SCHEME) ?
-                    this.vfs.pathToUri(doc.path) : await LocalReplicaSCMProvider.pathToUri(doc.path);
-
-        const editor = uri && vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString());
-        // delete decoration
-        const selection = this.onlineUsers[clientId].selection;
-        selection && editor?.setDecorations(selection.decoration, []);
-        // delete record
+        const user = this.onlineUsers[clientId];
+        if (user===undefined) { return; }
+        const doc = this.vfs._resolveById(user.doc_id);
+        const selection = user.selection;
+        if (doc!==undefined && selection!==undefined) {
+            const uri = (vscode.workspace.workspaceFolders?.[0].uri.scheme===OVERLEAF_URI_SCHEME) ?
+                        this.vfs.pathToUri(doc.path) : await LocalReplicaSCMProvider.pathToUri(doc.path);
+            const editor = uri && vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString());
+            editor?.setDecorations(selection.decoration, []);
+        }
+        selection?.decoration.dispose();
         delete this.onlineUsers[clientId];
     }
 

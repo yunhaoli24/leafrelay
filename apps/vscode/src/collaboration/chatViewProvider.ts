@@ -10,13 +10,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly vfs: VirtualFileSystem,
-        private readonly publicId: string,
+        private publicId: string,
         private readonly extensionUri: vscode.Uri,
         private readonly socket: ProjectSocket,
     ) {
         this.socket.updateEventHandlers({
             onReceivedMessage: this.onReceivedMessage.bind(this)
         });
+    }
+
+    updatePublicId(publicId:string) {
+        this.publicId = publicId;
     }
 
     async loadWebviewHtml(webview: vscode.Webview): Promise<string> {
