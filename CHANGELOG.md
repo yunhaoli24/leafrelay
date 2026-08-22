@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
-* **collaboration:** hide the current user's cursor ([06a01af](https://github.com/yunhaoli24/leafrelay/commit/06a01afcf107b1194450a1bd058aab167aef58b3))
 * **collaboration:** hide the current user's cursor ([c9c7db1](https://github.com/yunhaoli24/leafrelay/commit/c9c7db182c6c04b47f99900ca1afcc9ec16bbe22))
 
 ## [0.2.1](https://github.com/yunhaoli24/leafrelay/compare/v0.2.0...v0.2.1) (2026-08-21)
