@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3](https://github.com/yunhaoli24/leafrelay/compare/v0.2.2...v0.2.3) (2026-08-23)
+
+
+### Bug Fixes
+
+* **realtime:** restore project session after reconnect ([6ee9371](https://github.com/yunhaoli24/leafrelay/commit/6ee937127ff549f328677236d8d4ca800602ad0c))
+* **realtime:** restore project session after reconnect ([727231b](https://github.com/yunhaoli24/leafrelay/commit/727231b039d6d5469e2cc7e2f262c9c78fa57439))
+
 ## [0.2.2](https://github.com/yunhaoli24/leafrelay/compare/v0.2.1...v0.2.2) (2026-08-22)
 
 
