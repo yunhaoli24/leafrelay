@@ -19,10 +19,11 @@ class MemoryLocal implements ReplicaFileSystem {
 }
 
 class MemoryRemote implements RemoteReplica {
+    private reconnectHandler?:() => void;
     constructor(
         readonly files:Map<string,Uint8Array>,
-        readonly version:number,
-        readonly diff:ProjectFileTreeDiffResponseSchema,
+        public version:number,
+        public diff:ProjectFileTreeDiffResponseSchema,
     ) {}
     listEntries():RemoteEntry[] {
         return [...this.files.keys()].map((path, index) => ({
@@ -38,6 +39,8 @@ class MemoryRemote implements RemoteReplica {
     async getCurrentVersion() { return this.version; }
     async getFileTreeDiff() { return this.diff; }
     onChange() {}
+    onReconnect(handler:() => void) { this.reconnectHandler = handler; }
+    reconnect() { this.reconnectHandler?.(); }
 }
 
 class MemoryState implements SyncStateStore {
@@ -139,5 +142,31 @@ describe('SyncEngine', () => {
         expect(logs).toContain('[pull] update "/updated.tex"');
         expect(logs).toContain('[pull] delete "/deleted.tex"');
         await engine.stop();
+    });
+
+    it('reconciles changes that happened while the realtime connection was down', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
+        const remote = new MemoryRemote(
+            new Map([['/paper.tex', bytes('base\n')]]),
+            1,
+            {diff:[]},
+        );
+        const logs:string[] = [];
+        const engine = new SyncEngine({
+            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
+            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+        });
+
+        await engine.start();
+        remote.files.set('/paper.tex', bytes('changed while disconnected\n'));
+        remote.version = 2;
+        remote.diff = {diff:[{pathname:'/paper.tex', operation:'edited'}]};
+        remote.reconnect();
+        await engine.stop();
+
+        expect(text(local.files.get('/paper.tex'))).toBe('changed while disconnected\n');
+        expect(logs).toContain('Realtime connection restored at Overleaf version 2.');
     });
 });

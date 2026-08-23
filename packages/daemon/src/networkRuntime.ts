@@ -286,7 +286,7 @@ export class NetworkRuntimeRegistry {
             onFileRemoved:(...args) => emit('onFileRemoved', ...args),
             onFileMoved:(...args) => emit('onFileMoved', ...args),
             onFileChanged:(...args) => emit('onFileChanged', ...args),
-            onDisconnected:() => emit('onDisconnected'),
+            onDisconnected:(reason) => emit('onDisconnected', reason),
             onConnectionAccepted:(...args) => emit('onConnectionAccepted', ...args),
             onClientUpdated:(...args) => emit('onClientUpdated', ...args),
             onClientDisconnected:(...args) => emit('onClientDisconnected', ...args),
@@ -315,6 +315,7 @@ export class NetworkRuntimeRegistry {
             getCurrentVersion:() => this.enqueueProjectOperation(runtime, () => runtime.remote.getCurrentVersion()),
             getFileTreeDiff:(from, to) => this.enqueueProjectOperation(runtime, () => runtime.remote.getFileTreeDiff(from, to)),
             onChange:handler => runtime.remote.onChange(handler),
+            onReconnect:handler => runtime.remote.onReconnect(handler),
         };
     }
 
