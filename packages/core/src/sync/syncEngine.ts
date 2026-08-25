@@ -186,7 +186,7 @@ export class SyncEngine {
             const normalized = normalizePath(path);
             if (this.conflicts.has(normalized)) { continue; }
             if (this.state.files[normalized]!==undefined) {
-                await this.reconcilePath(normalized, 'remote');
+                await this.reconcilePath(normalized, 'local');
                 continue;
             }
             await this.initializePath(normalized);
@@ -328,7 +328,7 @@ export class SyncEngine {
             else { unknownRemoteActor = true; }
         }
         const pending:PendingChange = {
-            source,
+            source:previous?.source==='local' || source==='local' ? 'local' : 'remote',
             actors,
             unknownRemoteActor,
             timer:setTimeout(() => {
@@ -368,9 +368,11 @@ export class SyncEngine {
         const remoteHash = remoteContent && sha256(remoteContent);
 
         if (localHash===remoteHash) {
-            if (localContent) { updateSyncCheckpoint(this.state!, normalized, localContent); }
-            else { removeSyncCheckpoint(this.state!, normalized); }
-            await this.options.stateStore.save(this.state!);
+            if (localHash!==baseHash) {
+                if (localContent) { updateSyncCheckpoint(this.state!, normalized, localContent); }
+                else { removeSyncCheckpoint(this.state!, normalized); }
+                await this.options.stateStore.save(this.state!);
+            }
             return;
         }
 
@@ -390,6 +392,10 @@ export class SyncEngine {
             }
             const reason = 'Both local and Overleaf content changed since the last synchronized checkpoint.';
             await this.recordConflict(normalized, reason);
+            return;
+        }
+
+        if (source==='remote' && localChanged && !remoteChanged) {
             return;
         }
 
