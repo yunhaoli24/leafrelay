@@ -14,18 +14,29 @@ import {
 } from '../src/sync/syncEngine';
 
 class MemoryLocal implements ReplicaFileSystem {
+    private changeHandler?:(path:string) => void;
     constructor(readonly files:Map<string,Uint8Array>) {}
     async listFiles() { return [...this.files.keys()]; }
     async read(path:string) { return this.files.get(path); }
     async write(path:string, content:Uint8Array) { this.files.set(path, content); }
     async remove(path:string) { this.files.delete(path); }
-    async watch() { return async () => {}; }
+    async watch(onChange:(path:string) => void) {
+        this.changeHandler = onChange;
+        return async () => {
+            if (this.changeHandler===onChange) { this.changeHandler = undefined; }
+        };
+    }
+    change(path:string, content:Uint8Array) {
+        this.files.set(path, content);
+        this.changeHandler?.(path);
+    }
 }
 
 class MemoryRemote implements RemoteReplica {
     private reconnectHandler?:() => void;
     private changeHandler?:(change:{path:string; previousPath?:string; actor?:string}) => void;
     failReadPath?:string;
+    emitOnWrite = false;
     constructor(
         readonly files:Map<string,Uint8Array>,
         public version:number,
@@ -43,7 +54,10 @@ class MemoryRemote implements RemoteReplica {
         if (path===this.failReadPath) { throw new Error(`read failed for ${path}`); }
         return this.files.get(path)!;
     }
-    async write(path:string, content:Uint8Array) { this.files.set(path, content); }
+    async write(path:string, content:Uint8Array) {
+        this.files.set(path, content);
+        if (this.emitOnWrite) { setTimeout(() => this.change(path), 10); }
+    }
     async remove(path:string) { this.files.delete(path); }
     async getCurrentVersion() { return this.version; }
     async getFileTreeDiff() { return this.diff; }
@@ -205,7 +219,7 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 7, false);
         updateSyncCheckpoint(state, '/intact.tex', bytes('intact\n'));
         const local = new MemoryLocal(new Map([
-            ['/intact.tex', bytes('intact\n')],
+            ['/intact.tex', bytes('updated intact\n')],
             ['/local-only.tex', bytes('local only\n')],
         ]));
         const remote = new MemoryRemote(new Map([
@@ -222,6 +236,7 @@ describe('SyncEngine', () => {
 
         expect(remote.files.has('/local-only.tex')).toBe(false);
         expect(engine.getConflicts()).toEqual(['/local-only.tex']);
+        expect(text(remote.files.get('/intact.tex'))).toBe('updated intact\n');
         expect(text(local.files.get('/remote-only.tex'))).toBe('remote only\n');
         expect(store.saves.at(-1)?.initialized).toBe(true);
         await engine.stop();
@@ -307,6 +322,73 @@ describe('SyncEngine', () => {
         remote.change('/paper.tex', 'Remote User');
 
         expect(text(local.files.get('/paper.tex'))).toBe('base\n');
+    });
+
+    it('does not let delayed remote echoes reverse a stable local write', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        remote.emitOnWrite = true;
+        const store = new MemoryState(state);
+        const logs:string[] = [];
+        const engine = new SyncEngine({
+            projectUri:'overleaf://project', local, remote, stateStore:store,
+            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+        });
+
+        await engine.start();
+        local.change('/paper.tex', bytes('local\n'));
+        await vi.waitFor(() => expect(logs).toContain('[push] update "/paper.tex"; lines 1; source=local filesystem'));
+        const savesAfterPush = store.saves.length;
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(store.saves).toHaveLength(savesAfterPush);
+
+        remote.files.set('/paper.tex', bytes('remote later\n'));
+        remote.change('/paper.tex', 'Remote User');
+        await vi.waitFor(() => expect(text(local.files.get('/paper.tex'))).toBe('remote later\n'));
+        await engine.stop();
+    });
+
+    it('does not push transient local content in response to a stale remote event', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        const logs:string[] = [];
+        const engine = new SyncEngine({
+            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
+            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+        });
+
+        await engine.start();
+        remote.change('/paper.tex');
+        local.files.set('/paper.tex', bytes(''));
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(text(remote.files.get('/paper.tex'))).toBe('base\n');
+        expect(logs.some(log => log.startsWith('[push]'))).toBe(false);
+
+        local.change('/paper.tex', bytes('finished local write\n'));
+        await vi.waitFor(() => expect(text(remote.files.get('/paper.tex'))).toBe('finished local write\n'));
+        await engine.stop();
+    });
+
+    it('keeps a pending local change when a stale remote echo arrives later', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        const engine = new SyncEngine({
+            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
+            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+        });
+
+        await engine.start();
+        local.change('/paper.tex', bytes('stable local change\n'));
+        remote.change('/paper.tex');
+
+        await vi.waitFor(() => expect(text(remote.files.get('/paper.tex'))).toBe('stable local change\n'));
+        await engine.stop();
     });
 
     it('retains a conflict when retrying the path fails', async () => {
