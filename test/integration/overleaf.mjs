@@ -187,7 +187,7 @@ try {
     await waitFor(async () => (await secondClient.status()).replicas.length===0, 'the detached replica watcher did not stop');
     await writeFile(join(replica, 'after-detach.tex'), 'must remain local\n');
     await new Promise(resolve => setTimeout(resolve, 750));
-    assert.equal(await observer.entry('/after-detach.tex'), undefined, 'a replica without clients continued uploading');
+    assert.equal(await observer.entry('/after-detach.tex'), null, 'a replica without clients continued uploading');
     await observer.write('/after-detach-remote.tex', new TextEncoder().encode('must remain remote\n'));
     await new Promise(resolve => setTimeout(resolve, 750));
     await assert.rejects(
