@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -90,6 +91,8 @@ const running = await startServe(replica);
 const secondClient = await LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'integration'});
 const sharedReplica = await secondClient.attachReplica({directory:replica});
 const observedProject = await secondClient.openProject(baseUrl.host, projectId);
+let runningStopped = false;
+let secondReplicaDetached = false;
 const observer = {
     entry:path => secondClient.callProject(observedProject.projectKey, 'remote.entry', [path]),
     read:path => secondClient.callProject(observedProject.projectKey, 'remote.read', [path]),
@@ -106,8 +109,12 @@ async function waitFor(check, message) {
 
 async function hasCheckpoint(path) {
     try {
-        const state = JSON.parse(await readFile(join(replica, '.overleaf', 'sync-state.json'), 'utf8'));
-        return typeof state.files?.[path]==='string';
+        const key = createHash('sha256').update(path).digest('hex');
+        const record = JSON.parse(await readFile(
+            join(replica, '.overleaf', 'sync', 'paths', key.slice(0, 2), `${key}.json`),
+            'utf8',
+        ));
+        return record.path===path && typeof record.hash==='string';
     } catch {
         return false;
     }
@@ -172,9 +179,25 @@ try {
         if (!await observer.entry('/after-restart.tex')) { return false; }
         return new TextDecoder().decode(await observer.read('/after-restart.tex'))==='restored watcher\n';
     }, 'the replica was not restored after daemon restart');
-} finally {
+
     await running.stop();
-    await secondClient.detachReplica(sharedReplica.replicaId).catch(() => {});
+    runningStopped = true;
+    await secondClient.detachReplica(sharedReplica.replicaId);
+    secondReplicaDetached = true;
+    await waitFor(async () => (await secondClient.status()).replicas.length===0, 'the detached replica watcher did not stop');
+    await writeFile(join(replica, 'after-detach.tex'), 'must remain local\n');
+    await new Promise(resolve => setTimeout(resolve, 750));
+    assert.equal(await observer.entry('/after-detach.tex'), undefined, 'a replica without clients continued uploading');
+    await observer.write('/after-detach-remote.tex', new TextEncoder().encode('must remain remote\n'));
+    await new Promise(resolve => setTimeout(resolve, 750));
+    await assert.rejects(
+        readFile(join(replica, 'after-detach-remote.tex')),
+        error => error?.code==='ENOENT',
+        'a replica without clients continued downloading',
+    );
+} finally {
+    if (!runningStopped) { await running.stop(); }
+    if (!secondReplicaDetached) { await secondClient.detachReplica(sharedReplica.replicaId).catch(() => {}); }
     await secondClient.closeProject(observedProject.projectKey).catch(() => {});
     await secondClient.shutdownDaemon().catch(() => {});
     secondClient.close();

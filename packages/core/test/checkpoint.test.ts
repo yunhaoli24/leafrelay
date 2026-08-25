@@ -1,7 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
     createSyncState,
-    parseSyncState,
     readTextBase,
     removeSyncCheckpoint,
     sha256,
@@ -12,23 +11,6 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 describe('sync checkpoint', () => {
-    it('migrates version 1 hash-only state without invalidating it', () => {
-        const state = parseSyncState(JSON.stringify({
-            schemaVersion:1,
-            projectUri:'overleaf://project',
-            remoteVersion:42,
-            files:{'/main.tex':'hash'},
-        }), 'overleaf://project');
-
-        expect(state).toEqual({
-            schemaVersion:2,
-            projectUri:'overleaf://project',
-            remoteVersion:42,
-            files:{'/main.tex':'hash'},
-            textBases:{},
-        });
-    });
-
     it('stores a text merge base alongside the content fingerprint', () => {
         const state = createSyncState('overleaf://project', 7);
         const content = encoder.encode('shared text\n');
@@ -54,10 +36,12 @@ describe('sync checkpoint', () => {
         updateSyncCheckpoint(state, '/section/main.tex', encoder.encode('main'));
         updateSyncCheckpoint(state, '/section/notes.tex', encoder.encode('notes'));
         updateSyncCheckpoint(state, '/other.tex', encoder.encode('other'));
+        state.conflicts['/section/main.tex'] = 'conflict';
 
         removeSyncCheckpoint(state, '/section');
 
         expect(state.files).toEqual({'/other.tex':sha256(encoder.encode('other'))});
         expect(state.textBases).toEqual({'/other.tex':'other'});
+        expect(state.conflicts).toEqual({});
     });
 });

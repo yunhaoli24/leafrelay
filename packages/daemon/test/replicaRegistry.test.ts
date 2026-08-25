@@ -40,6 +40,9 @@ describe('ReplicaRegistry', () => {
             stop,
         }));
         const registry = new ReplicaRegistry({status:()=>{}, conflict:()=>{}, empty:()=>{}, log:()=>{}}, start);
+        registry.registerClient('client-1');
+        registry.registerClient('client-2');
+        registry.registerClient('client-3');
 
         const [first, shared] = await Promise.all([
             registry.attach('client-1', {directory:firstRoot}),
@@ -50,7 +53,37 @@ describe('ReplicaRegistry', () => {
         expect(start).toHaveBeenCalledTimes(1);
         await expect(registry.attach('client-3', {directory:secondRoot})).rejects.toBeInstanceOf(ReplicaAlreadyActiveError);
 
-        await registry.stopAll();
+        await registry.detach('client-1', first.replicaId);
+        expect(stop).not.toHaveBeenCalled();
+        await registry.detach('client-2', first.replicaId);
         expect(stop).toHaveBeenCalledOnce();
+        expect(registry.size).toBe(0);
+    });
+
+    it('stops a replica whose client disconnects while startup is pending', async () => {
+        const root = await projectDirectory('pending');
+        let finishStart!:(running:RunningServe) => void;
+        const stop = vi.fn(async () => {});
+        const start = vi.fn(() => new Promise<RunningServe>(resolveStart => { finishStart = resolveStart; }));
+        const registry = new ReplicaRegistry({status:()=>{}, conflict:()=>{}, empty:()=>{}, log:()=>{}}, start);
+        registry.registerClient('client-1');
+
+        const attaching = registry.attach('client-1', {directory:root});
+        while (start.mock.calls.length===0) { await new Promise(resolve => setTimeout(resolve, 0)); }
+        await registry.detachClient('client-1');
+        finishStart({
+            root,
+            serverName:'www.overleaf.com',
+            projectId:'p1',
+            projectName:'Test',
+            conflicts:() => [],
+            resolveConflict:async () => {},
+            retry:async () => {},
+            stop,
+        });
+
+        await expect(attaching).rejects.toThrow('disconnected before attachment completed');
+        expect(stop).toHaveBeenCalledOnce();
+        expect(registry.size).toBe(0);
     });
 });

@@ -1,4 +1,4 @@
-import {randomBytes} from 'node:crypto';
+import {randomBytes, randomUUID} from 'node:crypto';
 import {appendFile, chmod, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Server, type Socket} from 'node:net';
 import {
@@ -39,6 +39,7 @@ const REPLICA_ALREADY_ACTIVE = -32010;
 const daemonVersion = typeof LEAFRELAY_DAEMON_VERSION==='string' ? LEAFRELAY_DAEMON_VERSION : 'development';
 
 interface ClientConnection {
+    leaseId:string;
     socket:Socket;
     rpc:MessageConnection;
     clientId?:string;
@@ -141,7 +142,7 @@ export class LeafRelayDaemonServer {
     private accept(socket:Socket):void {
         this.cancelIdleExit();
         const rpc = createSocketRpcConnection(socket);
-        const client:ClientConnection = {socket, rpc, initialized:false};
+        const client:ClientConnection = {leaseId:randomUUID(), socket, rpc, initialized:false};
         this.clients.add(client);
         rpc.onRequest(RPC_METHOD.initialize, (params:InitializeParams) => this.initialize(client, params));
         rpc.onRequest(RPC_METHOD.daemonStatus, () => this.authorized(client, () => this.status()));
@@ -151,7 +152,7 @@ export class LeafRelayDaemonServer {
         }));
         rpc.onRequest(RPC_METHOD.replicaAttach, (params:ReplicaAttachParams) => this.authorized(client, async () => {
             try {
-                return await this.replicas.attach(client.clientId!, params);
+                return await this.replicas.attach(client.leaseId, params);
             } catch (error) {
                 if (error instanceof ReplicaAlreadyActiveError) {
                     throw new ResponseError(REPLICA_ALREADY_ACTIVE, error.message, {
@@ -164,8 +165,8 @@ export class LeafRelayDaemonServer {
                 throw error;
             }
         }));
-        rpc.onRequest(RPC_METHOD.replicaDetach, (params:{replicaId:string}) => this.authorized(client, () => {
-            this.replicas.detach(client.clientId!, params.replicaId);
+        rpc.onRequest(RPC_METHOD.replicaDetach, (params:{replicaId:string}) => this.authorized(client, async () => {
+            await this.replicas.detach(client.leaseId, params.replicaId);
             return null;
         }));
         rpc.onRequest(RPC_METHOD.replicaResolveConflict, (params:ReplicaConflictResolutionParams) => this.authorized(client, async () => {
@@ -196,17 +197,17 @@ export class LeafRelayDaemonServer {
             return encodeRpcValue(result);
         }));
         rpc.onRequest(RPC_METHOD.projectOpen, (params:ProjectOpenParams) => this.authorized(client, () => (
-            this.network.openProject(client.clientId!, params.server, params.projectId)
+            this.network.openProject(client.leaseId, params.server, params.projectId)
         )));
         rpc.onRequest(RPC_METHOD.projectClose, (params:{projectKey:string}) => this.authorized(client, () => {
-            this.network.closeProject(client.clientId!, params.projectKey);
+            this.network.closeProject(client.leaseId, params.projectKey);
             return null;
         }));
         rpc.onRequest(RPC_METHOD.projectCall, (params:ProjectCallParams) => this.authorized(client, async () => {
             const result = await this.network.callProject(params.projectKey, params.operation, decodeRpcValue(params.args) as unknown[]);
             return encodeRpcValue(await result);
         }));
-        rpc.onClose(() => this.closeClient(client));
+        rpc.onClose(() => void this.closeClient(client));
         rpc.onError(error => void this.log('error', `JSON-RPC connection error: ${String(error[0])}`));
         rpc.listen();
     }
@@ -219,6 +220,7 @@ export class LeafRelayDaemonServer {
         if (!params.clientId) { throw new ResponseError(-32602, 'clientId is required.'); }
         client.clientId = params.clientId;
         client.initialized = true;
+        this.replicas.registerClient(client.leaseId);
         void this.log('info', `${params.clientName} ${params.clientVersion} connected (${params.clientId}).`);
         return {
             daemonVersion:daemonVersion,
@@ -233,10 +235,17 @@ export class LeafRelayDaemonServer {
         return operation();
     }
 
-    private closeClient(client:ClientConnection):void {
+    private async closeClient(client:ClientConnection):Promise<void> {
         if (!this.clients.delete(client)) { return; }
-        if (client.clientId) { this.replicas.detachClient(client.clientId); }
-        if (client.clientId) { this.network.detachClient(client.clientId); }
+        if (client.clientId) {
+            try {
+                await this.replicas.detachClient(client.leaseId);
+            } catch (error) {
+                await this.log('error', `Failed to stop replicas for a disconnected client: ${error instanceof Error ? error.message : String(error)}`);
+            } finally {
+                this.network.detachClient(client.leaseId);
+            }
+        }
         this.scheduleIdleExit();
     }
 
@@ -246,7 +255,7 @@ export class LeafRelayDaemonServer {
         notification:ReplicaStatusNotification|ReplicaConflictNotification|ProjectEventNotification,
     ):void {
         for (const client of this.clients) {
-            if (client.clientId && owners.has(client.clientId)) { this.notifyClient(client, method, notification); }
+            if (owners.has(client.leaseId)) { this.notifyClient(client, method, notification); }
         }
     }
 

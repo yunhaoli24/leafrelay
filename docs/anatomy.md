@@ -22,7 +22,7 @@ Core has no dependency on the VS Code API. Its public entry point is `packages/c
 
 - `src/api` implements Overleaf HTTP requests and realtime events. Overleaf still exposes the Socket.IO 0.9 wire protocol; `overleafRealtimeSocket.ts` implements the required framing over Node's stable WebSocket API without the historical Socket.IO client or CommonJS runtime.
 - `src/sync` owns checkpoints, ignore rules, incremental reconciliation, three-way text merging, and per-path conflict handling.
-- `src/node` provides local filesystem watching, `.overleaf/settings.json` loading, user session configuration, sync-state persistence, and the long-running service entry point.
+- `src/node` provides local filesystem watching, `.overleaf/settings.json` loading, user session configuration, sharded `.overleaf/sync/` state persistence, and the long-running service entry point.
 - `src/core` contains shared logging and Overleaf project entity types.
 
 Core has no client lifecycle or editor dependency. The daemon is its network and synchronization owner.

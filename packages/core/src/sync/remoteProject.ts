@@ -19,7 +19,7 @@ export interface RemoteEntry {
     parent?: FolderEntity;
 }
 
-export type RemoteChange = {path:string; previousPath?:string};
+export type RemoteChange = {path:string; previousPath?:string; actor?:string};
 
 export interface RemoteProjectTransport {
     api:BaseAPI;
@@ -51,6 +51,7 @@ export class RemoteProject {
     private project!: ProjectEntity;
     private readonly entries = new Map<string, RemoteEntry>();
     private readonly idToPath = new Map<string, string>();
+    private readonly collaboratorNames = new Map<string,string>();
     private changeHandler?: (change:RemoteChange) => void;
     private reconnectHandler?: () => void;
     private readonly externalTransport?:RemoteProjectTransport;
@@ -78,6 +79,7 @@ export class RemoteProject {
             this.socket = new SocketIOAPI(this.url, this.api, this.identity, this.projectId);
         }
         this.project = await this.socket.joinProject(this.projectId);
+        this.indexCollaborators();
         this.reindex();
         this.registerEvents();
     }
@@ -88,10 +90,16 @@ export class RemoteProject {
 
     onChange(handler: (change:RemoteChange) => void) {
         this.changeHandler = handler;
+        return () => {
+            if (this.changeHandler===handler) { this.changeHandler = undefined; }
+        };
     }
 
     onReconnect(handler:() => void) {
         this.reconnectHandler = handler;
+        return () => {
+            if (this.reconnectHandler===handler) { this.reconnectHandler = undefined; }
+        };
     }
 
     listEntries(): RemoteEntry[] {
@@ -293,16 +301,34 @@ export class RemoteProject {
         if (index!==-1) { collection.splice(index, 1); }
     }
 
-    private emitChange(path:string, previousPath?:string) {
-        this.changeHandler?.({path:normalizePath(path), previousPath});
+    private emitChange(path:string, previousPath?:string, actor?:string) {
+        this.changeHandler?.({path:normalizePath(path), previousPath, actor});
+    }
+
+    private indexCollaborators() {
+        for (const member of [this.project.owner, ...this.project.members]) {
+            if (!member?._id) { continue; }
+            const name = [member.first_name, member.last_name].filter(Boolean).join(' ').trim();
+            if (name) { this.collaboratorNames.set(member._id, name); }
+        }
+    }
+
+    private actor(userId:string|undefined):string|undefined {
+        if (!userId) { return undefined; }
+        const name = this.collaboratorNames.get(userId);
+        return name ? `${name} (Overleaf)` : `Overleaf user ${userId}`;
     }
 
     private registerEvents() {
         this.socket.updateEventHandlers({
             onProjectJoined:project => {
                 this.project = project;
+                this.indexCollaborators();
                 this.reindex();
                 this.reconnectHandler?.();
+            },
+            onClientUpdated:user => {
+                if (user.user_id && user.name) { this.collaboratorNames.set(user.user_id, user.name); }
             },
             onFileCreated:(parentId, type, entity) => {
                 const parent = this.folderById(parentId);
@@ -353,7 +379,7 @@ export class RemoteProject {
             },
             onFileChanged:update => {
                 const path = this.idToPath.get(update.doc);
-                if (path) { this.emitChange(path); }
+                if (path) { this.emitChange(path, undefined, this.actor(update.meta?.user_id)); }
             },
         });
     }
