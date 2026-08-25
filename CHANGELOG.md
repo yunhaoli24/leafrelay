@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4](https://github.com/yunhaoli24/leafrelay/compare/v0.2.3...v0.2.4) (2026-08-25)
+
+
+### Features
+
+* shard local replica sync state ([#30](https://github.com/yunhaoli24/leafrelay/issues/30)) ([5b8173e](https://github.com/yunhaoli24/leafrelay/commit/5b8173e0271c7fcbcb1adde3093e6a05a01aa306))
+
+
+### Bug Fixes
+
+* **sync:** ignore stale remote event direction ([#32](https://github.com/yunhaoli24/leafrelay/issues/32)) ([471872b](https://github.com/yunhaoli24/leafrelay/commit/471872b177513773a7b6b04cca5072024b68f861))
+
 ## [0.2.3](https://github.com/yunhaoli24/leafrelay/compare/v0.2.2...v0.2.3) (2026-08-23)
 
 
