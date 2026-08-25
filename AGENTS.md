@@ -12,17 +12,20 @@
 ## Local Replica Sync
 
 - Runtime local changes are event-driven through the daemon's Chokidar watcher; do not add periodic directory or hash polling.
-- `.overleaf/sync-state.json` stores the remote history version, per-path SHA-256 checkpoint, and common UTF-8 text baseline used for startup, reconnect, and three-way reconciliation. Binary paths retain fingerprints but no merge baseline.
+- `.overleaf/sync/` stores daemon-owned replica state inside the local project. Keep the project cursor small, persist one JSON record per path, and store common UTF-8 merge bases as content-addressed plain-text files. Never recreate the monolithic `.overleaf/sync-state.json`.
 - `.overleaf/settings.json` is the authoritative local-replica association. It must contain enough project URI and SCM settings metadata to rebuild the transient per-login project/SCM state after authentication expires.
-- Persist each successfully synchronized path's SHA-256 checkpoint before processing the next path, so a later conflict or failure does not discard completed progress. Skip writes when serialized state is unchanged and write the disposable cache in place to avoid delete/create watcher events.
+- Persist each successfully synchronized path's SHA-256 checkpoint before processing the next path, so a later conflict or failure does not discard completed progress. Rewrite only the changed path record; update the project cursor after the complete remote batch is durably represented.
+- Do not migrate legacy `sync-state.json` contents. When the sharded state is missing, compare current local and Overleaf content per path, establish matching or remote-only paths, and pause divergent or local-only paths for explicit resolution.
 - History API failures such as HTTP 429 must not be interpreted as a missing version. Leave the checkpoint unchanged and retry on a later reconnect.
 - Reuse recent history updates for both version discovery and changed-path collection. Serialize unavoidable history requests and honor `Retry-After` instead of issuing immediate parallel probes.
 - Route every HTTP request and Socket.IO handshake through the daemon scheduler for its `{server,user}`. A 429 response pauses all projects for that user for `Retry-After`; local watcher bursts are debounced before upload.
 - Each `{server,projectId}` has one daemon project runtime and realtime connection. The same real local path may have multiple clients, but another path cannot become a second writable replica of that project.
+- Replica activity is leased per IPC connection and local root. When the last client attached to one root disconnects or detaches, immediately stop that root's watcher and sync engine and release its project lease; other roots with clients continue independently.
 - After a realtime transport reconnects, wait for that connection's fresh `joinProjectResponse` before reporting recovery or releasing queued project operations, then reconcile changes missed while disconnected.
 - A failed path must make incremental startup sync fail explicitly; never log completion or advance `remoteVersion` after partial failure.
 - Report final user-actionable failures through a deduplicated VS Code notification with access to the Output log; individual retries remain log-only.
 - Connection and SCM creation logs must include project ID, connection scheme, retry attempt, local base URI, and the original structured error. Never swallow `joinProject` or trigger-initialization errors behind a generic reconnecting message.
+- Successful path logs include a compact line-range or binary byte summary and the reliable source identity. Local watcher changes are attributed to the local filesystem; use Overleaf OT user metadata when it is available and do not guess the originating local application.
 - Disposing a cached VFS is terminal: disconnect handlers must not schedule reconnects after disposal. Successful `Open Project Locally` creation must leave its provider-owned VFS alive.
 - A background project used by `Open Project Locally` must not register workspace-global commands, views, status items, or compile actions. Those features belong only to the project identified by the active workspace; deterministic feature-registration failures must not enter the connection retry loop.
 - Ignore every path containing a dot-prefixed component, including `.output`, before any stat/read/write work.

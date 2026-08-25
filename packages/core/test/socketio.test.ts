@@ -45,7 +45,7 @@ function project(name:string):ProjectEntity {
         invites:[],
         owner:{} as ProjectEntity['owner'],
         features:{},
-        settings:{},
+        settings:{learnedWords:[], languages:[], compilers:[]},
     };
 }
 

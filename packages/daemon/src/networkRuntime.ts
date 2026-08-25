@@ -23,8 +23,6 @@ import type {
     ServerLoginParams,
 } from '@leafrelay/protocol';
 
-const PROJECT_IDLE_MS = 60_000;
-
 const SERVER_OPERATIONS = new Set([
     'userProjectsJson', 'getProjectsJson', 'projectEntitiesJson',
     'newProject', 'cloneProject', 'renameProject', 'deleteProject',
@@ -69,7 +67,6 @@ interface ProjectRuntime {
     owners:Set<string>;
     replicaReferences:number;
     operationQueue:Promise<void>;
-    idleTimer?:NodeJS.Timeout;
 }
 
 export interface ProjectLease {
@@ -168,7 +165,6 @@ export class NetworkRuntimeRegistry {
     async openProject(clientId:string, server:string, projectId:string):Promise<ProjectOpenResult> {
         const runtime = await this.getOrCreateProject(server, projectId);
         const shared = runtime.owners.size!==0 || runtime.replicaReferences!==0;
-        if (runtime.idleTimer) { clearTimeout(runtime.idleTimer); runtime.idleTimer = undefined; }
         runtime.owners.add(clientId);
         await runtime.ready;
         return {projectKey:runtime.key, shared};
@@ -202,7 +198,6 @@ export class NetworkRuntimeRegistry {
 
     async acquireReplica(server:string, projectId:string):Promise<ProjectLease> {
         const runtime = await this.getOrCreateProject(server, projectId);
-        if (runtime.idleTimer) { clearTimeout(runtime.idleTimer); runtime.idleTimer = undefined; }
         runtime.replicaReferences += 1;
         await runtime.ready;
         let released = false;
@@ -326,14 +321,12 @@ export class NetworkRuntimeRegistry {
     }
 
     private scheduleProjectStop(runtime:ProjectRuntime):void {
-        if (runtime.owners.size!==0 || runtime.replicaReferences!==0 || runtime.idleTimer) { return; }
-        runtime.idleTimer = setTimeout(() => void this.stopProject(runtime), PROJECT_IDLE_MS);
-        runtime.idleTimer.unref();
+        if (runtime.owners.size!==0 || runtime.replicaReferences!==0) { return; }
+        void this.stopProject(runtime);
     }
 
     private async stopProject(runtime:ProjectRuntime):Promise<void> {
         if (!this.projects.delete(runtime.key)) { return; }
-        if (runtime.idleTimer) { clearTimeout(runtime.idleTimer); }
         runtime.socket.disconnect();
     }
 }

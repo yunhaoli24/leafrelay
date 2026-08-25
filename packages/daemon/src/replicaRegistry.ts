@@ -10,8 +10,6 @@ import type {
     ReplicaStatusNotification,
 } from '@leafrelay/protocol';
 
-const DETACHED_REPLICA_GRACE_MS = 60_000;
-
 interface ReplicaEntry {
     id:string;
     root:string;
@@ -22,7 +20,6 @@ interface ReplicaEntry {
     owners:Set<string>;
     running:RunningServe;
     status:ReplicaStatus;
-    stopTimer?:NodeJS.Timeout;
 }
 
 type ReplicaStarter = (directory:string, options:NonNullable<Parameters<typeof startServe>[1]>) => Promise<RunningServe>;
@@ -47,6 +44,7 @@ export class ReplicaRegistry {
     private readonly byRoot = new Map<string,ReplicaEntry>();
     private readonly byProject = new Map<string,ReplicaEntry>();
     private readonly projectOperations = new Map<string,Promise<void>>();
+    private readonly clients = new Set<string>();
 
     constructor(
         private readonly events:ReplicaRegistryEvents,
@@ -54,6 +52,10 @@ export class ReplicaRegistry {
     ) {}
 
     get size():number { return this.byId.size; }
+
+    registerClient(clientId:string):void {
+        this.clients.add(clientId);
+    }
 
     async attach(clientId:string, params:ReplicaAttachParams):Promise<ReplicaAttachResult> {
         const root = await realpath(resolve(params.directory));
@@ -69,6 +71,7 @@ export class ReplicaRegistry {
         settings:Awaited<ReturnType<typeof readProjectSettings>>,
         projectKey:string,
     ):Promise<ReplicaAttachResult> {
+        if (!this.clients.has(clientId)) { throw new Error('The replica client disconnected before attachment started.'); }
         const rootEntry = this.byRoot.get(root);
         if (rootEntry) {
             if (rootEntry.projectKey!==projectKey) {
@@ -103,6 +106,11 @@ export class ReplicaRegistry {
                     this.events.status(entry.owners, {replicaId:entry.id, status:entry.status});
                 },
             });
+            if (!this.clients.has(clientId)) {
+                await running.stop();
+                this.events.empty();
+                throw new Error('The replica client disconnected before attachment completed.');
+            }
             entry = {
                 id,
                 root,
@@ -126,16 +134,21 @@ export class ReplicaRegistry {
         }
     }
 
-    detach(clientId:string, replicaId:string):void {
+    async detach(clientId:string, replicaId:string):Promise<void> {
         const entry = this.require(replicaId);
-        entry.owners.delete(clientId);
-        this.scheduleStopWhenDetached(entry);
+        await this.withProjectLock(entry.projectKey, async () => {
+            entry.owners.delete(clientId);
+            if (entry.owners.size===0) { await this.stop(entry); }
+        });
     }
 
-    detachClient(clientId:string):void {
-        for (const entry of this.byId.values()) {
-            if (entry.owners.delete(clientId)) { this.scheduleStopWhenDetached(entry); }
-        }
+    async detachClient(clientId:string):Promise<void> {
+        this.clients.delete(clientId);
+        const owned = [...this.byId.values()].filter(entry => entry.owners.has(clientId));
+        await Promise.all(owned.map(entry => this.withProjectLock(entry.projectKey, async () => {
+            entry.owners.delete(clientId);
+            if (entry.owners.size===0) { await this.stop(entry); }
+        })));
     }
 
     async resolveConflict(replicaId:string, path:string, winner:'local'|'remote'):Promise<void> {
@@ -170,19 +183,11 @@ export class ReplicaRegistry {
     }
 
     private addOwner(entry:ReplicaEntry, clientId:string):void {
-        if (entry.stopTimer) { clearTimeout(entry.stopTimer); entry.stopTimer = undefined; }
         entry.owners.add(clientId);
-    }
-
-    private scheduleStopWhenDetached(entry:ReplicaEntry):void {
-        if (entry.owners.size!==0 || entry.stopTimer) { return; }
-        entry.stopTimer = setTimeout(() => void this.stop(entry), DETACHED_REPLICA_GRACE_MS);
-        entry.stopTimer.unref();
     }
 
     private async stop(entry:ReplicaEntry):Promise<void> {
         if (!this.byId.delete(entry.id)) { return; }
-        if (entry.stopTimer) { clearTimeout(entry.stopTimer); }
         this.byRoot.delete(entry.root);
         this.byProject.delete(entry.projectKey);
         entry.status = {state:'stopping'};
