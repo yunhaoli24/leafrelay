@@ -169,7 +169,8 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             });
             if (this.conflicts.size!==0) {
                 warn(`Local replica attached with ${this.conflicts.size} unresolved conflict(s): ${[...this.conflicts].join(', ')}`);
-                void this.promptNextConflict();
+                // Let SCM registration finish before opening a modal notification.
+                setTimeout(() => void this.promptNextConflict(), 0);
             }
             return [
                 statusListener,
@@ -249,7 +250,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         } finally {
             this.conflictPromptActive = false;
         }
-        if (choice!==undefined) { await this.promptNextConflict(); }
+        if (choice!==undefined && choice!=='Review Difference') { await this.promptNextConflict(); }
     }
 
     private async handleConflictChoice(path:string, choice:string|undefined):Promise<void> {
