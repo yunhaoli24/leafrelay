@@ -15,6 +15,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
     private replica?:ReplicaAttachResult;
     private conflicts = new Set<string>();
+    private conflictPromptActive = false;
 
     constructor(
         protected readonly vfs:VirtualFileSystem,
@@ -167,9 +168,9 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                 shared:this.replica.shared,
             });
             if (this.conflicts.size!==0) {
-                const path = this.conflicts.values().next().value as string;
                 warn(`Local replica attached with ${this.conflicts.size} unresolved conflict(s): ${[...this.conflicts].join(', ')}`);
-                void this.promptConflict(path);
+                // Let SCM registration finish before opening a modal notification.
+                setTimeout(() => void this.promptNextConflict(), 0);
             }
             return [
                 statusListener,
@@ -189,8 +190,12 @@ export class LocalReplicaSCMProvider extends BaseSCM {
     private handleStatus(event:ReplicaStatusNotification):void {
         if (event.replicaId!==this.replica?.replicaId) { return; }
         if (event.status.state==='active') {
-            this.conflicts.clear();
-            this.status = {status:'idle', message:vscode.l10n.t('Synced')};
+            this.status = this.conflicts.size===0
+                ? {status:'idle', message:vscode.l10n.t('Synced')}
+                : {
+                    status:'need-attention',
+                    message:vscode.l10n.t('{count} conflict(s)', {count:this.conflicts.size}),
+                };
         } else if (event.status.state==='starting' || event.status.state==='syncing') {
             this.status = {status:'pull', message:event.status.message};
         } else {
@@ -207,9 +212,7 @@ export class LocalReplicaSCMProvider extends BaseSCM {
             message:vscode.l10n.t('{count} conflict(s)', {count:this.conflicts.size}),
         };
         warn(`Synchronization conflict in ${event.path}: ${event.reason}`);
-        if (isNew) {
-            void this.promptConflict(event.path);
-        }
+        if (isNew || !this.conflictPromptActive) { void this.promptNextConflict(); }
     }
 
     private async selectConflict():Promise<void> {
@@ -224,14 +227,30 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         if (path) { await this.promptConflict(path); }
     }
 
+    private async promptNextConflict():Promise<void> {
+        if (this.conflictPromptActive) { return; }
+        const path = [...this.conflicts].sort()[0];
+        if (!path) { return; }
+        await this.promptConflict(path);
+    }
+
     private async promptConflict(path:string):Promise<void> {
+        if (this.conflictPromptActive || !this.conflicts.has(path)) { return; }
+        this.conflictPromptActive = true;
+        const remaining = this.conflicts.size;
         const choice = await vscode.window.showWarningMessage(
-            `LeafRelay paused ${path} because both local and Overleaf changed.`,
+            `LeafRelay paused ${path} because both local and Overleaf changed (${remaining} conflict${remaining===1 ? '' : 's'} remaining).`,
             'Review Difference',
             'Use Local',
             'Use Overleaf',
+            ...(remaining>1 ? ['Use Local for All', 'Use Overleaf for All'] : []),
         );
-        await this.handleConflictChoice(path, choice);
+        try {
+            await this.handleConflictChoice(path, choice);
+        } finally {
+            this.conflictPromptActive = false;
+        }
+        if (choice!==undefined && choice!=='Review Difference') { await this.promptNextConflict(); }
     }
 
     private async handleConflictChoice(path:string, choice:string|undefined):Promise<void> {
@@ -246,6 +265,12 @@ export class LocalReplicaSCMProvider extends BaseSCM {
         }
         if (choice==='Use Local') { await this.resolveConflict(path, 'local'); }
         if (choice==='Use Overleaf') { await this.resolveConflict(path, 'remote'); }
+        if (choice==='Use Local for All' || choice==='Use Overleaf for All') {
+            const winner = choice==='Use Local for All' ? 'local' : 'remote';
+            for (const conflictPath of [...this.conflicts].sort()) {
+                await this.resolveConflict(conflictPath, winner);
+            }
+        }
     }
 
     private async resolveConflict(path:string, winner:'local'|'remote'):Promise<void> {
