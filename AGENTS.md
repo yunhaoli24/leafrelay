@@ -24,6 +24,7 @@
 - After a realtime transport reconnects, wait for that connection's fresh `joinProjectResponse` before reporting recovery or releasing queued project operations, then reconcile changes missed while disconnected.
 - A failed path must make incremental startup sync fail explicitly; never log completion or advance `remoteVersion` after partial failure.
 - Report final user-actionable failures through a deduplicated VS Code notification with access to the Output log; individual retries remain log-only.
+- Present replica conflicts through one serialized VS Code prompt per local folder; resolving one path continues to the next, and multi-path conflicts offer an explicit all-local or all-Overleaf action.
 - Connection and SCM creation logs must include project ID, connection scheme, retry attempt, local base URI, and the original structured error. Never swallow `joinProject` or trigger-initialization errors behind a generic reconnecting message.
 - Successful path logs include a compact line-range or binary byte summary and the reliable source identity. Local watcher changes are attributed to the local filesystem; use Overleaf OT user metadata when it is available and do not guess the originating local application.
 - Disposing a cached VFS is terminal: disconnect handlers must not schedule reconnects after disposal. Successful `Open Project Locally` creation must leave its provider-owned VFS alive.
