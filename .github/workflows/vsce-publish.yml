@@ -2,6 +2,7 @@ name: Publish Extension
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ inputs.ref || github.ref }}
@@ -156,10 +157,19 @@ jobs:
 
       - name: Publish to VS Code Marketplace
         env:
+          MARKETPLACE_OIDC_ENABLED: ${{ vars.MARKETPLACE_OIDC_ENABLED }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
+          if [ "$MARKETPLACE_OIDC_ENABLED" = "true" ]; then
+            pnpm exec vsce publish \
+              --packagePath "${{ steps.package.outputs.vsix }}" \
+              --oidc \
+              --skip-duplicate
+            exit 0
+          fi
+
           if [ -z "$VSCE_PAT" ]; then
-            echo "::warning::VSCE_PAT is not configured; the VSIX is available from the GitHub Release and can be published later."
+            echo "::warning::Marketplace publishing is not enabled: set MARKETPLACE_OIDC_ENABLED=true with a configured trusted publisher, or provide VSCE_PAT."
             exit 0
           fi
           pnpm exec vsce publish \
