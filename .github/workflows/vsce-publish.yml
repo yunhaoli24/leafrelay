@@ -155,19 +155,19 @@ jobs:
             "${{ steps.package.outputs.npm_tarball }}" \
             --clobber
 
-      - name: Publish to VS Code Marketplace
+      - name: Publish to VS Code Marketplace with OIDC
+        if: vars.MARKETPLACE_OIDC_ENABLED == 'true'
+        run: |
+          pnpm exec vsce publish \
+            --packagePath "${{ steps.package.outputs.vsix }}" \
+            --oidc \
+            --skip-duplicate
+
+      - name: Publish to VS Code Marketplace with PAT
+        if: vars.MARKETPLACE_OIDC_ENABLED != 'true'
         env:
-          MARKETPLACE_OIDC_ENABLED: ${{ vars.MARKETPLACE_OIDC_ENABLED }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          if [ "$MARKETPLACE_OIDC_ENABLED" = "true" ]; then
-            pnpm exec vsce publish \
-              --packagePath "${{ steps.package.outputs.vsix }}" \
-              --oidc \
-              --skip-duplicate
-            exit 0
-          fi
-
           if [ -z "$VSCE_PAT" ]; then
             echo "::warning::Marketplace publishing is not enabled: set MARKETPLACE_OIDC_ENABLED=true with a configured trusted publisher, or provide VSCE_PAT."
             exit 0
