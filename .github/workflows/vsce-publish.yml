@@ -2,6 +2,7 @@ name: Publish Extension
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ inputs.ref || github.ref }}
@@ -23,9 +24,6 @@ on:
         description: Release tag created by Release Please
         required: true
         type: string
-    secrets:
-      VSCE_PAT:
-        required: false
 
 jobs:
   build:
@@ -154,15 +152,9 @@ jobs:
             "${{ steps.package.outputs.npm_tarball }}" \
             --clobber
 
-      - name: Publish to VS Code Marketplace
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish to VS Code Marketplace with OIDC
         run: |
-          if [ -z "$VSCE_PAT" ]; then
-            echo "::warning::VSCE_PAT is not configured; the VSIX is available from the GitHub Release and can be published later."
-            exit 0
-          fi
           pnpm exec vsce publish \
             --packagePath "${{ steps.package.outputs.vsix }}" \
-            --pat "$VSCE_PAT" \
+            --oidc \
             --skip-duplicate

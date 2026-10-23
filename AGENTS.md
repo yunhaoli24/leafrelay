@@ -57,4 +57,4 @@
 - Retry an existing release with `gh workflow run vsce-publish.yml -f ref=vX.Y.Z`; do not use `gh run rerun`, because a rerun of the tag-triggered job reports `main` as its release ref. Asset uploads and Marketplace publication are idempotent.
 - The GitHub release and its VSIX must be created even when Marketplace publishing is temporarily unavailable.
 - Release Please uses the root package as the fixed-version source and updates all published product versions together. Publish the pnpm-packed CLI tarball with npm trusted publishing and GitHub OIDC.
-- The `VSCE_PAT` GitHub Actions secret is required for Marketplace publishing; never commit or print the token. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.
+- Marketplace publishing uses GitHub Actions OIDC with a trusted publisher policy for the repository and `vsce-publish.yml`; do not store a Marketplace PAT or add a PAT fallback. An optional `RELEASE_PLEASE_TOKEN` may be configured so generated release pull requests trigger normal pull-request workflows.

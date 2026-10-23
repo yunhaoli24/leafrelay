@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 
 suite('LeafRelay activation', () => {
     test('registers the Add Server command', async () => {
-        const extension = vscode.extensions.getExtension('lealaxy.leafrelay');
+        const extension = vscode.extensions.getExtension('lealaxy.leafrelay-sync');
         assert.ok(extension, 'LeafRelay extension is available to the Extension Host');
 
         await extension.activate();
