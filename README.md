@@ -1,6 +1,6 @@
 # LeafRelay
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/yunhaoli24.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/lealaxy.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)
 [![npm](https://img.shields.io/npm/v/leafrelay?label=npm)](https://www.npmjs.com/package/leafrelay)
 [![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
 [![License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
@@ -33,7 +33,9 @@ LeafRelay keeps the original Overleaf Workshop virtual-project and collaboration
 
 ### VS Code extension
 
-Install **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)** from the VS Code Marketplace. VS Code will receive future releases through its normal extension update mechanism.
+Install **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)** from the VS Code Marketplace. VS Code will receive future releases through its normal extension update mechanism.
+
+If you installed `yunhaoli24.leafrelay`, uninstall it before installing `lealaxy.leafrelay`. Existing `.overleaf/settings.json` project associations remain reusable.
 
 ### npm CLI
 
@@ -84,7 +86,7 @@ LeafRelay started from [Overleaf Workshop](https://github.com/overleaf-workshop/
 
 ## Links
 
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=yunhaoli24.leafrelay)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)
 - [Issues and feature requests](https://github.com/yunhaoli24/leafrelay/issues)
 - [Contributing](./CONTRIBUTING.md)
 - [Documentation](./docs/README.md)
