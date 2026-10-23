@@ -1,5 +1,5 @@
 {
-    "extension.displayName": "LeafRelay",
+    "extension.displayName": "LeafRelay Sync",
     "extension.description": "Reliably synchronize local LaTeX projects with Overleaf, with VS Code collaboration and preview support.",
 
     "commands.remoteFileSystem.refreshLinkedFile.title": "Overleaf: Refresh File",
