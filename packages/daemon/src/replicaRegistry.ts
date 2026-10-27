@@ -90,6 +90,7 @@ export class ReplicaRegistry {
         const status:ReplicaStatus = {state:'starting'};
         let entry:ReplicaEntry|undefined;
         this.events.status(owners, {replicaId:id, status});
+        this.events.log(`[${settings.projectName}] Starting synchronization for ${root}.`);
         try {
             const running = await this.start(root, {
                 cookie:params.cookie,

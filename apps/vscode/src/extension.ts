@@ -83,7 +83,7 @@ export async function activate(context: vscode.ExtensionContext) {
         })()
         .catch(error => {
             notifyError(
-                'The local Overleaf project could not reconnect. Log in from LeafRelay, then retry the connection.',
+                'The local Overleaf project could not reconnect. Check the connection details in the LeafRelay Output channel, then retry.',
                 error,
                 'local-replica-reconnect',
                 [

@@ -1,8 +1,10 @@
 import {randomBytes, randomUUID} from 'node:crypto';
 import {appendFile, chmod, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Server, type Socket} from 'node:net';
+import {formatWithOptions} from 'node:util';
 import {
     readProjectSettings,
+    setLogSink,
     startServe,
 } from '@leafrelay/core';
 import {
@@ -96,6 +98,7 @@ export class LeafRelayDaemonServer {
 
     async start():Promise<DaemonMetadata> {
         await mkdir(this.paths.home, {recursive:true, mode:0o700});
+        setLogSink((level, args) => void this.log(level, formatWithOptions({depth:5, breakLength:Infinity}, ...args)));
         if (process.platform!=='win32') { await rm(this.paths.socketPath, {force:true}); }
         this.server = createServer(socket => this.accept(socket));
         await new Promise<void>((resolveListen, reject) => {
@@ -232,7 +235,14 @@ export class LeafRelayDaemonServer {
 
     private async authorized<T>(client:ClientConnection, operation:() => T|Promise<T>):Promise<T> {
         if (!client.initialized) { throw new ResponseError(-32001, 'Initialize the daemon connection first.'); }
-        return operation();
+        try {
+            return await operation();
+        } catch (error) {
+            if (error instanceof ResponseError) { throw error; }
+            const message = error instanceof Error ? error.message : String(error);
+            await this.log('error', `RPC operation failed: ${formatWithOptions({depth:5, breakLength:Infinity}, error)}`);
+            throw new ResponseError(-32603, message);
+        }
     }
 
     private async closeClient(client:ClientConnection):Promise<void> {
@@ -286,6 +296,7 @@ export class LeafRelayDaemonServer {
         this.cancelIdleExit();
         await this.replicas.stopAll();
         await this.network.stopAll();
+        setLogSink(undefined);
         for (const client of this.clients) {
             client.rpc.dispose();
             client.socket.destroy();
