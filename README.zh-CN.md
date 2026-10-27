@@ -1,6 +1,6 @@
 # LeafRelay
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/lealaxy.leafrelay?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/lealaxy.leafrelay-sync?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)
 [![npm](https://img.shields.io/npm/v/leafrelay?label=npm)](https://www.npmjs.com/package/leafrelay)
 [![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
 [![许可证](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
@@ -33,9 +33,9 @@ LeafRelay 保留 Overleaf Workshop 的虚拟项目和协作能力，同时把日
 
 ### VS Code 扩展
 
-从 VS Code Marketplace 安装 **[LeafRelay](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)**。后续版本由 VS Code 按正常扩展更新机制自动更新。
+从 VS Code Marketplace 安装 **[LeafRelay Sync](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)**。后续版本由 VS Code 按正常扩展更新机制自动更新。
 
-如果已安装 `yunhaoli24.leafrelay`，请先卸载再安装 `lealaxy.leafrelay`。已有的 `.overleaf/settings.json` 项目配置可以继续使用。
+如果已安装 `yunhaoli24.leafrelay`，请先卸载再安装 `lealaxy.leafrelay-sync`。已有的 `.overleaf/settings.json` 项目配置可以继续使用。
 
 ### npm CLI
 
@@ -86,7 +86,7 @@ LeafRelay 起源于 [Overleaf Workshop](https://github.com/overleaf-workshop/Ove
 
 ## 链接
 
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)
 - [问题反馈与功能建议](https://github.com/yunhaoli24/leafrelay/issues)
 - [贡献指南](./CONTRIBUTING.md)
 - [文档](./docs/README.md)

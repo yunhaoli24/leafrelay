@@ -1,5 +1,5 @@
 {
-  "name": "leafrelay",
+  "name": "leafrelay-sync",
   "type": "module",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
