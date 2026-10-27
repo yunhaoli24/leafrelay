@@ -284,7 +284,6 @@ export class LeafRelayDaemonClient {
                 await new Promise<void>(resolveWait => {
                     this.cancelReconnectWait = resolveWait;
                     this.reconnectTimer = setTimeout(resolveWait, delay);
-                    this.reconnectTimer.unref();
                 });
                 this.cancelReconnectWait = undefined;
                 this.reconnectTimer = undefined;
