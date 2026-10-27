@@ -1,6 +1,6 @@
 {
   "name": "leafrelay",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Reliable two-way synchronization between Overleaf and a local directory.",
   "keywords": [
     "overleaf",

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6](https://github.com/yunhaoli24/leafrelay/compare/v0.2.5...v0.2.6) (2026-10-27)
+
+
+### Bug Fixes
+
+* **api:** allow long compilation requests within bounded network timeouts ([4d5427b](https://github.com/yunhaoli24/leafrelay/commit/4d5427b304742e7da694538b40052ef488b01764))
+* **cli:** keep clients alive while reconnecting to the daemon ([ba3b22b](https://github.com/yunhaoli24/leafrelay/commit/ba3b22b2a6dd861bbd1536048a84fd0cb6ad0109))
+* **sync:** restore pending replicas after daemon reconnect ([82c1c54](https://github.com/yunhaoli24/leafrelay/commit/82c1c542efb47af61b22f126dc1c618b04932dcc))
+* **sync:** restore pending replicas after daemon reconnect ([b0b28e3](https://github.com/yunhaoli24/leafrelay/commit/b0b28e334f990adfb17c29f0673b9c3f53c56e9d))
+* **vscode:** publish under lealaxy publisher ([#36](https://github.com/yunhaoli24/leafrelay/issues/36)) ([4c79481](https://github.com/yunhaoli24/leafrelay/commit/4c794813a445e1f801686b0f470a00cd36873409))
+* **vscode:** rename Marketplace extension and use OIDC publishing ([b4c3396](https://github.com/yunhaoli24/leafrelay/commit/b4c33963ea8008aff3bf0815bc929c9cb22901d8))
+* **vscode:** rename Marketplace extension and use OIDC publishing ([58f2f75](https://github.com/yunhaoli24/leafrelay/commit/58f2f75d9de99dc3b4f891b3fbdceb9d9f34c5f3))
+
 ## [0.2.5](https://github.com/yunhaoli24/leafrelay/compare/v0.2.4...v0.2.5) (2026-09-03)
 
 
