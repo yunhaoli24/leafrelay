@@ -2,6 +2,22 @@ import {describe, expect, it, vi} from 'vitest';
 import {HttpRequestScheduler} from '../src/api/requestScheduler';
 
 describe('HttpRequestScheduler', () => {
+    it('releases the shared queue when a request stalls and preserves caller cancellation', async () => {
+        const requests = vi.fn<typeof globalThis.fetch>()
+            .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+                init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), {once:true});
+            }))
+            .mockResolvedValueOnce(new Response('next project'));
+        const scheduler = new HttpRequestScheduler({fetch:requests, minimumIntervalMs:0, requestTimeoutMs:25});
+        const stalled = scheduler.fetch('https://overleaf.test/project/one');
+        const controller = new AbortController();
+        const next = scheduler.fetch('https://overleaf.test/project/two', {signal:controller.signal});
+        await expect(stalled).rejects.toThrow('timeout');
+        expect(await (await next).text()).toBe('next project');
+        controller.abort();
+        expect(requests.mock.calls[1][1]!.signal!.aborted).toBe(true);
+    });
+
     it('applies one rate-limit cooldown to requests from different projects', async () => {
         let now = 1000;
         const waits:number[] = [];

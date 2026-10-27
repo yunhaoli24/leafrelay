@@ -46,13 +46,15 @@ export interface DaemonClientListener {
 
 interface ReplicaRegistration {
     params:ReplicaAttachParams;
-    currentId:string;
+    currentId?:string;
+    result?:ReplicaAttachResult;
 }
 
 interface ProjectRegistration {
     server:string;
     projectId:string;
     currentKey:string;
+    result?:ProjectOpenResult;
 }
 
 export class LeafRelayDaemonClient {
@@ -61,6 +63,8 @@ export class LeafRelayDaemonClient {
     private connected = false;
     private closing = false;
     private reconnecting?:Promise<void>;
+    private reconnectTimer?:NodeJS.Timeout;
+    private cancelReconnectWait?:() => void;
     private connectionClosed:Promise<void> = Promise.resolve();
     private initializeState!:InitializeResult;
     private readonly paths:DaemonPaths;
@@ -82,7 +86,10 @@ export class LeafRelayDaemonClient {
 
     static async connect(options:DaemonClientOptions):Promise<LeafRelayDaemonClient> {
         const client = new LeafRelayDaemonClient(options);
-        await client.connectTransport();
+        client.reconnecting = client.connectTransport();
+        try { await client.reconnecting; }
+        catch (error) { client.close(); throw error; }
+        finally { client.reconnecting = undefined; }
         return client;
     }
 
@@ -93,18 +100,38 @@ export class LeafRelayDaemonClient {
     }
 
     async attachReplica(params:ReplicaAttachParams):Promise<ReplicaAttachResult> {
-        const result = await this.request<ReplicaAttachResult>(RPC_METHOD.replicaAttach, params);
-        this.replicas.set(result.replicaId, {params, currentId:result.replicaId});
-        return result;
+        // Record the directory before startup: a daemon may restart while its
+        // initial reconciliation is still running.
+        const replicaId = randomUUID();
+        const registration:ReplicaRegistration = {params};
+        this.replicas.set(replicaId, registration);
+        try {
+            if (!this.connected) { await this.ensureReconnected(); }
+            if (!registration.result) {
+                const rpc = this.rpc;
+                try {
+                    await this.registerReplica(replicaId, registration);
+                } catch (error) {
+                    if (this.closing || (this.rpc===rpc && this.connected)) { throw error; }
+                    await this.ensureReconnected();
+                }
+            }
+            return registration.result!;
+        } catch (error) {
+            this.replicas.delete(replicaId);
+            throw error;
+        }
     }
 
     async detachReplica(replicaId:string):Promise<void> {
+        if (!this.connected) { await this.ensureReconnected(); }
         const registration = this.replicas.get(replicaId);
-        await this.request(RPC_METHOD.replicaDetach, {replicaId:registration?.currentId ?? replicaId});
         this.replicas.delete(replicaId);
+        await this.request(RPC_METHOD.replicaDetach, {replicaId:registration?.currentId ?? replicaId});
     }
 
     async resolveConflict(params:ReplicaConflictResolutionParams):Promise<void> {
+        if (!this.connected) { await this.ensureReconnected(); }
         const registration = this.replicas.get(params.replicaId);
         await this.request(RPC_METHOD.replicaResolveConflict, {
             ...params,
@@ -113,6 +140,7 @@ export class LeafRelayDaemonClient {
     }
 
     async retry(replicaId:string, path:string):Promise<void> {
+        if (!this.connected) { await this.ensureReconnected(); }
         const registration = this.replicas.get(replicaId);
         await this.request(RPC_METHOD.replicaRetry, {replicaId:registration?.currentId ?? replicaId, path});
     }
@@ -159,9 +187,25 @@ export class LeafRelayDaemonClient {
     }
 
     async openProject(server:string, projectId:string):Promise<ProjectOpenResult> {
-        const result = await this.request<ProjectOpenResult>(RPC_METHOD.projectOpen, {server, projectId});
-        this.projects.set(result.projectKey, {server, projectId, currentKey:result.projectKey});
-        return result;
+        const host = new URL(server.includes('://') ? server : `https://${server}`).host;
+        const projectKey = `${host}:${projectId}`;
+        const registration:ProjectRegistration = {server, projectId, currentKey:projectKey};
+        this.projects.set(projectKey, registration);
+        try {
+            if (!this.connected) { await this.ensureReconnected(); }
+            if (!registration.result) {
+                const rpc = this.rpc;
+                try { await this.registerProject(registration); }
+                catch (error) {
+                    if (this.closing || (this.rpc===rpc && this.connected)) { throw error; }
+                    await this.ensureReconnected();
+                }
+            }
+            return registration.result!;
+        } catch (error) {
+            if (this.projects.get(projectKey)===registration) { this.projects.delete(projectKey); }
+            throw error;
+        }
     }
 
     async closeProject(projectKey:string):Promise<void> {
@@ -191,6 +235,8 @@ export class LeafRelayDaemonClient {
 
     close():void {
         this.closing = true;
+        if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); }
+        this.cancelReconnectWait?.();
         this.connected = false;
         this.rpc?.dispose();
         this.socket?.destroy();
@@ -200,13 +246,9 @@ export class LeafRelayDaemonClient {
 
     private async request<T>(method:string, params?:unknown):Promise<T> {
         if (!this.connected) { await this.ensureReconnected(); }
-        try {
-            return await this.rawRequest<T>(method, params);
-        } catch (requestError) {
-            if (this.connected || this.closing) { throw requestError; }
-            await this.ensureReconnected();
-            return this.rawRequest<T>(method, params);
-        }
+        // An interrupted write may already have reached Overleaf. Restore
+        // subscriptions on reconnect, but never replay arbitrary mutations.
+        return this.rawRequest<T>(method, params);
     }
 
     private rawRequest<T>(method:string, params?:unknown):Promise<T> {
@@ -220,8 +262,34 @@ export class LeafRelayDaemonClient {
 
     private async ensureReconnected():Promise<void> {
         if (this.closing) { throw new Error('LeafRelay daemon client is closed.'); }
-        this.reconnecting ??= this.connectTransport().finally(() => { this.reconnecting = undefined; });
+        this.reconnecting ??= this.reconnectTransport().finally(() => { this.reconnecting = undefined; });
         return this.reconnecting;
+    }
+
+    private async reconnectTransport():Promise<void> {
+        let attempt = 0;
+        while (!this.closing) {
+            try {
+                await this.connectTransport();
+                return;
+            } catch (error) {
+                // Authentication and protocol failures require user action.
+                const code = (error as {code?:number}).code;
+                if (code===-32001 || code===-32002 || this.closing) { throw error; }
+                const delay = Math.min(1000*2**attempt++, 16_000);
+                dispatch<LogNotification>(this.logListeners, {
+                    timestamp:new Date().toISOString(), level:'warn',
+                    message:`Daemon reconnection failed; retrying in ${delay}ms: ${error instanceof Error ? error.message : String(error)}`,
+                });
+                await new Promise<void>(resolveWait => {
+                    this.cancelReconnectWait = resolveWait;
+                    this.reconnectTimer = setTimeout(resolveWait, delay);
+                });
+                this.cancelReconnectWait = undefined;
+                this.reconnectTimer = undefined;
+            }
+        }
+        throw new Error('LeafRelay daemon client is closed.');
     }
 
     private async connectTransport():Promise<void> {
@@ -240,7 +308,17 @@ export class LeafRelayDaemonClient {
             this.connected = false;
             this.rpc = undefined;
             this.socket = undefined;
-            if (!this.closing) { void this.ensureReconnected(); }
+            for (const registration of this.replicas.values()) {
+                registration.currentId = undefined;
+                registration.result = undefined;
+            }
+            for (const registration of this.projects.values()) { registration.result = undefined; }
+            if (!this.closing) {
+                void this.ensureReconnected().catch(error => dispatch<LogNotification>(this.logListeners, {
+                    timestamp:new Date().toISOString(), level:'error',
+                    message:`Daemon reconnection failed: ${error instanceof Error ? error.message : String(error)}`,
+                }));
+            }
         });
         rpc.listen();
         try {
@@ -251,9 +329,10 @@ export class LeafRelayDaemonClient {
                 clientVersion:this.options.clientVersion,
                 protocolVersion:LEAFRELAY_PROTOCOL_VERSION,
             } satisfies InitializeParams);
+            await this.restoreRegistrations();
             this.connected = true;
-            await this.restoreRegistrations(rpc);
         } catch (connectError) {
+            this.connected = false;
             rpc.dispose();
             socket.destroy();
             if (this.rpc===rpc) { this.rpc = undefined; this.socket = undefined; }
@@ -261,17 +340,43 @@ export class LeafRelayDaemonClient {
         }
     }
 
-    private async restoreRegistrations(rpc:MessageConnection):Promise<void> {
+    private async restoreRegistrations():Promise<void> {
         for (const registration of this.projects.values()) {
-            const result = await rpc.sendRequest<ProjectOpenResult>(RPC_METHOD.projectOpen, {
-                server:registration.server,
-                projectId:registration.projectId,
-            });
-            registration.currentKey = result.projectKey;
+            await this.registerProject(registration);
         }
-        for (const registration of this.replicas.values()) {
-            const result = await rpc.sendRequest<ReplicaAttachResult>(RPC_METHOD.replicaAttach, registration.params);
-            registration.currentId = result.replicaId;
+        for (const [replicaId, registration] of this.replicas) {
+            await this.registerReplica(replicaId, registration);
+        }
+        if (this.projects.size!==0 || this.replicas.size!==0) {
+            dispatch<LogNotification>(this.logListeners, {
+                timestamp:new Date().toISOString(), level:'info',
+                message:`Daemon registrations restored: ${this.projects.size} project(s), ${this.replicas.size} local replica(s).`,
+            });
+        }
+    }
+
+    private async registerProject(registration:ProjectRegistration):Promise<void> {
+        const rpc = this.rpc;
+        const result = await this.rawRequest<ProjectOpenResult>(RPC_METHOD.projectOpen, {
+            server:registration.server, projectId:registration.projectId,
+        });
+        if (this.rpc!==rpc) { throw new Error('LeafRelay daemon connection changed during project attachment.'); }
+        registration.currentKey = result.projectKey;
+        registration.result = result;
+    }
+
+    private async registerReplica(replicaId:string, registration:ReplicaRegistration):Promise<void> {
+        const rpc = this.rpc;
+        const result = await this.rawRequest<ReplicaAttachResult>(RPC_METHOD.replicaAttach, registration.params);
+        if (this.rpc!==rpc) { throw new Error('LeafRelay daemon connection changed during replica attachment.'); }
+        registration.currentId = result.replicaId;
+        registration.result = {...result, replicaId};
+        dispatch(this.statusListeners, {replicaId, status:result.status});
+        for (const path of result.conflicts) {
+            dispatch(this.conflictListeners, {
+                replicaId, path, conflicts:result.conflicts,
+                reason:'This path has an unresolved synchronization conflict.',
+            });
         }
     }
 

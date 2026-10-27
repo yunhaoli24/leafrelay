@@ -82,6 +82,7 @@ export class SyncEngine {
         const currentVersion = await this.options.remote.getCurrentVersion();
         const localFiles = await this.options.local.listFiles();
         const remoteFiles = this.remoteFilePaths();
+        this.options.log(`Checking replica at Overleaf version ${currentVersion}: ${localFiles.length} local file(s), ${remoteFiles.length} remote file(s).`);
 
         if (!this.state || !this.state.initialized) {
             await this.initializeState(currentVersion, localFiles, remoteFiles);
@@ -287,6 +288,7 @@ export class SyncEngine {
         }
 
         let failed = false;
+        this.options.log(`Reconciling ${candidates.size} changed path(s).`);
         for (const path of [...candidates].sort()) {
             try {
                 await this.reconcilePath(path, localChanged.has(path) ? 'local' : 'remote');

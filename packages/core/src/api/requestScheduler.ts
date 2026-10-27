@@ -1,4 +1,4 @@
-import {log} from '../core/logger';
+import {error as logError, log} from '../core/logger';
 
 export interface HttpRequestSchedulerOptions {
     minimumIntervalMs?:number;
@@ -7,6 +7,7 @@ export interface HttpRequestSchedulerOptions {
     now?:() => number;
     wait?:(milliseconds:number) => Promise<void>;
     onRateLimit?:(until:number) => void;
+    requestTimeoutMs?:number;
 }
 
 function retryAfterMilliseconds(response:Response, now:number):number {
@@ -39,7 +40,7 @@ export class HttpRequestScheduler {
         this.wait = options.wait ?? (milliseconds => new Promise(resolveWait => setTimeout(resolveWait, milliseconds)));
     }
 
-    fetch(input:string|URL|Request, init?:RequestInit):Promise<Response> {
+    fetch(input:string|URL|Request, init?:RequestInit, timeoutMs=this.options.requestTimeoutMs ?? 60_000):Promise<Response> {
         const url = input instanceof Request ? input.url : String(input);
         const history = url.includes('/updates?') || url.includes('/filetree/diff?') || url.includes('/diff?');
         return this.enqueue(async () => {
@@ -49,7 +50,21 @@ export class HttpRequestScheduler {
             const requestAt = this.now();
             this.nextRequestAt = requestAt+this.minimumIntervalMs;
             if (history) { this.historyNextRequestAt = requestAt+this.historyIntervalMs; }
-            const response = await this.fetchImplementation(input, init);
+            const timeout = AbortSignal.timeout(timeoutMs);
+            const signals = [timeout, init?.signal, input instanceof Request ? input.signal : undefined]
+                .filter((signal):signal is AbortSignal => Boolean(signal));
+            let response:Response;
+            try {
+                response = await this.fetchImplementation(input, {...init, signal:AbortSignal.any(signals)});
+            } catch (error) {
+                const destination = new URL(url);
+                logError('HTTP request failed', {
+                    method:init?.method ?? (input instanceof Request ? input.method : 'GET'),
+                    url:`${destination.origin}${destination.pathname}`,
+                    error,
+                });
+                throw error;
+            }
             if (response.status===429) {
                 this.rateLimitedUntil = Math.max(
                     this.rateLimitedUntil,

@@ -377,7 +377,7 @@ export class BaseAPI {
         return false;
     }
 
-    protected async request(type:'GET'|'POST'|'PUT'|'DELETE', route:string, body?:FormData|object, callback?: (res?:string)=>object|undefined, extraHeaders?:object ): Promise<ResponseSchema> {
+    protected async request(type:'GET'|'POST'|'PUT'|'DELETE', route:string, body?:FormData|object, callback?: (res?:string)=>object|undefined, extraHeaders?:object, timeoutMs?:number): Promise<ResponseSchema> {
         if (this.identity===undefined) { return Promise.reject(); }
 
         const MAX_HTTP_RETRIES = 2;
@@ -395,7 +395,7 @@ export class BaseAPI {
                                 'Cookie': this.identity!.cookies,
                                 ...extraHeaders
                             }
-                        });
+                        }, timeoutMs);
                         break;
                     case 'POST':
                         const content_type = body instanceof FormData ? undefined : {'Content-Type': 'application/json'};
@@ -412,7 +412,7 @@ export class BaseAPI {
                                 ...extraHeaders
                             },
                             body: raw_body
-                        });
+                        }, timeoutMs);
                         break;
                     case 'PUT':
                         break;
@@ -425,7 +425,7 @@ export class BaseAPI {
                                 'X-Csrf-Token': this.identity!.csrfToken,
                                 ...extraHeaders
                             }
-                        });
+                        }, timeoutMs);
                         break;
                 };
 
@@ -681,7 +681,7 @@ export class BaseAPI {
         return this.request('POST', `project/${projectId}/compile?auto_compile=true`, body, (res) => {
             const compile = JSON.parse(res!) as CompileResponseSchema;
             return {compile};
-        }, {'X-Csrf-Token': identity.csrfToken});
+        }, {'X-Csrf-Token': identity.csrfToken}, 300_000);
     }
 
     async stopCompile(identity:Identity, projectId:string) {

@@ -151,6 +151,7 @@ export class OverleafRealtimeSocket {
     private reconnectAttempts = 0;
     private reconnectTimer?: NodeJS.Timeout;
     private inactivityTimer?: NodeJS.Timeout;
+    private connectionAbort?:AbortController;
     private closeTimeoutMs = 60_000;
     private acknowledgementId = 0;
     private readonly acknowledgements = new Map<string, (...args:unknown[]) => void>();
@@ -225,6 +226,10 @@ export class OverleafRealtimeSocket {
     }
 
     private async connect(): Promise<void> {
+        if (this.explicitlyDisconnected) { return; }
+        const controller = new AbortController();
+        this.connectionAbort?.abort();
+        this.connectionAbort = controller;
         try {
             this.projectJoined = false;
             const handshakeUrl = new URL('/socket.io/1/', this.endpoint.origin);
@@ -235,6 +240,7 @@ export class OverleafRealtimeSocket {
             const response = await (this.options.fetch ?? fetch)(handshakeUrl, {
                 headers:{origin:this.origin, cookie:this.cookie},
                 redirect:'manual',
+                signal:AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
             });
             if (!response.ok) {
                 throw new Error(`Socket.IO handshake failed: HTTP ${response.status} ${await response.text()}`);
@@ -250,27 +256,41 @@ export class OverleafRealtimeSocket {
             const websocketUrl = new URL(`/socket.io/1/websocket/${sessionId}`, this.endpoint.origin);
             websocketUrl.protocol = websocketUrl.protocol==='https:' ? 'wss:' : 'ws:';
             websocketUrl.search = this.endpoint.search;
-            this.socket = new WebSocket(websocketUrl, {
+            if (controller.signal.aborted) { return; }
+            const socket = new WebSocket(websocketUrl, {
                 headers:{origin:this.origin, cookie:this.cookie},
             });
-            this.socket.addEventListener('open', () => this.events.emit('connecting', 'websocket'));
-            this.socket.addEventListener('message', event => void this.receive(event.data));
-            this.socket.addEventListener('error', error => this.events.emit('error', error));
-            this.socket.addEventListener('close', event => this.handleClose(event));
+            this.socket = socket;
+            socket.addEventListener('open', () => {
+                if (this.socket!==socket) { return; }
+                this.resetInactivityTimer();
+                this.events.emit('connecting', 'websocket');
+            });
+            socket.addEventListener('message', event => {
+                if (this.socket===socket) { void this.receive(event.data, socket); }
+            });
+            socket.addEventListener('error', error => {
+                if (this.socket===socket) { this.events.emit('error', error); }
+            });
+            socket.addEventListener('close', event => {
+                if (this.socket===socket) { this.handleClose(event); }
+            });
         } catch (error) {
+            if (controller.signal.aborted) { return; }
             this.events.emit('connect_failed', error);
             this.events.emit('error', error);
             this.scheduleReconnect();
         }
     }
 
-    private async receive(data: unknown) {
+    private async receive(data: unknown, socket:WebSocket) {
         this.resetInactivityTimer();
         const value = typeof data==='string'
             ? data
             : data instanceof Blob
                 ? await data.text()
                 : Buffer.from(data as ArrayBuffer).toString('utf8');
+        if (this.socket!==socket) { return; }
         for (const packet of decodePayload(value)) { this.handlePacket(packet); }
     }
 
@@ -344,6 +364,7 @@ export class OverleafRealtimeSocket {
 
     private handleClose(event:CloseEvent) {
         const wasConnected = this.connected;
+        this.socket = undefined;
         this.connected = false;
         this.projectJoined = false;
         if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
@@ -357,6 +378,8 @@ export class OverleafRealtimeSocket {
     }
 
     private closeSocket(reason: string) {
+        this.connectionAbort?.abort();
+        this.connectionAbort = undefined;
         const wasConnected = this.connected;
         this.connected = false;
         this.projectJoined = false;
@@ -379,7 +402,7 @@ export class OverleafRealtimeSocket {
 
     private scheduleReconnect() {
         if (!this.reconnectEnabled || this.explicitlyDisconnected || this.reconnectTimer) { return; }
-        const maxAttempts = this.options.maxReconnectionAttempts ?? 10;
+        const maxAttempts = this.options.maxReconnectionAttempts ?? Infinity;
         if (this.reconnectAttempts>=maxAttempts) {
             this.events.emit('reconnect_failed');
             return;

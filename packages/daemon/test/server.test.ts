@@ -1,10 +1,12 @@
 import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {LeafRelayDaemonClient} from '../src/client';
 import {daemonPaths} from '../src/paths';
 import {LeafRelayDaemonServer} from '../src/server';
+import {NetworkRuntimeRegistry} from '../src/networkRuntime';
+import {log} from '@leafrelay/core';
 
 const homes:string[] = [];
 
@@ -13,6 +15,27 @@ afterEach(async () => {
 });
 
 describe('LeafRelay daemon IPC', () => {
+    it('forwards connection diagnostics and string rejections through RPC', async () => {
+        const home = await mkdtemp(join(tmpdir(), 'leafrelay-errors-'));
+        homes.push(home);
+        const environment = {...process.env, LEAFRELAY_HOME:home};
+        const server = new LeafRelayDaemonServer({paths:daemonPaths(environment), exitOnIdle:false});
+        await server.start();
+        const client = await LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'test', environment, autoStart:false});
+        const messages:string[] = [];
+        client.onLog(event => messages.push(event.message));
+        const call = vi.spyOn(NetworkRuntimeRegistry.prototype, 'callProject').mockRejectedValueOnce('timeout');
+        try {
+            log('SocketIOAPI: connect_failed', {error:new Error('fetch failed', {cause:new Error('ECONNRESET')})});
+            await expect(client.callProject('project', 'joinProject')).rejects.toThrow('timeout');
+            await vi.waitFor(() => expect(messages.some(message => message.includes('ECONNRESET'))).toBe(true));
+        } finally {
+            call.mockRestore();
+            client.close();
+            await server.stop();
+        }
+    });
+
     it('shares one daemon between concurrent clients and validates the protocol', async () => {
         const home = await mkdtemp(join(tmpdir(), 'leafrelay-daemon-'));
         homes.push(home);
