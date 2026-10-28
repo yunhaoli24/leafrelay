@@ -11,7 +11,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    # MongoDB 8.0 cannot run on Linux 6.19–7.0.13 (SERVER-121912).
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
       LEAFRELAY_HOME: ${{ github.workspace }}/.leafrelay-test
