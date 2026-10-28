@@ -97,6 +97,92 @@ afterEach(async () => {
 });
 
 describe('SyncEngine', () => {
+    it('does not download unchanged entries returned by the history API, including on restart', async () => {
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        updateSyncCheckpoint(state, '/reference.pdf', bytes('binary contents'));
+        const local = new MemoryLocal(new Map([
+            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('binary contents')],
+        ]));
+        const remote = new MemoryRemote(new Map([
+            ['/paper.tex', bytes('updated\n')], ['/reference.pdf', bytes('binary contents')],
+        ]), 2, {diff:[{pathname:'paper.tex', operation:'edited'}, {pathname:'reference.pdf'}]});
+        const read = vi.spyOn(remote, 'read');
+        const store = new MemoryState(state);
+        const options = {projectUri:'overleaf://project', local, remote, stateStore:store,
+            ignore:()=>false, log:()=>{}, onConflict:()=>{}};
+        const engine = new SyncEngine(options);
+        await engine.start();
+        expect(text(local.files.get('/paper.tex'))).toBe('updated\n');
+        expect(read.mock.calls).toEqual([['/paper.tex']]);
+        await engine.stop();
+
+        read.mockClear();
+        const restarted = new SyncEngine(options);
+        await restarted.start();
+        expect(read).not.toHaveBeenCalled();
+        await restarted.stop();
+    });
+
+    it('keeps healthy paths live during a failed download and retries only failed paths', async () => {
+        vi.useFakeTimers();
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        updateSyncCheckpoint(state, '/reference.pdf', bytes('old binary'));
+        const local = new MemoryLocal(new Map([
+            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('old binary')],
+        ]));
+        const remote = new MemoryRemote(new Map([
+            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('new binary')],
+        ]), 2, {diff:[{pathname:'paper.tex'}, {pathname:'reference.pdf', operation:'edited'}]});
+        remote.failReadPath = '/reference.pdf';
+        const read = vi.spyOn(remote, 'read');
+        const store = new MemoryState(state);
+        const errors:(string|undefined)[] = [];
+        const engine = new SyncEngine({projectUri:'overleaf://project', local, remote, stateStore:store,
+            ignore:()=>false, log:()=>{}, onConflict:()=>{}, onSyncError:message=>errors.push(message)});
+        await engine.start();
+        expect(engine.syncError).toContain('/reference.pdf');
+        expect(store.saves.at(-1)?.remoteVersion ?? state.remoteVersion).toBe(1);
+
+        local.change('/paper.tex', bytes('local edit while PDF is unavailable\n'));
+        await vi.advanceTimersByTimeAsync(250);
+        expect(text(remote.files.get('/paper.tex'))).toBe('local edit while PDF is unavailable\n');
+        expect(store.saves.at(-1)?.remoteVersion).toBe(1);
+        read.mockClear();
+        remote.failReadPath = undefined;
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(read.mock.calls).toEqual([['/reference.pdf']]);
+        expect(text(local.files.get('/reference.pdf'))).toBe('new binary');
+        expect(store.saves.at(-1)?.remoteVersion).toBe(2);
+        expect(engine.syncError).toBeUndefined();
+        expect(errors.at(-1)).toBeUndefined();
+        await engine.stop();
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it('queues edits made during startup instead of missing watcher events', async () => {
+        vi.useFakeTimers();
+        const state = createSyncState('overleaf://project', 1);
+        updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
+        const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        let finishVersion!:(version:number) => void;
+        vi.spyOn(remote, 'getCurrentVersion').mockImplementationOnce(() => new Promise(resolve => { finishVersion = resolve; }));
+        const engine = new SyncEngine({projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
+            ignore:()=>false, log:()=>{}, onConflict:()=>{}});
+        const startup = engine.start();
+        await vi.advanceTimersByTimeAsync(0);
+        local.change('/paper.tex', bytes('edit during startup\n'));
+        await vi.advanceTimersByTimeAsync(250);
+        expect(text(remote.files.get('/paper.tex'))).toBe('base\n');
+        finishVersion(1);
+        await startup;
+        await engine.stop();
+        expect(text(remote.files.get('/paper.tex'))).toBe('edit during startup\n');
+    });
+
     it('three-way merges non-overlapping local and remote edits', async () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('first\nmiddle\nthird\n'));

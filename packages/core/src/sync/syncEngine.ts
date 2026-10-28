@@ -45,6 +45,7 @@ export interface SyncEngineOptions {
     ignore(path:string):boolean;
     log(message:string):void;
     onConflict(path:string, reason:string):void;
+    onSyncError?(message:string|undefined):void;
 }
 
 type ChangeSource = 'local' | 'remote';
@@ -73,24 +74,29 @@ export class SyncEngine {
     private stopRemoteReconnect?:() => void;
     private eventTimers = new Map<string, PendingChange>();
     private stopped = false;
+    private failedPaths = new Map<string, {source:ChangeSource; actor?:string; message:string}>();
+    private retryTimer?:NodeJS.Timeout;
+    private retryDelayMs = 30_000;
+    private pendingRemoteVersion?:number;
+    private pendingInitialization = false;
+
+    get syncError():string|undefined {
+        if (this.failedPaths.size===0) { return undefined; }
+        const [path, failure] = this.failedPaths.entries().next().value!;
+        return `${this.failedPaths.size} path(s) could not synchronize, including ${path}: ${failure.message}. Other paths remain active; failed paths will retry automatically.`;
+    }
 
     constructor(private readonly options:SyncEngineOptions) {}
 
     async start():Promise<void> {
         this.stopped = false;
+        const startup = this.enqueue(() => this.initialize());
+        try { await startup; }
+        catch (error) { await this.stop(); throw error; }
+    }
+
+    private async initialize():Promise<void> {
         this.state = await this.options.stateStore.load();
-        const currentVersion = await this.options.remote.getCurrentVersion();
-        const localFiles = await this.options.local.listFiles();
-        const remoteFiles = this.remoteFilePaths();
-        this.options.log(`Checking replica at Overleaf version ${currentVersion}: ${localFiles.length} local file(s), ${remoteFiles.length} remote file(s).`);
-
-        if (!this.state || !this.state.initialized) {
-            await this.initializeState(currentVersion, localFiles, remoteFiles);
-        } else {
-            this.restoreConflicts();
-            await this.startupReconcile(currentVersion, localFiles, remoteFiles);
-        }
-
         this.stopLocalWatch = await this.options.local.watch(path => this.schedule(path, 'local'));
         this.stopRemoteChange = this.options.remote.onChange(change => {
             if (this.stopped) { return; }
@@ -103,11 +109,26 @@ export class SyncEngine {
                 this.options.log(`Failed to reconcile after reconnecting: ${error instanceof Error ? error.message : String(error)}`);
             });
         });
-        this.options.log(`Synchronization active at Overleaf version ${this.state!.remoteVersion}.`);
+        const currentVersion = await this.options.remote.getCurrentVersion();
+        const localFiles = await this.options.local.listFiles();
+        const remoteFiles = this.remoteFilePaths();
+        this.options.log(`Checking replica at Overleaf version ${currentVersion}: ${localFiles.length} local file(s), ${remoteFiles.length} remote file(s).`);
+
+        if (!this.state || !this.state.initialized) {
+            await this.initializeState(currentVersion, localFiles, remoteFiles);
+        } else {
+            this.restoreConflicts();
+            await this.startupReconcile(currentVersion, localFiles, remoteFiles);
+        }
+
+        this.options.log(this.syncError
+            ? `Synchronization active with pending retries. ${this.syncError}`
+            : `Synchronization active at Overleaf version ${this.state!.remoteVersion}.`);
     }
 
     async stop():Promise<void> {
         this.stopped = true;
+        if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = undefined; }
         this.stopRemoteChange?.();
         this.stopRemoteChange = undefined;
         this.stopRemoteReconnect?.();
@@ -182,19 +203,23 @@ export class SyncEngine {
         }
         this.restoreConflicts();
 
+        this.pendingRemoteVersion = currentVersion;
+        this.pendingInitialization = true;
         const paths = new Set([...localFiles, ...remoteFiles, ...Object.keys(this.state.files)]);
         for (const path of [...paths].sort()) {
             const normalized = normalizePath(path);
             if (this.conflicts.has(normalized)) { continue; }
-            if (this.state.files[normalized]!==undefined) {
-                await this.reconcilePath(normalized, 'local');
-                continue;
+            try {
+                if (this.state.files[normalized]!==undefined) {
+                    await this.synchronizePath(normalized, 'local');
+                } else {
+                    await this.initializePath(normalized);
+                }
+            } catch (error) {
+                this.recordFailure(normalized, 'local', error);
             }
-            await this.initializePath(normalized);
         }
-        this.state.remoteVersion = currentVersion;
-        this.state.initialized = true;
-        await this.options.stateStore.save(this.state);
+        await this.finishRemoteBatch();
         if (this.conflicts.size!==0) {
             this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
         }
@@ -268,12 +293,14 @@ export class SyncEngine {
                 throw new Error('Synchronization paused: Overleaf history is unavailable, so remote changes cannot be distinguished safely.');
             }
         }
-        const candidates = new Set<string>(localChanged);
+        const candidates = new Set<string>([...localChanged, ...this.failedPaths.keys()]);
         const knownFiles = new Set([...Object.keys(state.files), ...localFiles, ...remoteFiles]);
         for (const path of [...localFiles, ...remoteFiles]) {
             if (state.files[path]===undefined) { candidates.add(path); }
         }
         for (const change of remoteDiff.diff) {
+            // Overleaf returns unchanged entries too, with only pathname/editable.
+            if (!change.operation) { continue; }
             const paths = [change.pathname, change.newPathname].filter((path):path is string => Boolean(path));
             for (const changedPath of paths.map(normalizePath)) {
                 let matched = false;
@@ -287,21 +314,17 @@ export class SyncEngine {
             }
         }
 
-        let failed = false;
+        this.pendingRemoteVersion = currentVersion;
         this.options.log(`Reconciling ${candidates.size} changed path(s).`);
         for (const path of [...candidates].sort()) {
+            if (this.stopped) { return; }
             try {
-                await this.reconcilePath(path, localChanged.has(path) ? 'local' : 'remote');
+                await this.synchronizePath(path, localChanged.has(path) ? 'local' : 'remote');
             } catch (error) {
-                failed = true;
-                this.options.log(`Failed to synchronize ${path}: ${error instanceof Error ? error.message : String(error)}`);
+                this.recordFailure(path, localChanged.has(path) ? 'local' : 'remote', error);
             }
         }
-        if (failed) {
-            throw new Error('Synchronization paused for failed paths; successful paths were checkpointed.');
-        }
-        state.remoteVersion = currentVersion;
-        await this.options.stateStore.save(state);
+        await this.finishRemoteBatch();
         if (this.conflicts.size!==0) {
             this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
         }
@@ -315,7 +338,9 @@ export class SyncEngine {
             await this.options.local.listFiles(),
             this.remoteFilePaths(),
         );
-        this.options.log(`Realtime connection restored at Overleaf version ${currentVersion}.`);
+        this.options.log(this.syncError
+            ? `Realtime connection restored; ${this.syncError}`
+            : `Realtime connection restored at Overleaf version ${currentVersion}.`);
     }
 
     private schedule(path:string, source:ChangeSource, actor?:string) {
@@ -343,12 +368,64 @@ export class SyncEngine {
                         : pending.actors.size>1
                             ? 'multiple Overleaf collaborators'
                             : undefined;
-                this.queue = this.queue.then(() => this.reconcilePath(normalized, pending.source, remoteActor)).catch(error => {
-                    this.options.log(`Failed to synchronize ${normalized}: ${error instanceof Error ? error.message : String(error)}`);
+                this.queue = this.queue.then(() => this.synchronizePath(normalized, pending.source, remoteActor)).catch(error => {
+                    this.recordFailure(normalized, pending.source, error, remoteActor);
                 });
             }, 250),
         };
         this.eventTimers.set(normalized, pending);
+    }
+
+    private async synchronizePath(path:string, source:ChangeSource, actor?:string):Promise<void> {
+        if (this.pendingInitialization && this.state!.files[path]===undefined) {
+            await this.initializePath(path);
+        } else {
+            await this.reconcilePath(path, source, actor);
+        }
+        if (this.failedPaths.delete(path)) { this.options.onSyncError?.(this.syncError); }
+    }
+
+    private recordFailure(path:string, source:ChangeSource, error:unknown, actor?:string):void {
+        const message = error instanceof Error ? error.message : String(error);
+        this.failedPaths.set(path, {source, actor, message});
+        this.options.log(`Failed to synchronize ${path}: ${message}; retrying without stopping other paths.`);
+        this.options.onSyncError?.(this.syncError);
+        this.scheduleRetry();
+    }
+
+    private scheduleRetry():void {
+        if (this.stopped || this.retryTimer || this.failedPaths.size===0) { return; }
+        this.retryTimer = setTimeout(() => {
+            this.retryTimer = undefined;
+            void this.enqueue(async () => {
+                if (this.stopped) { return; }
+                for (const [path, failure] of [...this.failedPaths]) {
+                    if (this.stopped) { return; }
+                    try {
+                        await this.synchronizePath(path, failure.source, failure.actor);
+                        this.options.log(`Recovered synchronization for ${path}.`);
+                    } catch (error) {
+                        // Schedule once after the entire retry batch.
+                        const message = error instanceof Error ? error.message : String(error);
+                        this.failedPaths.set(path, {...failure, message});
+                        this.options.log(`Retry failed for ${path}: ${message}`);
+                    }
+                }
+                await this.finishRemoteBatch();
+            }).catch(error => this.options.log(`Could not checkpoint retry batch: ${String(error)}`)).finally(() => {
+                this.retryDelayMs = this.failedPaths.size ? Math.min(this.retryDelayMs*2, 120_000) : 30_000;
+                this.scheduleRetry();
+            });
+        }, this.retryDelayMs);
+    }
+
+    private async finishRemoteBatch():Promise<void> {
+        if (this.stopped || this.failedPaths.size || this.pendingRemoteVersion===undefined) { return; }
+        this.state!.remoteVersion = this.pendingRemoteVersion;
+        if (this.pendingInitialization) { this.state!.initialized = true; }
+        await this.options.stateStore.save(this.state!);
+        this.pendingRemoteVersion = undefined;
+        this.pendingInitialization = false;
     }
 
     private enqueue<T>(operation:() => Promise<T>):Promise<T> {

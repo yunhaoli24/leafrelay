@@ -13,6 +13,7 @@ export interface RunningServe {
     readonly serverName:string;
     readonly projectId:string;
     readonly projectName:string;
+    syncError():string|undefined;
     conflicts():string[];
     resolveConflict(path:string, winner:'local'|'remote'):Promise<void>;
     retry(path:string):Promise<void>;
@@ -23,6 +24,7 @@ export interface StartServeOptions {
     cookie?:string;
     log?:(message:string) => void;
     onConflict?:(path:string, reason:string) => void;
+    onSyncError?:(message:string|undefined) => void;
     remote?:ServeRemoteProject;
 }
 
@@ -51,6 +53,7 @@ export async function startServe(directory=process.cwd(), options:StartServeOpti
         remote,
         stateStore:new FileSyncStateStore(root, settings.uri),
         ignore,
+        onSyncError:options.onSyncError,
         log:options.log ?? log,
         onConflict:options.onConflict ?? ((path, reason) => {
             (options.log ?? log)(`Conflict paused for ${path}: ${reason}`);
@@ -68,6 +71,7 @@ export async function startServe(directory=process.cwd(), options:StartServeOpti
         serverName:settings.serverName,
         projectId:settings.projectId,
         projectName:settings.projectName,
+        syncError:() => engine.syncError,
         conflicts:() => engine.getConflicts(),
         resolveConflict:(path, winner) => engine.resolveConflict(path, winner),
         retry:path => engine.retry(path),

@@ -94,6 +94,12 @@ export class ReplicaRegistry {
         try {
             const running = await this.start(root, {
                 cookie:params.cookie,
+                onSyncError:message => {
+                    if (!entry) { return; }
+                    entry.status = message ? {state:'error', message}
+                        : entry.running.conflicts().length ? {state:'paused'} : {state:'active'};
+                    this.events.status(entry.owners, {replicaId:id, status:entry.status});
+                },
                 log:message => this.events.log(`[${settings.projectName}] ${message}`),
                 onConflict:(path, reason) => {
                     if (!entry) { return; }
@@ -121,7 +127,8 @@ export class ReplicaRegistry {
                 projectName:settings.projectName,
                 owners,
                 running,
-                status:running.conflicts().length===0 ? {state:'active'} : {state:'paused'},
+                status:running.syncError() ? {state:'error', message:running.syncError()}
+                    : running.conflicts().length===0 ? {state:'active'} : {state:'paused'},
             };
             this.byId.set(id, entry);
             this.byRoot.set(root, entry);
@@ -155,14 +162,16 @@ export class ReplicaRegistry {
     async resolveConflict(replicaId:string, path:string, winner:'local'|'remote'):Promise<void> {
         const entry = this.require(replicaId);
         await entry.running.resolveConflict(path, winner);
-        entry.status = entry.running.conflicts().length===0 ? {state:'active'} : {state:'paused'};
+        entry.status = entry.running.syncError() ? {state:'error', message:entry.running.syncError()}
+            : entry.running.conflicts().length===0 ? {state:'active'} : {state:'paused'};
         this.events.status(entry.owners, {replicaId, status:entry.status});
     }
 
     async retry(replicaId:string, path:string):Promise<void> {
         const entry = this.require(replicaId);
         await entry.running.retry(path);
-        entry.status = entry.running.conflicts().length===0 ? {state:'active'} : {state:'paused'};
+        entry.status = entry.running.syncError() ? {state:'error', message:entry.running.syncError()}
+            : entry.running.conflicts().length===0 ? {state:'active'} : {state:'paused'};
         this.events.status(entry.owners, {replicaId, status:entry.status});
     }
 
