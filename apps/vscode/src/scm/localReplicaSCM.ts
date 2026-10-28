@@ -5,7 +5,7 @@ import type {ReplicaAttachResult, ReplicaConflictNotification, ReplicaStatusNoti
 import {BaseSCM, CommitItem, SettingItem} from '.';
 import {VirtualFileSystem} from '../core/remoteFileSystemProvider';
 import {DaemonService} from '../utils/daemonService';
-import {log, warn} from '../utils/outputChannel';
+import {log, notifyError, warn} from '../utils/outputChannel';
 
 const IGNORE_SETTING_KEY = 'ignore-patterns';
 
@@ -167,6 +167,9 @@ export class LocalReplicaSCMProvider extends BaseSCM {
                 baseUri:this.replica.root,
                 shared:this.replica.shared,
             });
+            if (this.replica.status.state==='error') {
+                notifyError(this.replica.status.message ?? 'Some paths could not synchronize. Failed paths will retry automatically.', undefined, `replica-sync:${this.baseUri.fsPath}`);
+            }
             if (this.conflicts.size!==0) {
                 warn(`Local replica attached with ${this.conflicts.size} unresolved conflict(s): ${[...this.conflicts].join(', ')}`);
                 // Let SCM registration finish before opening a modal notification.
@@ -189,6 +192,9 @@ export class LocalReplicaSCMProvider extends BaseSCM {
 
     private handleStatus(event:ReplicaStatusNotification):void {
         if (event.replicaId!==this.replica?.replicaId) { return; }
+        if (event.status.state==='error') {
+            notifyError(event.status.message ?? 'Some paths could not synchronize. Failed paths will retry automatically.', undefined, `replica-sync:${this.baseUri.fsPath}`);
+        }
         if (event.status.state==='active') {
             this.status = this.conflicts.size===0
                 ? {status:'idle', message:vscode.l10n.t('Synced')}

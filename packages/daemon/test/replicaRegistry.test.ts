@@ -25,6 +25,28 @@ async function projectDirectory(name:string):Promise<string> {
 }
 
 describe('ReplicaRegistry', () => {
+    it('reports partial startup failures without losing the replica and clears the status after recovery', async () => {
+        const root = await projectDirectory('retrying');
+        const status = vi.fn();
+        let report!:NonNullable<StartServeOptions['onSyncError']>;
+        let message:string|undefined = 'PDF download failed; other paths remain active and will retry.';
+        const registry = new ReplicaRegistry({status, conflict:()=>{}, empty:()=>{}, log:()=>{}},
+            async (directory, options) => {
+                report = options.onSyncError!;
+                report(message);
+                return {root:directory, serverName:'www.overleaf.com', projectId:'p1', projectName:'Test',
+                    syncError:()=>message, conflicts:()=>[], resolveConflict:async()=>{}, retry:async()=>{}, stop:async()=>{}};
+            });
+        registry.registerClient('client');
+        const replica = await registry.attach('client', {directory:root});
+        expect(replica.status).toEqual({state:'error', message});
+        expect(registry.size).toBe(1);
+        message = undefined;
+        report(undefined);
+        expect(status.mock.calls.at(-1)?.[1]).toEqual({replicaId:replica.replicaId, status:{state:'active'}});
+        await registry.stopAll();
+    });
+
     it('shares the same real path and rejects a second writable root for one project', async () => {
         const firstRoot = await projectDirectory('first');
         const secondRoot = await projectDirectory('second');
@@ -34,6 +56,7 @@ describe('ReplicaRegistry', () => {
             serverName:'www.overleaf.com',
             projectId:'p1',
             projectName:'Test',
+            syncError:() => undefined,
             conflicts:() => [],
             resolveConflict:async () => {},
             retry:async () => {},
@@ -76,6 +99,7 @@ describe('ReplicaRegistry', () => {
             serverName:'www.overleaf.com',
             projectId:'p1',
             projectName:'Test',
+            syncError:() => undefined,
             conflicts:() => [],
             resolveConflict:async () => {},
             retry:async () => {},

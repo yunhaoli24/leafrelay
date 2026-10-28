@@ -22,7 +22,7 @@
 - Each `{server,projectId}` has one daemon project runtime and realtime connection. The same real local path may have multiple clients, but another path cannot become a second writable replica of that project.
 - Replica activity is leased per IPC connection and local root. When the last client attached to one root disconnects or detaches, immediately stop that root's watcher and sync engine and release its project lease; other roots with clients continue independently.
 - After a realtime transport reconnects, wait for that connection's fresh `joinProjectResponse` before reporting recovery or releasing queued project operations, then reconcile changes missed while disconnected.
-- A failed path must make incremental startup sync fail explicitly; never log completion or advance `remoteVersion` after partial failure.
+- A failed path must remain visible in replica status and retry independently while healthy paths keep syncing. Never report a completed batch or advance `remoteVersion` until every failed path has recovered.
 - Report final user-actionable failures through a deduplicated VS Code notification with access to the Output log; individual retries remain log-only.
 - Present replica conflicts through one serialized VS Code prompt per local folder; resolving one path continues to the next, and multi-path conflicts offer an explicit all-local or all-Overleaf action.
 - Connection and SCM creation logs must include project ID, connection scheme, retry attempt, local base URI, and the original structured error. Never swallow `joinProject` or trigger-initialization errors behind a generic reconnecting message.
