@@ -233,6 +233,9 @@ importers:
 
   packages/daemon:
     dependencies:
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       vscode-jsonrpc:
         specifier: 9.0.1
         version: 9.0.1
@@ -243,6 +246,9 @@ importers:
       '@leafrelay/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
 
   packages/protocol: {}
 
@@ -1351,6 +1357,9 @@ packages:
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -4844,6 +4853,8 @@ snapshots:
   '@types/responselike@1.0.3':
     dependencies:
       '@types/node': 26.2.0
+
+  '@types/semver@7.8.0': {}
 
   '@types/trusted-types@2.0.7': {}
 

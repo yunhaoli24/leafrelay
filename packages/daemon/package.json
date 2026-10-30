@@ -16,10 +16,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "semver": "^7.8.5",
     "vscode-jsonrpc": "9.0.1"
   },
   "devDependencies": {
     "@leafrelay/core": "workspace:*",
-    "@leafrelay/protocol": "workspace:*"
+    "@leafrelay/protocol": "workspace:*",
+    "@types/semver": "^7.8.0"
   }
 }

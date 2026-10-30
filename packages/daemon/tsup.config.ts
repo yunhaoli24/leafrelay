@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {defineConfig} from 'tsup';
 
-const packageJson = JSON.parse(await readFile(new URL('package.json', import.meta.url), 'utf8'));
+const packageJson = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
 
 export default defineConfig({
     entry:{index:'src/index.ts', daemon:'src/main.ts'},
