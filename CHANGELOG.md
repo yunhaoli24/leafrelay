@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8](https://github.com/yunhaoli24/leafrelay/compare/v0.2.7...v0.2.8) (2026-10-30)
+
+
+### Features
+
+* upgrade outdated daemons and reject newer runtime versions ([#44](https://github.com/yunhaoli24/leafrelay/issues/44)) ([2bc49e2](https://github.com/yunhaoli24/leafrelay/commit/2bc49e23a9954b682b88fc287e5c05947aeb6a3b))
+
 ## [0.2.7](https://github.com/yunhaoli24/leafrelay/compare/v0.2.6...v0.2.7) (2026-10-28)
 
 
