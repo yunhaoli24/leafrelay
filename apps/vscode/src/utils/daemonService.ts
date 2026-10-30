@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import {LeafRelayDaemonClient} from '@leafrelay/daemon';
-import {error, log, warn} from './outputChannel';
+import {DaemonVersionError, LeafRelayDaemonClient} from '@leafrelay/daemon';
+import {log, notifyError, warn} from './outputChannel';
 
 export class DaemonService {
     private static client?:LeafRelayDaemonClient;
@@ -11,9 +11,12 @@ export class DaemonService {
             clientName:'vscode',
             clientVersion:context.extension.packageJSON.version,
             daemonEntrypoint:vscode.Uri.joinPath(context.extensionUri, 'out', 'daemon.cjs').fsPath,
+        }).catch(error => {
+            if (error instanceof DaemonVersionError) { notifyError(error.message, error, 'daemon-version'); }
+            throw error;
         });
         client.onLog(event => {
-            if (event.level==='error') { error(event.message); }
+            if (event.level==='error') { notifyError(event.message, undefined, 'daemon-connection'); }
             else if (event.level==='warn') { warn(event.message); }
             else { log(event.message); }
         });

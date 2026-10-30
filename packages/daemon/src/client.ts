@@ -1,4 +1,6 @@
 import {randomUUID} from 'node:crypto';
+import {compare, valid} from 'semver';
+import {log} from '@leafrelay/core';
 import {mkdir, readFile, rm, stat} from 'node:fs/promises';
 import {connect, type Socket} from 'node:net';
 import {spawn} from 'node:child_process';
@@ -275,7 +277,7 @@ export class LeafRelayDaemonClient {
             } catch (error) {
                 // Authentication and protocol failures require user action.
                 const code = (error as {code?:number}).code;
-                if (code===-32001 || code===-32002 || this.closing) { throw error; }
+                if (code===-32001 || code===-32002 || error instanceof DaemonVersionError || this.closing) { throw error; }
                 const delay = Math.min(1000*2**attempt++, 16_000);
                 dispatch<LogNotification>(this.logListeners, {
                     timestamp:new Date().toISOString(), level:'warn',
@@ -406,7 +408,11 @@ export class LeafRelayDaemonClient {
         if (metadata && await tryConnect(metadata).then(socket => {
             socket?.destroy();
             return Boolean(socket);
-        })) { return metadata; }
+        })) {
+            const order = versionOrder(metadata, this.options);
+            if (order>0) { throw newerDaemonError(metadata, this.options); }
+            if (order===0 || this.options.autoStart===false) { return metadata; }
+        }
         if (this.options.autoStart===false) {
             throw new Error(`LeafRelay daemon is not running at ${this.paths.socketPath}.`);
         }
@@ -441,6 +447,16 @@ async function startDaemon(paths:DaemonPaths, options:DaemonClientOptions, envir
 
     if (ownsLock) {
         try {
+            // Recheck under the shared startup lock: another client may already
+            // have replaced the daemon while this client was waiting.
+            const running = await readMetadata(paths);
+            if (running && await isListening(running)) {
+                const order = versionOrder(running, options);
+                if (order>0) { throw newerDaemonError(running, options); }
+                if (order===0) { return running; }
+                log(`Upgrading LeafRelay daemon ${running.version} to ${options.clientVersion}; waiting for active synchronization to stop.`);
+                await stopForUpgrade(paths, running, options);
+            }
             const entrypoint = options.daemonEntrypoint ?? new URL('./daemon.js', import.meta.url);
             const childEnvironment = {...environment};
             childEnvironment.LEAFRELAY_HOME = paths.home;
@@ -450,12 +466,25 @@ async function startDaemon(paths:DaemonPaths, options:DaemonClientOptions, envir
                 env:childEnvironment,
             });
             child.unref();
-            return await waitForDaemon(paths);
+            const started = await waitForDaemon(paths);
+            if (versionOrder(started, options)!==0) {
+                throw new DaemonVersionError(`Started daemon ${started.version} does not match client ${options.clientVersion}. Update the LeafRelay installation and retry.`);
+            }
+            return started;
         } finally {
             await rm(paths.startupLockPath, {recursive:true, force:true});
         }
     }
-    return waitForDaemon(paths);
+    // The lock owner may be draining an old daemon. Do not attach to it.
+    const deadline = Date.now()+START_TIMEOUT_MS;
+    while (Date.now()<deadline) {
+        const metadata = await waitForDaemon(paths);
+        const order = versionOrder(metadata, options);
+        if (order>0) { throw newerDaemonError(metadata, options); }
+        if (order===0) { return metadata; }
+        await new Promise(resolveWait => setTimeout(resolveWait, START_POLL_MS));
+    }
+    throw new Error('Timed out waiting for the LeafRelay daemon upgrade.');
 }
 
 async function waitForDaemon(paths:DaemonPaths):Promise<DaemonMetadata> {
@@ -494,4 +523,59 @@ async function tryConnect(metadata:DaemonMetadata):Promise<Socket|undefined> {
             resolveConnection(undefined);
         });
     });
+}
+
+export class DaemonVersionError extends Error {}
+
+function versionOrder(metadata:DaemonMetadata, options:DaemonClientOptions):number {
+    // Development/test clients have no release version to enforce.
+    return valid(metadata.version) && valid(options.clientVersion)
+        ? compare(metadata.version, options.clientVersion)
+        : 0;
+}
+
+function newerDaemonError(metadata:DaemonMetadata, options:DaemonClientOptions):Error {
+    return new DaemonVersionError(`LeafRelay daemon ${metadata.version} is newer than this ${options.clientName} client (${options.clientVersion}). Update ${options.clientName==='vscode' ? 'the LeafRelay VS Code extension' : 'LeafRelay (npm install -g leafrelay@latest)'} and retry.`);
+}
+
+async function isListening(metadata:DaemonMetadata):Promise<boolean> {
+    const socket = await tryConnect(metadata);
+    socket?.destroy();
+    return Boolean(socket);
+}
+
+async function stopForUpgrade(paths:DaemonPaths, metadata:DaemonMetadata, options:DaemonClientOptions):Promise<void> {
+    const socket = await tryConnect(metadata);
+    if (!socket) { return; }
+    const rpc = createSocketRpcConnection(socket);
+    rpc.listen();
+    let timer:NodeJS.Timeout|undefined;
+    try {
+        await Promise.race([
+            (async () => {
+                // Use the old protocol only to authenticate shutdown. Project
+                // operations always use the client's current protocol.
+                await rpc.sendRequest(RPC_METHOD.initialize, {
+                    token:metadata.token, clientId:randomUUID(),
+                    clientName:options.clientName, clientVersion:options.clientVersion,
+                    protocolVersion:metadata.protocolVersion,
+                } satisfies InitializeParams);
+                await rpc.sendRequest(RPC_METHOD.daemonShutdown);
+                const deadline = Date.now()+START_TIMEOUT_MS;
+                while (Date.now()<deadline) {
+                    const current = await readMetadata(paths);
+                    if (!current || current.token!==metadata.token) { return; }
+                    await new Promise(resolveWait => setTimeout(resolveWait, START_POLL_MS));
+                }
+                throw new Error('Old LeafRelay daemon did not finish shutting down.');
+            })(),
+            new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Timed out stopping the old LeafRelay daemon.')), START_TIMEOUT_MS);
+            }),
+        ]);
+    } finally {
+        if (timer) { clearTimeout(timer); }
+        rpc.dispose();
+        socket.destroy();
+    }
 }

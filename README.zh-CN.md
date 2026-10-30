@@ -65,6 +65,8 @@ leafrelay serve
 
 第一个 VS Code 窗口或 CLI 命令会启动共享 daemon，后续客户端通过 `~/.leafrelay/daemon.sock` 连接。因此同时运行 VS Code 和 `leafrelay serve` 不会重复上传。
 
+客户端仅复用版本一致的 daemon；旧 daemon 会自动重启升级，daemon 版本更高时则提示先更新 CLI 或 VS Code 扩展。
+
 `leafrelay login` 会按服务器把登录会话保存到 `~/.leafrelay/config.json`。使用 `leafrelay daemon status|stop|restart` 查看或控制后台进程。`LEAFRELAY_HOME` 可以移动全部用户状态，`LEAFRELAY_CONFIG` 只修改登录文件位置，`LEAFRELAY_COOKIE` 则仅覆盖当前进程使用的 cookie。
 
 ## 开发

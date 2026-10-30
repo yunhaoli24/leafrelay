@@ -65,6 +65,8 @@ leafrelay serve
 
 The first VS Code window or CLI command starts a shared local daemon. Later clients connect through `~/.leafrelay/daemon.sock`, so running VS Code and `leafrelay serve` together does not duplicate uploads.
 
+Clients reuse a daemon only when its release version matches. An older daemon is restarted automatically; a newer daemon requires updating the CLI or VS Code extension before connecting.
+
 `leafrelay login` stores sessions by server in `~/.leafrelay/config.json`. Use `leafrelay daemon status|stop|restart` to inspect or control the background process. Set `LEAFRELAY_HOME` to relocate all user state, `LEAFRELAY_CONFIG` to relocate only the login file, or `LEAFRELAY_COOKIE` to override the saved cookie for one process.
 
 ## Development

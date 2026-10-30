@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {createServer, type Socket} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -14,7 +14,9 @@ afterEach(async () => {
     for (const dispose of cleanup.splice(0).reverse()) { await dispose(); }
 });
 
-async function daemonPeer() {
+const releaseVersion = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8')).version as string;
+
+async function daemonPeer(version='test') {
     const home = await mkdtemp(join(tmpdir(), 'leafrelay-client-'));
     const environment = {...process.env, LEAFRELAY_HOME:home};
     const paths = daemonPaths(environment);
@@ -28,7 +30,15 @@ async function daemonPeer() {
     const server = createServer(socket => {
         sockets.push(socket);
         const rpc = createSocketRpcConnection(socket);
-        rpc.onRequest(RPC_METHOD.initialize, () => ({daemonVersion:'test', protocolVersion:1, pid:process.pid, startedAt:''}));
+        rpc.onRequest(RPC_METHOD.initialize, () => ({daemonVersion:version, protocolVersion:1, pid:process.pid, startedAt:''}));
+        rpc.onRequest(RPC_METHOD.daemonShutdown, () => {
+            setTimeout(() => void (async () => {
+                for (const connected of sockets) { connected.destroy(); }
+                await new Promise<void>(resolve => server.close(() => resolve()));
+                await rm(paths.metadataPath, {force:true});
+            })(), 25);
+            return null;
+        });
         rpc.onRequest(RPC_METHOD.projectOpen, () => {
             projectOpens.push('www.overleaf.com:project');
             return {projectKey:'www.overleaf.com:project', shared:false};
@@ -59,7 +69,7 @@ async function daemonPeer() {
     });
     await new Promise<void>(resolve => server.listen(paths.socketPath, resolve));
     await writeFile(paths.metadataPath, JSON.stringify({
-        pid:process.pid, socketPath:paths.socketPath, token:randomUUID(), protocolVersion:1,
+        pid:process.pid, socketPath:paths.socketPath, token:randomUUID(), protocolVersion:1, version,
     }));
     cleanup.push(async () => {
         for (const socket of sockets) { socket.destroy(); }
@@ -69,7 +79,7 @@ async function daemonPeer() {
     const client = await LeafRelayDaemonClient.connect({clientName:'test', clientVersion:'test', environment, autoStart:false});
     cleanup.push(async () => client.close());
     return {
-        client, attached, projectOpens, retryIds,
+        client, environment, attached, projectOpens, retryIds,
         hold:() => { holdAttach = true; },
         disconnect:() => { holdAttach = false; sockets.at(-1)!.destroy(); },
         interruptRestore:() => { interruptRestore = true; },
@@ -114,4 +124,40 @@ describe('daemon client registration recovery', () => {
         await peer.client.status();
         expect(peer.mutations()).toBe(1);
     });
+});
+
+describe('daemon version negotiation', () => {
+    it('reuses an equal version without restarting', async () => {
+        const peer = await daemonPeer(releaseVersion);
+        const client = await LeafRelayDaemonClient.connect({clientName:'cli', clientVersion:releaseVersion, environment:peer.environment});
+        try { expect(client.initializeResult.pid).toBe(process.pid); }
+        finally { client.close(); }
+    });
+
+    it('rejects a newer daemon and tells the user to upgrade the client', async () => {
+        const peer = await daemonPeer('99.0.0');
+        await expect(LeafRelayDaemonClient.connect({
+            clientName:'vscode', clientVersion:releaseVersion, environment:peer.environment,
+        })).rejects.toThrow('Update the LeafRelay VS Code extension');
+        expect((await peer.client.status()).pid).toBe(process.pid);
+    });
+
+    it('upgrades once for concurrent CLI and VS Code clients and reconnects an existing client', async () => {
+        const peer = await daemonPeer('0.0.1');
+        const clients:LeafRelayDaemonClient[] = [];
+        try {
+            clients.push(...await Promise.all(['cli', 'vscode'].map(clientName => LeafRelayDaemonClient.connect({
+                clientName:clientName as 'cli'|'vscode', clientVersion:releaseVersion,
+                environment:peer.environment, daemonEntrypoint:new URL('../dist/daemon.js', import.meta.url),
+            }))));
+            expect(clients[0]!.initializeResult.daemonVersion).toBe(releaseVersion);
+            expect(clients[0]!.initializeResult.pid).not.toBe(process.pid);
+            expect(clients[1]!.initializeResult.pid).toBe(clients[0]!.initializeResult.pid);
+            await vi.waitFor(async () => expect((await peer.client.status()).pid).toBe(clients[0]!.initializeResult.pid), {timeout:5000});
+        } finally {
+            peer.client.close();
+            for (const client of clients.slice(1)) { client.close(); }
+            if (clients[0]) { await clients[0].shutdownDaemon(); clients[0].close(); }
+        }
+    }, 20_000);
 });
