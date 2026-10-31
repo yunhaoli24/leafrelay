@@ -1,95 +1,98 @@
 # LeafRelay
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/lealaxy.leafrelay-sync?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)
+**Write locally. Collaborate on Overleaf. Keep both in sync.**
+
 [![npm](https://img.shields.io/npm/v/leafrelay?label=npm)](https://www.npmjs.com/package/leafrelay)
-[![Build](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/lealaxy.leafrelay-sync?label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)
+[![CI](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml/badge.svg)](https://github.com/yunhaoli24/leafrelay/actions/workflows/vsce-package.yml)
 [![License](https://img.shields.io/github/license/yunhaoli24/leafrelay)](./LICENSE)
 
-**Reliable two-way sync between Overleaf and a local project in Visual Studio Code.**
+[中文](./README.zh-CN.md) · [Get started](#get-started-in-vs-code) · [CLI](#sync-without-vs-code) · [Documentation](./docs/README.md) · [Releases](https://github.com/yunhaoli24/leafrelay/releases)
 
-LeafRelay is a VS Code extension for Overleaf and LaTeX users who edit the same project with a local IDE, terminal, scripts, or AI coding tools. It keeps the local folder and Overleaf synchronized while making conflicts visible instead of silently choosing a winner.
+LeafRelay connects your **local LaTeX folder and Overleaf with two-way synchronization**. Edit with VS Code, another editor, a terminal, or AI coding tools while your collaborators keep working in the Overleaf browser editor. Use the VS Code extension for an integrated writing workspace, or the npm CLI for synchronization without an IDE.
 
-> LeafRelay is an independent, community-maintained fork of Overleaf Workshop. It is not affiliated with Overleaf or the Overleaf Workshop maintainers. Existing `.overleaf/settings.json` project associations remain reusable.
-
-[中文说明](./README.zh-CN.md)
+![LaTeX source and a PDF preview side by side in VS Code](./docs/assets/leafrelay-editor-preview.png)
 
 ## Why LeafRelay?
 
-Overleaf Workshop pioneered the VS Code workflow, but older local-replica behavior was centered on editor-driven changes. That becomes fragile when the local folder is changed by another editor, a terminal, a script, or an AI tool: updates may wait for an editor save, reconnects may download far more than necessary, duplicate local replicas may compete, and simultaneous edits can overwrite one side without a clear decision.
+Local editing should fit the way you work: file changes should upload without an extra editor save, reconnecting should not restart a whole download, and concurrent edits should not silently overwrite each other.
 
-LeafRelay is built around those failure modes:
+LeafRelay builds on Overleaf Workshop with a synchronization core shared by the extension and CLI:
 
-- **External edits sync automatically** through file-system events, including edits made by another editor, a terminal, a script, or an AI tool.
-- **Incremental startup and reconnects** transfer only changed files whenever the local checkpoint is usable.
-- **Conflicts stop safely** when both local and Overleaf changed the same path; neither copy is silently overwritten.
-- **One writable folder per Overleaf project** prevents old replicas from racing the active folder and pushing stale content.
-- **Rate-limit aware requests** serialize project traffic and respect Overleaf `429` cooldowns instead of creating request bursts.
-- **One shared background service** coordinates every VS Code window and CLI process, so a project has one watcher, one realtime connection, and one upload queue.
-- **Dot directories and symbolic links stay out of sync**, including generated build folders such as `.output`.
+| Your workflow | What LeafRelay adds |
+| --- | --- |
+| Edit with another editor, script, or AI tool | File-system events trigger synchronization, including while VS Code is in the background. |
+| Work alongside someone in Overleaf | Three-way merging combines non-overlapping text edits. Overlapping edits pause that path for review. |
+| Reopen a large project | Saved checkpoints let startup and reconnects transfer changed content instead of downloading every unchanged file. |
+| Run several VS Code windows and CLI processes | A shared daemon coordinates connections, watchers, and uploads; the same folder can be attached more than once. |
+| Encounter Overleaf rate limits | Requests share a queue per account and honor `429` cooldowns across projects. |
+| Need to understand a sync problem | Per-file logs report direction, source, and line or byte changes; conflicts and failed paths remain visible. |
 
-LeafRelay keeps the original Overleaf Workshop virtual-project and collaboration features while prioritizing dependable local-folder synchronization for daily work.
+**Keep the writing features too:** remote compilation, PDF preview and SyncTeX, LaTeX completion, document outlines, project history, and collaborator chat.
 
-## Install
+| Navigate a LaTeX document | Chat with collaborators |
+| --- | --- |
+| ![VS Code document outline showing LaTeX sections and subsections](./docs/assets/leafrelay-document-outline.png) | ![Project files and the collaborator chat panel in VS Code](./docs/assets/leafrelay-chat.png) |
 
-### VS Code extension
+## Get started in VS Code
 
-Install **[LeafRelay Sync](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)** from the VS Code Marketplace. VS Code will receive future releases through its normal extension update mechanism.
+1. Install **[LeafRelay Sync](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)** (`lealaxy.leafrelay-sync`). Alternatively, download the `.vsix` from [GitHub Releases](https://github.com/yunhaoli24/leafrelay/releases) and use **Extensions → … → Install from VSIX…**.
+2. Open **LeafRelay: Hosts**, click **+**, and add `www.overleaf.com` or your self-hosted Overleaf server. Sign in using a browser cookie or the authentication method supported by your server.
+3. Select a project, choose **Open Project Locally…**, and pick a local folder. Open that folder in VS Code to start synchronization.
+4. Edit the files with your preferred tools. Check **Output → LeafRelay** for sync activity. Use the extension's compile command when you want to build and preview the PDF on Overleaf.
 
-If you installed `yunhaoli24.leafrelay`, uninstall it before installing `lealaxy.leafrelay-sync`. Existing `.overleaf/settings.json` project associations remain reusable.
+Already have a local replica? Open the folder containing `.overleaf/settings.json` and sign in to its server. Existing Overleaf Workshop project associations remain usable. Disable the original extension for that folder so it does not run a second, independent sync process.
 
-### npm CLI
+## Sync without VS Code
 
-Install the standalone sync service from **[npm](https://www.npmjs.com/package/leafrelay)**. Node.js 24 or later is required.
+Requires **Node.js 24 or later**.
 
 ```bash
 npm install --global leafrelay
-```
-
-## Start syncing
-
-1. Open the **LeafRelay** view in VS Code and add your Overleaf server.
-2. Sign in, choose a project, and select **Open Project Locally**.
-3. Open the selected folder in VS Code. Changes made locally or on Overleaf will then flow in both directions.
-
-For project details, login options, self-hosted Overleaf, and troubleshooting, see the [user documentation](./docs/README.md).
-
-## Run without VS Code
-
-LeafRelay also ships as a Node.js CLI. A local replica created by the VS Code extension can be served directly because both clients use the same `.overleaf/settings.json` project association.
-
-```bash
 leafrelay login https://www.overleaf.com
 cd /path/to/local-replica
 leafrelay serve
 ```
 
-The first VS Code window or CLI command starts a shared local daemon. Later clients connect through `~/.leafrelay/daemon.sock`, so running VS Code and `leafrelay serve` together does not duplicate uploads.
+`login` offers an interactive browser-cookie or email/password prompt. For `www.overleaf.com`, you can reuse a session cookie from your signed-in browser. Sessions are saved in `~/.leafrelay/config.json` and shared with the VS Code extension.
 
-Clients reuse a daemon only when its release version matches. An older daemon is restarted automatically; a newer daemon requires updating the CLI or VS Code extension before connecting.
+`serve` reads the folder's **`.overleaf/settings.json`**; it does not create a project association. Use **Open Project Locally…** once to set up the folder, then run it from the terminal whenever you need it. You can also pass the directory explicitly:
 
-`leafrelay login` stores sessions by server in `~/.leafrelay/config.json`. Use `leafrelay daemon status|stop|restart` to inspect or control the background process. Set `LEAFRELAY_HOME` to relocate all user state, `LEAFRELAY_CONFIG` to relocate only the login file, or `LEAFRELAY_COOKIE` to override the saved cookie for one process.
+```bash
+leafrelay serve /path/to/local-replica
+leafrelay daemon status
+```
 
-## Development
+Keep `serve` running for terminal-only synchronization, and press **Ctrl+C** to detach. The CLI syncs files; remote compilation and the PDF viewer are available in the VS Code extension.
+
+## Use both together
+
+VS Code and the CLI connect to one local daemon, so opening the same folder in both shares one sync engine. Each Overleaf project has one writable local directory; different projects can sync in parallel. When the last client for a folder disconnects, that folder stops syncing and releases its remote connection.
+
+Keep the extension and CLI on the same release version. An older running daemon restarts automatically; a newer daemon asks you to upgrade the connecting client.
+
+## When edits overlap
+
+Non-overlapping text changes merge automatically. If both sides edit the same passage, LeafRelay pauses **that file**, while healthy files continue to sync. In VS Code, choose **Review Difference**, **Use Local**, or **Use Overleaf**. Resolving one conflict continues to the next; for several conflicts, the dialog also offers a batch choice for the conflicting paths.
+
+Dot-prefixed paths, such as `.git` and `.output`, and symbolic links are excluded from synchronization. Keep normal source files outside those directories.
+
+## Learn more and contribute
+
+- [User guide](./docs/README.md): project management, compilation, collaboration, and settings.
+- [CLI and architecture](./docs/anatomy.md): configuration locations, shared daemon, and package layout.
+- [Contributing](./CONTRIBUTING.md): development, Oxc tooling, tests, and release workflow.
+- [Issues and feature requests](https://github.com/yunhaoli24/leafrelay/issues).
 
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
-pnpm test
 pnpm run compile
+pnpm test
 ```
 
-Pull requests run the VS Code activation check and a ShareLaTeX container integration test before packaging. Releases are prepared by Release Please and publish the VS Code extension, npm package, and GitHub release artifacts through automated workflows.
+Pull requests run Vitest, platform IPC tests, real VS Code Extension Host checks, and ShareLaTeX container integration tests before packaging.
 
-The pnpm monorepo separates the protocol, reusable synchronization core, shared daemon, CLI, and VS Code adapter.
+## Acknowledgments
 
-## Project background
-
-LeafRelay started from [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop) and is now maintained as an independent project under the [AGPL-3.0-only](./LICENSE). The focus is reliable Overleaf-to-local synchronization, while the project continues to evolve toward reusable sync components beyond VS Code.
-
-## Links
-
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=lealaxy.leafrelay-sync)
-- [Issues and feature requests](https://github.com/yunhaoli24/leafrelay/issues)
-- [Contributing](./CONTRIBUTING.md)
-- [Documentation](./docs/README.md)
-- [Original Overleaf Workshop project](https://github.com/overleaf-workshop/Overleaf-Workshop)
+LeafRelay is an independently maintained fork of [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop), licensed under [AGPL-3.0-only](./LICENSE). The editor screenshots above are adapted from its example-project demos. Thanks to the original contributors for the foundation. LeafRelay is not affiliated with Overleaf.
