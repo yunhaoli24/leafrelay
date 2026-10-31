@@ -1,99 +1,126 @@
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {afterEach, describe, expect, it, vi} from 'vitest';
-import type {ProjectFileTreeDiffResponseSchema} from '../src/api/base';
-import {FileSyncStateStore} from '../src/node/syncStateStore';
-import type {RemoteEntry} from '../src/sync/remoteProject';
-import {createSyncState, sha256, type LocalReplicaSyncState, updateSyncCheckpoint} from '../src/sync/checkpoint';
-import {
-    SyncEngine,
-    type RemoteReplica,
-    type ReplicaFileSystem,
-    type SyncStateStore,
-} from '../src/sync/syncEngine';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ProjectFileTreeDiffResponseSchema } from '../src/api/base';
+import { FileSyncStateStore } from '../src/node/syncStateStore';
+import type { RemoteEntry } from '../src/sync/remoteProject';
+import { createSyncState, sha256, type LocalReplicaSyncState, updateSyncCheckpoint } from '../src/sync/checkpoint';
+import { SyncEngine, type RemoteReplica, type ReplicaFileSystem, type SyncStateStore } from '../src/sync/syncEngine';
 
 class MemoryLocal implements ReplicaFileSystem {
-    private changeHandler?:(path:string) => void;
-    constructor(readonly files:Map<string,Uint8Array>) {}
-    async listFiles() { return [...this.files.keys()]; }
-    async read(path:string) { return this.files.get(path); }
-    async write(path:string, content:Uint8Array) { this.files.set(path, content); }
-    async remove(path:string) { this.files.delete(path); }
-    async watch(onChange:(path:string) => void) {
+    private changeHandler?: (path: string) => void;
+    constructor(readonly files: Map<string, Uint8Array>) {}
+    async listFiles() {
+        return [...this.files.keys()];
+    }
+    async read(path: string) {
+        return this.files.get(path);
+    }
+    async write(path: string, content: Uint8Array) {
+        this.files.set(path, content);
+    }
+    async remove(path: string) {
+        this.files.delete(path);
+    }
+    async watch(onChange: (path: string) => void) {
         this.changeHandler = onChange;
         return async () => {
-            if (this.changeHandler===onChange) { this.changeHandler = undefined; }
+            if (this.changeHandler === onChange) {
+                this.changeHandler = undefined;
+            }
         };
     }
-    change(path:string, content:Uint8Array) {
+    change(path: string, content: Uint8Array) {
         this.files.set(path, content);
         this.changeHandler?.(path);
     }
 }
 
 class MemoryRemote implements RemoteReplica {
-    private reconnectHandler?:() => void;
-    private changeHandler?:(change:{path:string; previousPath?:string; actor?:string}) => void;
-    failReadPath?:string;
+    private reconnectHandler?: () => void;
+    private changeHandler?: (change: { path: string; previousPath?: string; actor?: string }) => void;
+    failReadPath?: string;
     emitOnWrite = false;
     constructor(
-        readonly files:Map<string,Uint8Array>,
-        public version:number,
-        public diff:ProjectFileTreeDiffResponseSchema,
+        readonly files: Map<string, Uint8Array>,
+        public version: number,
+        public diff: ProjectFileTreeDiffResponseSchema,
     ) {}
-    listEntries():RemoteEntry[] {
+    listEntries(): RemoteEntry[] {
         return [...this.files.keys()].map((path, index) => ({
             path,
-            type:'doc',
-            entity:{_id:String(index), name:path.split('/').at(-1)!, _type:'doc'},
+            type: 'doc',
+            entity: { _id: String(index), name: path.split('/').at(-1)!, _type: 'doc' },
         }));
     }
-    entry(path:string) { return this.listEntries().find(entry => entry.path===path); }
-    async read(path:string) {
-        if (path===this.failReadPath) { throw new Error(`read failed for ${path}`); }
+    entry(path: string) {
+        return this.listEntries().find((entry) => entry.path === path);
+    }
+    async read(path: string) {
+        if (path === this.failReadPath) {
+            throw new Error(`read failed for ${path}`);
+        }
         return this.files.get(path)!;
     }
-    async write(path:string, content:Uint8Array) {
+    async write(path: string, content: Uint8Array) {
         this.files.set(path, content);
-        if (this.emitOnWrite) { setTimeout(() => this.change(path), 10); }
+        if (this.emitOnWrite) {
+            setTimeout(() => this.change(path), 10);
+        }
     }
-    async remove(path:string) { this.files.delete(path); }
-    async getCurrentVersion() { return this.version; }
-    async getFileTreeDiff() { return this.diff; }
-    onChange(handler:(change:{path:string; previousPath?:string; actor?:string}) => void) {
+    async remove(path: string) {
+        this.files.delete(path);
+    }
+    async getCurrentVersion() {
+        return this.version;
+    }
+    async getFileTreeDiff() {
+        return this.diff;
+    }
+    onChange(handler: (change: { path: string; previousPath?: string; actor?: string }) => void) {
         this.changeHandler = handler;
         return () => {
-            if (this.changeHandler===handler) { this.changeHandler = undefined; }
+            if (this.changeHandler === handler) {
+                this.changeHandler = undefined;
+            }
         };
     }
-    onReconnect(handler:() => void) {
+    onReconnect(handler: () => void) {
         this.reconnectHandler = handler;
         return () => {
-            if (this.reconnectHandler===handler) { this.reconnectHandler = undefined; }
+            if (this.reconnectHandler === handler) {
+                this.reconnectHandler = undefined;
+            }
         };
     }
-    change(path:string, actor?:string) { this.changeHandler?.({path, actor}); }
-    reconnect() { this.reconnectHandler?.(); }
+    change(path: string, actor?: string) {
+        this.changeHandler?.({ path, actor });
+    }
+    reconnect() {
+        this.reconnectHandler?.();
+    }
 }
 
 class MemoryState implements SyncStateStore {
-    saves:LocalReplicaSyncState[] = [];
-    constructor(private state?:LocalReplicaSyncState) {}
-    async load() { return this.state; }
-    async save(state:LocalReplicaSyncState) {
+    saves: LocalReplicaSyncState[] = [];
+    constructor(private state?: LocalReplicaSyncState) {}
+    async load() {
+        return this.state;
+    }
+    async save(state: LocalReplicaSyncState) {
         this.state = structuredClone(state);
         this.saves.push(structuredClone(state));
     }
 }
 
-const bytes = (value:string) => new TextEncoder().encode(value);
-const text = (value:Uint8Array|undefined) => value && new TextDecoder().decode(value);
-const roots:string[] = [];
+const bytes = (value: string) => new TextEncoder().encode(value);
+const text = (value: Uint8Array | undefined) => value && new TextDecoder().decode(value);
+const roots: string[] = [];
 
 afterEach(async () => {
     vi.useRealTimers();
-    await Promise.all(roots.splice(0).map(root => rm(root, {recursive:true, force:true})));
+    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe('SyncEngine', () => {
@@ -101,16 +128,31 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         updateSyncCheckpoint(state, '/reference.pdf', bytes('binary contents'));
-        const local = new MemoryLocal(new Map([
-            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('binary contents')],
-        ]));
-        const remote = new MemoryRemote(new Map([
-            ['/paper.tex', bytes('updated\n')], ['/reference.pdf', bytes('binary contents')],
-        ]), 2, {diff:[{pathname:'paper.tex', operation:'edited'}, {pathname:'reference.pdf'}]});
+        const local = new MemoryLocal(
+            new Map([
+                ['/paper.tex', bytes('base\n')],
+                ['/reference.pdf', bytes('binary contents')],
+            ]),
+        );
+        const remote = new MemoryRemote(
+            new Map([
+                ['/paper.tex', bytes('updated\n')],
+                ['/reference.pdf', bytes('binary contents')],
+            ]),
+            2,
+            { diff: [{ pathname: 'paper.tex', operation: 'edited' }, { pathname: 'reference.pdf' }] },
+        );
         const read = vi.spyOn(remote, 'read');
         const store = new MemoryState(state);
-        const options = {projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{}};
+        const options = {
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
+        };
         const engine = new SyncEngine(options);
         await engine.start();
         expect(text(local.files.get('/paper.tex'))).toBe('updated\n');
@@ -129,18 +171,34 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         updateSyncCheckpoint(state, '/reference.pdf', bytes('old binary'));
-        const local = new MemoryLocal(new Map([
-            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('old binary')],
-        ]));
-        const remote = new MemoryRemote(new Map([
-            ['/paper.tex', bytes('base\n')], ['/reference.pdf', bytes('new binary')],
-        ]), 2, {diff:[{pathname:'paper.tex'}, {pathname:'reference.pdf', operation:'edited'}]});
+        const local = new MemoryLocal(
+            new Map([
+                ['/paper.tex', bytes('base\n')],
+                ['/reference.pdf', bytes('old binary')],
+            ]),
+        );
+        const remote = new MemoryRemote(
+            new Map([
+                ['/paper.tex', bytes('base\n')],
+                ['/reference.pdf', bytes('new binary')],
+            ]),
+            2,
+            { diff: [{ pathname: 'paper.tex' }, { pathname: 'reference.pdf', operation: 'edited' }] },
+        );
         remote.failReadPath = '/reference.pdf';
         const read = vi.spyOn(remote, 'read');
         const store = new MemoryState(state);
-        const errors:(string|undefined)[] = [];
-        const engine = new SyncEngine({projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{}, onSyncError:message=>errors.push(message)});
+        const errors: (string | undefined)[] = [];
+        const engine = new SyncEngine({
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
+            onSyncError: (message) => errors.push(message),
+        });
         await engine.start();
         expect(engine.syncError).toContain('/reference.pdf');
         expect(store.saves.at(-1)?.remoteVersion ?? state.remoteVersion).toBe(1);
@@ -167,11 +225,23 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
-        let finishVersion!:(version:number) => void;
-        vi.spyOn(remote, 'getCurrentVersion').mockImplementationOnce(() => new Promise(resolve => { finishVersion = resolve; }));
-        const engine = new SyncEngine({projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:()=>{}, onConflict:()=>{}});
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
+        let finishVersion!: (version: number) => void;
+        vi.spyOn(remote, 'getCurrentVersion').mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishVersion = resolve;
+                }),
+        );
+        const engine = new SyncEngine({
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
+        });
         const startup = engine.start();
         await vi.advanceTimersByTimeAsync(0);
         local.change('/paper.tex', bytes('edit during startup\n'));
@@ -187,15 +257,18 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('first\nmiddle\nthird\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('FIRST\nmiddle\nthird\n')]]));
-        const remote = new MemoryRemote(
-            new Map([['/paper.tex', bytes('first\nmiddle\nTHIRD\n')]]),
-            2,
-            {diff:[{pathname:'/paper.tex', operation:'edited'}]},
-        );
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('first\nmiddle\nTHIRD\n')]]), 2, {
+            diff: [{ pathname: '/paper.tex', operation: 'edited' }],
+        });
         const store = new MemoryState(state);
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -208,20 +281,31 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/a.tex', bytes('base\n'));
         updateSyncCheckpoint(state, '/b.tex', bytes('base\n'));
-        const local = new MemoryLocal(new Map([
-            ['/a.tex', bytes('local\n')],
-            ['/b.tex', bytes('updated\n')],
-        ]));
-        const remote = new MemoryRemote(new Map([
-            ['/a.tex', bytes('remote\n')],
-            ['/b.tex', bytes('base\n')],
-        ]), 2, {diff:[{pathname:'/a.tex', operation:'edited'}]});
+        const local = new MemoryLocal(
+            new Map([
+                ['/a.tex', bytes('local\n')],
+                ['/b.tex', bytes('updated\n')],
+            ]),
+        );
+        const remote = new MemoryRemote(
+            new Map([
+                ['/a.tex', bytes('remote\n')],
+                ['/b.tex', bytes('base\n')],
+            ]),
+            2,
+            { diff: [{ pathname: '/a.tex', operation: 'edited' }] },
+        );
         const store = new MemoryState(state);
-        const conflicts:string[] = [];
-        const logs:string[] = [];
+        const conflicts: string[] = [];
+        const logs: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:message=>logs.push(message), onConflict:path=>conflicts.push(path),
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: (message) => logs.push(message),
+            onConflict: (path) => conflicts.push(path),
         });
 
         await engine.start();
@@ -243,22 +327,27 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/updated.tex', bytes('base\n'));
         updateSyncCheckpoint(state, '/deleted.tex', bytes('base\n'));
-        const local = new MemoryLocal(new Map([
-            ['/updated.tex', bytes('base\n')],
-            ['/deleted.tex', bytes('base\n')],
-        ]));
-        const remote = new MemoryRemote(
-            new Map([['/updated.tex', bytes('remote\n')]]),
-            2,
-            {diff:[
-                {pathname:'/updated.tex', operation:'edited'},
-                {pathname:'/deleted.tex', operation:'removed'},
-            ]},
+        const local = new MemoryLocal(
+            new Map([
+                ['/updated.tex', bytes('base\n')],
+                ['/deleted.tex', bytes('base\n')],
+            ]),
         );
-        const logs:string[] = [];
+        const remote = new MemoryRemote(new Map([['/updated.tex', bytes('remote\n')]]), 2, {
+            diff: [
+                { pathname: '/updated.tex', operation: 'edited' },
+                { pathname: '/deleted.tex', operation: 'removed' },
+            ],
+        });
+        const logs: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: (message) => logs.push(message),
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -271,21 +360,32 @@ describe('SyncEngine', () => {
     });
 
     it('rebuilds missing state per path without choosing a winner for divergent content', async () => {
-        const local = new MemoryLocal(new Map([
-            ['/same.tex', bytes('same\n')],
-            ['/different.tex', bytes('local\n')],
-            ['/local-only.tex', bytes('local only\n')],
-        ]));
-        const remote = new MemoryRemote(new Map([
-            ['/same.tex', bytes('same\n')],
-            ['/different.tex', bytes('remote\n')],
-            ['/remote-only.tex', bytes('remote only\n')],
-        ]), 7, {diff:[]});
+        const local = new MemoryLocal(
+            new Map([
+                ['/same.tex', bytes('same\n')],
+                ['/different.tex', bytes('local\n')],
+                ['/local-only.tex', bytes('local only\n')],
+            ]),
+        );
+        const remote = new MemoryRemote(
+            new Map([
+                ['/same.tex', bytes('same\n')],
+                ['/different.tex', bytes('remote\n')],
+                ['/remote-only.tex', bytes('remote only\n')],
+            ]),
+            7,
+            { diff: [] },
+        );
         const store = new MemoryState();
-        const conflicts:string[] = [];
+        const conflicts: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:path=>conflicts.push(path),
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: (path) => conflicts.push(path),
         });
 
         await engine.start();
@@ -304,18 +404,29 @@ describe('SyncEngine', () => {
     it('safely rebuilds only the missing paths when sharded state is incomplete', async () => {
         const state = createSyncState('overleaf://project', 7, false);
         updateSyncCheckpoint(state, '/intact.tex', bytes('intact\n'));
-        const local = new MemoryLocal(new Map([
-            ['/intact.tex', bytes('updated intact\n')],
-            ['/local-only.tex', bytes('local only\n')],
-        ]));
-        const remote = new MemoryRemote(new Map([
-            ['/intact.tex', bytes('intact\n')],
-            ['/remote-only.tex', bytes('remote only\n')],
-        ]), 7, {diff:[]});
+        const local = new MemoryLocal(
+            new Map([
+                ['/intact.tex', bytes('updated intact\n')],
+                ['/local-only.tex', bytes('local only\n')],
+            ]),
+        );
+        const remote = new MemoryRemote(
+            new Map([
+                ['/intact.tex', bytes('intact\n')],
+                ['/remote-only.tex', bytes('remote only\n')],
+            ]),
+            7,
+            { diff: [] },
+        );
         const store = new MemoryState(state);
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -341,10 +452,15 @@ describe('SyncEngine', () => {
         await writeFile(recordPath, '{damaged');
 
         const local = new MemoryLocal(new Map([['/local-only.tex', bytes('local work\n')]]));
-        const remote = new MemoryRemote(new Map(), 1, {diff:[]});
+        const remote = new MemoryRemote(new Map(), 1, { diff: [] });
         const firstEngine = new SyncEngine({
-            projectUri, local, remote, stateStore:new FileSyncStateStore(root, projectUri),
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri,
+            local,
+            remote,
+            stateStore: new FileSyncStateStore(root, projectUri),
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
         await firstEngine.start();
         expect(firstEngine.getConflicts()).toEqual(['/local-only.tex']);
@@ -356,8 +472,13 @@ describe('SyncEngine', () => {
         expect(reloaded?.initialized).toBe(true);
         expect(reloaded?.conflicts['/local-only.tex']).toContain('no common checkpoint');
         const secondEngine = new SyncEngine({
-            projectUri, local, remote, stateStore:reloadedStore,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri,
+            local,
+            remote,
+            stateStore: reloadedStore,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
         await secondEngine.start();
         expect(secondEngine.getConflicts()).toEqual(['/local-only.tex']);
@@ -369,21 +490,22 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(
-            new Map([['/paper.tex', bytes('base\n')]]),
-            1,
-            {diff:[]},
-        );
-        const logs:string[] = [];
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
+        const logs: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: (message) => logs.push(message),
+            onConflict: () => {},
         });
 
         await engine.start();
         remote.files.set('/paper.tex', bytes('changed while disconnected\n'));
         remote.version = 2;
-        remote.diff = {diff:[{pathname:'/paper.tex', operation:'edited'}]};
+        remote.diff = { diff: [{ pathname: '/paper.tex', operation: 'edited' }] };
         remote.reconnect();
         await vi.waitFor(() => expect(text(local.files.get('/paper.tex'))).toBe('changed while disconnected\n'));
         await engine.stop();
@@ -396,10 +518,15 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -414,20 +541,25 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
         remote.emitOnWrite = true;
         const store = new MemoryState(state);
-        const logs:string[] = [];
+        const logs: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: (message) => logs.push(message),
+            onConflict: () => {},
         });
 
         await engine.start();
         local.change('/paper.tex', bytes('local\n'));
         await vi.waitFor(() => expect(logs).toContain('[push] update "/paper.tex"; lines 1; source=local filesystem'));
         const savesAfterPush = store.saves.length;
-        await new Promise(resolve => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, 350));
         expect(store.saves).toHaveLength(savesAfterPush);
 
         remote.files.set('/paper.tex', bytes('remote later\n'));
@@ -440,19 +572,24 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
-        const logs:string[] = [];
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
+        const logs: string[] = [];
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: (message) => logs.push(message),
+            onConflict: () => {},
         });
 
         await engine.start();
         remote.change('/paper.tex');
         local.files.set('/paper.tex', bytes(''));
-        await new Promise(resolve => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, 350));
         expect(text(remote.files.get('/paper.tex'))).toBe('base\n');
-        expect(logs.some(log => log.startsWith('[push]'))).toBe(false);
+        expect(logs.some((log) => log.startsWith('[push]'))).toBe(false);
 
         local.change('/paper.tex', bytes('finished local write\n'));
         await vi.waitFor(() => expect(text(remote.files.get('/paper.tex'))).toBe('finished local write\n'));
@@ -463,10 +600,15 @@ describe('SyncEngine', () => {
         const state = createSyncState('overleaf://project', 1);
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: new MemoryState(state),
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -482,11 +624,16 @@ describe('SyncEngine', () => {
         updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
         state.conflicts['/paper.tex'] = 'Both sides changed.';
         const local = new MemoryLocal(new Map([['/paper.tex', bytes('local\n')]]));
-        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('remote\n')]]), 1, {diff:[]});
+        const remote = new MemoryRemote(new Map([['/paper.tex', bytes('remote\n')]]), 1, { diff: [] });
         const store = new MemoryState(state);
         const engine = new SyncEngine({
-            projectUri:'overleaf://project', local, remote, stateStore:store,
-            ignore:()=>false, log:()=>{}, onConflict:()=>{},
+            projectUri: 'overleaf://project',
+            local,
+            remote,
+            stateStore: store,
+            ignore: () => false,
+            log: () => {},
+            onConflict: () => {},
         });
 
         await engine.start();
@@ -504,11 +651,16 @@ describe('SyncEngine', () => {
             const state = createSyncState('overleaf://project', 1);
             updateSyncCheckpoint(state, '/paper.tex', bytes('base\n'));
             const local = new MemoryLocal(new Map([['/paper.tex', bytes('base\n')]]));
-            const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, {diff:[]});
-            const logs:string[] = [];
+            const remote = new MemoryRemote(new Map([['/paper.tex', bytes('base\n')]]), 1, { diff: [] });
+            const logs: string[] = [];
             const engine = new SyncEngine({
-                projectUri:'overleaf://project', local, remote, stateStore:new MemoryState(state),
-                ignore:()=>false, log:message=>logs.push(message), onConflict:()=>{},
+                projectUri: 'overleaf://project',
+                local,
+                remote,
+                stateStore: new MemoryState(state),
+                ignore: () => false,
+                log: (message) => logs.push(message),
+                onConflict: () => {},
             });
 
             await engine.start();
@@ -519,6 +671,8 @@ describe('SyncEngine', () => {
             await engine.stop();
 
             expect(logs).toContain('[pull] update "/paper.tex"; lines 1; source=multiple Overleaf collaborators');
-        } finally { vi.useRealTimers(); }
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

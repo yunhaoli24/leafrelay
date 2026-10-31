@@ -784,9 +784,9 @@
     "update-l10n": "pnpm exec l10n-dev export -o ./l10n ./src",
     "clean": "rimraf out views/chat-view/dist",
     "typecheck": "tsc -p ./ --noEmit",
-    "build:extension": "node build.mjs",
+    "build:extension": "tsdown",
     "build": "pnpm run clean && pnpm run typecheck && pnpm run build:extension && pnpm --dir views/chat-view run build",
-    "watch": "node build.mjs --watch"
+    "watch": "tsdown --watch"
   },
   "dependencies": {
     "@unified-latex/unified-latex-prettier": "^1.8.4",
@@ -795,8 +795,8 @@
     "@vscode/l10n": "^0.0.18",
     "diff-match-patch": "^1.0.5",
     "fuzzysearch": "^1.0.3",
-    "minimatch": "^10.2.6",
-    "prettier": "^3.9.6"
+    "minimatch": "^11.0.3",
+    "prettier": "^3.9.10"
   },
   "devDependencies": {
     "@leafrelay/core": "workspace:*",

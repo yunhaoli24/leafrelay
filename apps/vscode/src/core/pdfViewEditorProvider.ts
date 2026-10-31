@@ -13,10 +13,9 @@ export class PdfDocument implements vscode.CustomDocument {
         if (uri.scheme !== OVERLEAF_URI_SCHEME) {
             throw new Error(`Invalid uri scheme: ${uri}`);
         }
-        this.uri = uri;
     }
 
-    dispose() { }
+    dispose() {}
 
     async refresh(): Promise<Uint8Array> {
         try {
@@ -24,30 +23,38 @@ export class PdfDocument implements vscode.CustomDocument {
         } catch {
             this.cache = new Uint8Array();
         }
-        this._onDidChange.fire({content:this.cache});
+        this._onDidChange.fire({ content: this.cache });
         return this.cache;
     }
 }
 
 export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDocument> {
-    private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<PdfDocument>>();
+    private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
+        vscode.CustomDocumentEditEvent<PdfDocument>
+    >();
     readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
-    constructor(private readonly context:vscode.ExtensionContext) {
-        this.context = context;
-    }
+    constructor(private readonly context: vscode.ExtensionContext) {}
 
-    public saveCustomDocument(document: PdfDocument, cancellation: vscode.CancellationToken): Thenable<void> {
+    public saveCustomDocument(_document: PdfDocument, _cancellation: vscode.CancellationToken): Thenable<void> {
         return Promise.resolve();
     }
-    public saveCustomDocumentAs(document: PdfDocument, destination: vscode.Uri, cancellation: vscode.CancellationToken): Thenable<void> {
+    public saveCustomDocumentAs(
+        _document: PdfDocument,
+        _destination: vscode.Uri,
+        _cancellation: vscode.CancellationToken,
+    ): Thenable<void> {
         return Promise.resolve();
     }
-    public revertCustomDocument(document: PdfDocument, cancellation: vscode.CancellationToken): Thenable<void> {
+    public revertCustomDocument(_document: PdfDocument, _cancellation: vscode.CancellationToken): Thenable<void> {
         return Promise.resolve();
     }
-    public backupCustomDocument(document: PdfDocument, context: vscode.CustomDocumentBackupContext, cancellation: vscode.CancellationToken): Thenable<vscode.CustomDocumentBackup> {
-        return Promise.resolve({id: '', delete: () => {}});
+    public backupCustomDocument(
+        _document: PdfDocument,
+        _context: vscode.CustomDocumentBackupContext,
+        _cancellation: vscode.CancellationToken,
+    ): Thenable<vscode.CustomDocumentBackup> {
+        return Promise.resolve({ id: '', delete: () => {} });
     }
 
     public async openCustomDocument(uri: vscode.Uri): Promise<PdfDocument> {
@@ -57,13 +64,13 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
     }
 
     public async resolveCustomEditor(doc: PdfDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
-        EventBus.fire('pdfWillOpenEvent', {uri: doc.uri, doc, webviewPanel});
+        EventBus.fire('pdfWillOpenEvent', { uri: doc.uri, doc, webviewPanel });
 
         const updateWebview = () => {
             if (doc.cache.buffer.byteLength !== 0) {
-                webviewPanel.webview.postMessage({type:'update', content:doc.cache.buffer});
+                webviewPanel.webview.postMessage({ type: 'update', content: doc.cache.buffer });
             }
-        }
+        };
 
         const docOnDidChangeListener = doc.onDidChange(() => {
             updateWebview();
@@ -73,13 +80,13 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
             docOnDidChangeListener.dispose();
         });
 
-        webviewPanel.webview.options = {enableScripts:true};
+        webviewPanel.webview.options = { enableScripts: true };
         webviewPanel.webview.html = await this.getHtmlForWebview(webviewPanel.webview);
 
         // register event listeners
         webviewPanel.onDidChangeViewState((e) => {
             if (e.webviewPanel.active) {
-                EventBus.fire('fileWillOpenEvent', {uri: doc.uri});
+                EventBus.fire('fileWillOpenEvent', { uri: doc.uri });
             }
         });
         webviewPanel.webview.onDidReceiveMessage((e) => {
@@ -98,7 +105,7 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
                         scrollMode: config.get('defaultScrollMode', 'vertical'),
                         spreadMode: config.get('defaultSpreadMode', 'none'),
                     };
-                    webviewPanel.webview.postMessage({type:'initState', content:state, colorThemes, defaults});
+                    webviewPanel.webview.postMessage({ type: 'initState', content: state, colorThemes, defaults });
                     updateWebview();
                     break;
                 default:
@@ -119,18 +126,21 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
     }
 
     private patchViewerHtml(webview: vscode.Webview, html: string): string {
-        const patchPath = (...path:string[]) => webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'views/pdf-viewer', ...path)).toString();
+        const patchPath = (...path: string[]) =>
+            webview
+                .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'views/pdf-viewer', ...path))
+                .toString();
 
         // adjust original path
-        html = html.replace('../build/pdf.js', patchPath('vendor','build','pdf.js'));
-        html = html.replace('viewer.css', patchPath('vendor','web','viewer.css'));
-        html = html.replace('viewer.js',  patchPath('vendor','web','viewer.js'));
+        html = html.replace('../build/pdf.js', patchPath('vendor', 'build', 'pdf.js'));
+        html = html.replace('viewer.css', patchPath('vendor', 'web', 'viewer.css'));
+        html = html.replace('viewer.js', patchPath('vendor', 'web', 'viewer.js'));
 
         // patch custom files
-        const workerScript = `<script src="${patchPath('vendor','build','pdf.worker.js')}"></script>`;
+        const workerScript = `<script src="${patchPath('vendor', 'build', 'pdf.worker.js')}"></script>`;
         const customScript = `<script src="${patchPath('index.js')}"></script>`;
         const customStyle = `<link rel="stylesheet" href="${patchPath('index.css')}" />`;
-        html = html.replace(/\<\/head\>/, `${workerScript}\n${customScript}\n${customStyle}\n</head>`);
+        html = html.replace(/<\/head>/, `${workerScript}\n${customScript}\n${customStyle}\n</head>`);
 
         return html;
     }
@@ -140,5 +150,4 @@ export class PdfViewEditorProvider implements vscode.CustomEditorProvider<PdfDoc
         let html = (await vscode.workspace.fs.readFile(htmlPath)).toString();
         return this.patchViewerHtml(webview, html);
     }
-
 }

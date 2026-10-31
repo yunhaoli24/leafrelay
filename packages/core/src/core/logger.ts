@@ -9,11 +9,11 @@ export function setLogSink(nextSink: LogSink | undefined) {
 }
 
 function write(level: LogLevel, args: readonly unknown[]) {
-    if (sink!==undefined) {
+    if (sink !== undefined) {
         sink(level, args);
         return;
     }
-    const method = level==='error' ? console.error : level==='warn' ? console.warn : console.log;
+    const method = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     method(...args);
 }
 

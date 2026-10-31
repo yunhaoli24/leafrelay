@@ -1,22 +1,6 @@
 {
-  "bibtex": [
-    "abbrv",
-    "acm",
-    "alpha",
-    "apalike",
-    "ieeetr",
-    "plain",
-    "siam",
-    "unsrt"
-  ],
-  "natbib": [
-    "dinat",
-    "plainnat",
-    "abbrvnat",
-    "unsrtnat",
-    "rusnat",
-    "ksfh_nat"
-  ],
+  "bibtex": ["abbrv", "acm", "alpha", "apalike", "ieeetr", "plain", "siam", "unsrt"],
+  "natbib": ["dinat", "plainnat", "abbrvnat", "unsrtnat", "rusnat", "ksfh_nat"],
   "biblatex": [
     "numeric",
     "alphabetic",

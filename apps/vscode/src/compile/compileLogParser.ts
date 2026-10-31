@@ -9,12 +9,10 @@ const LINES_REGEX = /lines? ([0-9]+)/;
 // This is used to parse the package name from the package warnings
 const PACKAGE_REGEX = /^(?:Package|Class|Module) (\b.+\b) Warning/;
 const FILE_LINE_ERROR_REGEX = /^([./].*):(\d+): (.*)/;
-const STATE = { 
+const STATE = {
     normal: 0,
     error: 1,
 };
-
-
 
 export type ErrorSchema = {
     line: number | null;
@@ -26,7 +24,6 @@ export type ErrorSchema = {
 };
 
 export class LatexParser {
-    
     private state: number;
     private data: ErrorSchema[];
     private fileStack: any[];
@@ -37,7 +34,7 @@ export class LatexParser {
     private currentLine: string = '';
     private currentError!: ErrorSchema;
     private currentFilePath: string = '';
-    constructor(text: string, options = {}) {
+    constructor(text: string, _options = {}) {
         this.state = STATE.normal;
         this.data = [];
         this.fileStack = [];
@@ -80,17 +77,11 @@ export class LatexParser {
                 }
             }
             if (this.state === STATE.error) {
-                this.currentError.content += this.log
-                    .linesUpToNextMatchingLine(/^l\.[0-9]+/)
-                    .join('\n');
+                this.currentError.content += this.log.linesUpToNextMatchingLine(/^l\.[0-9]+/).join('\n');
                 this.currentError.content += '\n';
-                this.currentError.content += this.log
-                    .linesUpToNextWhitespaceLine()
-                    .join('\n');
+                this.currentError.content += this.log.linesUpToNextWhitespaceLine().join('\n');
                 this.currentError.content += '\n';
-                this.currentError.content += this.log
-                    .linesUpToNextWhitespaceLine()
-                    .join('\n');
+                this.currentError.content += this.log.linesUpToNextWhitespaceLine().join('\n');
                 this.currentError.raw += this.currentError.content;
                 const lineNo = this.currentError.raw.match(/l\.([0-9]+)/);
                 if (lineNo && this.currentError.line === null) {
@@ -106,8 +97,7 @@ export class LatexParser {
     currentLineIsError() {
         return (
             this.currentLine[0] === '!' &&
-            this.currentLine !==
-            '!  ==> Fatal error occurred, no output PDF file produced!'
+            this.currentLine !== '!  ==> Fatal error occurred, no output PDF file produced!'
         );
     }
 
@@ -152,13 +142,9 @@ export class LatexParser {
             content: '',
             raw: this.currentLine + '\n',
         };
-        this.currentError.content += this.log
-            .linesUpToNextWhitespaceLine()
-            .join('\n');
+        this.currentError.content += this.log.linesUpToNextWhitespaceLine().join('\n');
         this.currentError.content += '\n';
-        this.currentError.content += this.log
-            .linesUpToNextWhitespaceLine()
-            .join('\n');
+        this.currentError.content += this.log.linesUpToNextWhitespaceLine().join('\n');
         this.currentError.raw += this.currentError.content;
         const lineNo = this.currentError.raw.match(/l\.([0-9]+)/);
         if (lineNo) {
@@ -167,7 +153,7 @@ export class LatexParser {
         return this.data.push(this.currentError);
     }
 
-    parseSingleWarningLine(prefixRegex :RegExp) {
+    parseSingleWarningLine(prefixRegex: RegExp) {
         const warningMatch = this.currentLine.match(prefixRegex);
         if (!warningMatch) {
             return;
@@ -181,7 +167,7 @@ export class LatexParser {
             level: 'warning',
             message: warning,
             raw: warning,
-            content: 'Warning' // add new content
+            content: 'Warning', // add new content
         });
     }
 
@@ -198,15 +184,12 @@ export class LatexParser {
         const packageMatch = this.currentLine.match(PACKAGE_REGEX) || [];
         const packageName = packageMatch[1];
         // Regex to get rid of the unnecesary (packagename) prefix in most multi-line warnings
-        const prefixRegex = new RegExp(
-            '(?:\\(' + packageName + '\\))*[\\s]*(.*)',
-            'i'
-        );
+        const prefixRegex = new RegExp('(?:\\(' + packageName + '\\))*[\\s]*(.*)', 'i');
         // After every warning message there's a blank line, let's use it
         while ((this.currentLine = this.log.nextLine())) {
             lineMatch = this.currentLine.match(LINES_REGEX);
             line = lineMatch ? parseInt(lineMatch[1], 10) : line;
-            warningMatch = this.currentLine.match(prefixRegex) || [] ;
+            warningMatch = this.currentLine.match(prefixRegex) || [];
             warningLines.push(warningMatch[1]);
         }
         const rawMessage = warningLines.join(' ');
@@ -216,7 +199,7 @@ export class LatexParser {
             level: 'warning',
             message: rawMessage,
             raw: rawMessage,
-            content: 'Warning' // add new content
+            content: 'Warning', // add new content
         });
     }
 
@@ -229,7 +212,7 @@ export class LatexParser {
             level: 'information',
             message: this.currentLine,
             raw: this.currentLine,
-            content: 'Hbox Warning' // add new content
+            content: 'Hbox Warning', // add new content
         });
     }
 
@@ -315,17 +298,19 @@ export class LatexParser {
     }
 
     postProcess(data: ErrorSchema[]) {
-        const all:ErrorSchema[] = [];
+        const all: ErrorSchema[] = [];
         const hashes = new Set();
 
-        const hashEntry = (entry:ErrorSchema) => entry.raw;
-        const errorsByLevel:Record<string, ErrorSchema[]> = {
+        const hashEntry = (entry: ErrorSchema) => entry.raw;
+        const errorsByLevel: Record<string, ErrorSchema[]> = {
             error: [],
             warning: [],
             information: [],
         };
-        if (data.length === 0 ) {return ;}
-        data.forEach(item => {
+        if (data.length === 0) {
+            return;
+        }
+        data.forEach((item) => {
             const hash = hashEntry(item);
             if (hashes.has(hash)) {
                 return;

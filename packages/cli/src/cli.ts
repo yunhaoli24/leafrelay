@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import {Command} from 'commander';
-import {login} from './login';
-import {daemonRestart, daemonStatus, daemonStop, serve} from './serve';
+import { Command } from 'commander';
+import { login } from './login';
+import { daemonRestart, daemonStatus, daemonStop, serve } from './serve';
 
 declare const LEAFRELAY_VERSION: string;
 
@@ -10,7 +10,8 @@ const program = new Command()
     .description('Keep a local directory synchronized with an Overleaf project.')
     .version(LEAFRELAY_VERSION);
 
-program.command('login')
+program
+    .command('login')
     .description('Authenticate to Overleaf and save the session in ~/.leafrelay/config.json.')
     .argument('[server]', 'Overleaf server URL', 'https://www.overleaf.com/')
     .option('--cookie <cookie>', 'Overleaf browser cookie')
@@ -18,19 +19,19 @@ program.command('login')
     .option('--password <password>', 'Overleaf account password')
     .action(login);
 
-program.command('serve')
+program
+    .command('serve')
     .description('Synchronize the current directory with its configured Overleaf project.')
     .argument('[directory]', 'Local replica directory', process.cwd())
     .action(serve);
 
-const daemon = program.command('daemon')
-    .description('Inspect or control the shared LeafRelay daemon.');
+const daemon = program.command('daemon').description('Inspect or control the shared LeafRelay daemon.');
 
 daemon.command('status').description('Show daemon clients and replicas.').action(daemonStatus);
 daemon.command('stop').description('Stop the daemon and its active replicas.').action(daemonStop);
 daemon.command('restart').description('Restart the daemon.').action(daemonRestart);
 
-program.parseAsync().catch(error => {
+program.parseAsync().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
 });

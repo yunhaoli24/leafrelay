@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
     createSyncState,
     readTextBase,
@@ -40,8 +40,8 @@ describe('sync checkpoint', () => {
 
         removeSyncCheckpoint(state, '/section');
 
-        expect(state.files).toEqual({'/other.tex':sha256(encoder.encode('other'))});
-        expect(state.textBases).toEqual({'/other.tex':'other'});
+        expect(state.files).toEqual({ '/other.tex': sha256(encoder.encode('other')) });
+        expect(state.textBases).toEqual({ '/other.tex': 'other' });
         expect(state.conflicts).toEqual({});
     });
 });

@@ -1,7 +1,7 @@
-import {posix} from 'node:path';
-import type {ProjectFileTreeDiffResponseSchema} from '../api/base';
-import type {RemoteEntry} from './remoteProject';
-import {describeContentChange} from './changeSummary';
+import { posix } from 'node:path';
+import type { ProjectFileTreeDiffResponseSchema } from '../api/base';
+import type { RemoteEntry } from './remoteProject';
+import { describeContentChange } from './changeSummary';
 import {
     createSyncState,
     type LocalReplicaSyncState,
@@ -10,109 +10,127 @@ import {
     sha256,
     updateSyncCheckpoint,
 } from './checkpoint';
-import {mergeText} from './threeWayMerge';
+import { mergeText } from './threeWayMerge';
 
 export interface ReplicaFileSystem {
     listFiles(): Promise<string[]>;
-    read(path:string): Promise<Uint8Array | undefined>;
-    write(path:string, content:Uint8Array): Promise<void>;
-    remove(path:string): Promise<void>;
-    watch(onChange:(path:string) => void): Promise<() => Promise<void>>;
+    read(path: string): Promise<Uint8Array | undefined>;
+    write(path: string, content: Uint8Array): Promise<void>;
+    remove(path: string): Promise<void>;
+    watch(onChange: (path: string) => void): Promise<() => Promise<void>>;
 }
 
 export interface RemoteReplica {
     listEntries(): RemoteEntry[];
-    entry(path:string): RemoteEntry | undefined;
-    read(path:string): Promise<Uint8Array>;
-    write(path:string, content:Uint8Array): Promise<void>;
-    remove(path:string): Promise<void>;
+    entry(path: string): RemoteEntry | undefined;
+    read(path: string): Promise<Uint8Array>;
+    write(path: string, content: Uint8Array): Promise<void>;
+    remove(path: string): Promise<void>;
     getCurrentVersion(): Promise<number>;
-    getFileTreeDiff(from:number, to:number): Promise<ProjectFileTreeDiffResponseSchema | undefined>;
-    onChange(handler:(change:{path:string; previousPath?:string; actor?:string}) => void): () => void;
-    onReconnect?(handler:() => void): () => void;
+    getFileTreeDiff(from: number, to: number): Promise<ProjectFileTreeDiffResponseSchema | undefined>;
+    onChange(handler: (change: { path: string; previousPath?: string; actor?: string }) => void): () => void;
+    onReconnect?(handler: () => void): () => void;
 }
 
 export interface SyncStateStore {
     load(): Promise<LocalReplicaSyncState | undefined>;
-    save(state:LocalReplicaSyncState): Promise<void>;
+    save(state: LocalReplicaSyncState): Promise<void>;
 }
 
 export interface SyncEngineOptions {
-    projectUri:string;
-    local:ReplicaFileSystem;
-    remote:RemoteReplica;
-    stateStore:SyncStateStore;
-    ignore(path:string):boolean;
-    log(message:string):void;
-    onConflict(path:string, reason:string):void;
-    onSyncError?(message:string|undefined):void;
+    projectUri: string;
+    local: ReplicaFileSystem;
+    remote: RemoteReplica;
+    stateStore: SyncStateStore;
+    ignore(path: string): boolean;
+    log(message: string): void;
+    onConflict(path: string, reason: string): void;
+    onSyncError?(message: string | undefined): void;
 }
 
 type ChangeSource = 'local' | 'remote';
 
 interface PendingChange {
-    timer:NodeJS.Timeout;
-    source:ChangeSource;
-    actors:Set<string>;
-    unknownRemoteActor:boolean;
+    timer: NodeJS.Timeout;
+    source: ChangeSource;
+    actors: Set<string>;
+    unknownRemoteActor: boolean;
 }
 
-function normalizePath(path:string):string {
+function normalizePath(path: string): string {
     return `/${posix.normalize(path).replace(/^\/+/, '')}`;
 }
 
-function isRemoteFile(entry:RemoteEntry|undefined):boolean {
-    return entry?.type==='doc' || entry?.type==='file';
+function isRemoteFile(entry: RemoteEntry | undefined): boolean {
+    return entry?.type === 'doc' || entry?.type === 'file';
 }
 
 export class SyncEngine {
     private state?: LocalReplicaSyncState;
-    private queue:Promise<void> = Promise.resolve();
+    private queue: Promise<void> = Promise.resolve();
     private conflicts = new Set<string>();
     private stopLocalWatch?: () => Promise<void>;
-    private stopRemoteChange?:() => void;
-    private stopRemoteReconnect?:() => void;
+    private stopRemoteChange?: () => void;
+    private stopRemoteReconnect?: () => void;
     private eventTimers = new Map<string, PendingChange>();
     private stopped = false;
-    private failedPaths = new Map<string, {source:ChangeSource; actor?:string; message:string}>();
-    private retryTimer?:NodeJS.Timeout;
+    private failedPaths = new Map<string, { source: ChangeSource; actor?: string; message: string }>();
+    private retryTimer?: NodeJS.Timeout;
     private retryDelayMs = 30_000;
-    private pendingRemoteVersion?:number;
+    private pendingRemoteVersion?: number;
     private pendingInitialization = false;
 
-    get syncError():string|undefined {
-        if (this.failedPaths.size===0) { return undefined; }
+    get syncError(): string | undefined {
+        if (this.failedPaths.size === 0) {
+            return undefined;
+        }
         const [path, failure] = this.failedPaths.entries().next().value!;
         return `${this.failedPaths.size} path(s) could not synchronize, including ${path}: ${failure.message}. Other paths remain active; failed paths will retry automatically.`;
     }
 
-    constructor(private readonly options:SyncEngineOptions) {}
+    constructor(private readonly options: SyncEngineOptions) {}
 
-    async start():Promise<void> {
+    async start(): Promise<void> {
         this.stopped = false;
         const startup = this.enqueue(() => this.initialize());
-        try { await startup; }
-        catch (error) { await this.stop(); throw error; }
+        try {
+            await startup;
+        } catch (error) {
+            await this.stop();
+            throw error;
+        }
     }
 
-    private async initialize():Promise<void> {
+    private async initialize(): Promise<void> {
         this.state = await this.options.stateStore.load();
-        this.stopLocalWatch = await this.options.local.watch(path => this.schedule(path, 'local'));
-        this.stopRemoteChange = this.options.remote.onChange(change => {
-            if (this.stopped) { return; }
-            if (change.previousPath) { this.schedule(change.previousPath, 'remote', change.actor); }
+        this.stopLocalWatch = await this.options.local.watch((path) => this.schedule(path, 'local'));
+        this.stopRemoteChange = this.options.remote.onChange((change) => {
+            if (this.stopped) {
+                return;
+            }
+            if (change.previousPath) {
+                this.schedule(change.previousPath, 'remote', change.actor);
+            }
             this.schedule(change.path, 'remote', change.actor);
         });
         this.stopRemoteReconnect = this.options.remote.onReconnect?.(() => {
-            if (this.stopped) { return; }
-            this.queue = this.queue.then(() => this.reconcileAfterReconnect()).catch(error => {
-                this.options.log(`Failed to reconcile after reconnecting: ${error instanceof Error ? error.message : String(error)}`);
-            });
+            if (this.stopped) {
+                return;
+            }
+            this.queue = this.queue
+                .then(() => this.reconcileAfterReconnect())
+                .catch((error) => {
+                    this.options.log(
+                        `Failed to reconcile after reconnecting: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                });
         });
         const currentVersion = await this.options.remote.getCurrentVersion();
         const localFiles = await this.options.local.listFiles();
         const remoteFiles = this.remoteFilePaths();
-        this.options.log(`Checking replica at Overleaf version ${currentVersion}: ${localFiles.length} local file(s), ${remoteFiles.length} remote file(s).`);
+        this.options.log(
+            `Checking replica at Overleaf version ${currentVersion}: ${localFiles.length} local file(s), ${remoteFiles.length} remote file(s).`,
+        );
 
         if (!this.state || !this.state.initialized) {
             await this.initializeState(currentVersion, localFiles, remoteFiles);
@@ -121,47 +139,56 @@ export class SyncEngine {
             await this.startupReconcile(currentVersion, localFiles, remoteFiles);
         }
 
-        this.options.log(this.syncError
-            ? `Synchronization active with pending retries. ${this.syncError}`
-            : `Synchronization active at Overleaf version ${this.state!.remoteVersion}.`);
+        this.options.log(
+            this.syncError
+                ? `Synchronization active with pending retries. ${this.syncError}`
+                : `Synchronization active at Overleaf version ${this.state!.remoteVersion}.`,
+        );
     }
 
-    async stop():Promise<void> {
+    async stop(): Promise<void> {
         this.stopped = true;
-        if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = undefined; }
+        if (this.retryTimer) {
+            clearTimeout(this.retryTimer);
+            this.retryTimer = undefined;
+        }
         this.stopRemoteChange?.();
         this.stopRemoteChange = undefined;
         this.stopRemoteReconnect?.();
         this.stopRemoteReconnect = undefined;
-        for (const pending of this.eventTimers.values()) { clearTimeout(pending.timer); }
+        for (const pending of this.eventTimers.values()) {
+            clearTimeout(pending.timer);
+        }
         this.eventTimers.clear();
         await this.stopLocalWatch?.();
         this.stopLocalWatch = undefined;
         await this.queue;
     }
 
-    getConflicts():string[] {
+    getConflicts(): string[] {
         return [...this.conflicts].sort();
     }
 
-    async resolveConflict(path:string, winner:'local'|'remote'):Promise<void> {
+    async resolveConflict(path: string, winner: 'local' | 'remote'): Promise<void> {
         const normalized = normalizePath(path);
         if (!this.conflicts.has(normalized)) {
             throw new Error(`No unresolved conflict exists for ${normalized}.`);
         }
         await this.enqueue(async () => {
             const remoteEntry = this.options.remote.entry(normalized);
-            if (winner==='local') {
+            if (winner === 'local') {
                 const localContent = await this.options.local.read(normalized);
                 if (localContent) {
                     await this.options.remote.write(normalized, localContent);
                     const synchronized = await this.options.remote.read(normalized);
-                    if (sha256(synchronized)!==sha256(localContent)) {
+                    if (sha256(synchronized) !== sha256(localContent)) {
                         await this.options.local.write(normalized, synchronized);
                     }
                     updateSyncCheckpoint(this.state!, normalized, synchronized);
                 } else {
-                    if (remoteEntry) { await this.options.remote.remove(normalized); }
+                    if (remoteEntry) {
+                        await this.options.remote.remove(normalized);
+                    }
                     removeSyncCheckpoint(this.state!, normalized);
                 }
             } else if (isRemoteFile(remoteEntry)) {
@@ -175,11 +202,11 @@ export class SyncEngine {
             this.conflicts.delete(normalized);
             delete this.state!.conflicts[normalized];
             await this.options.stateStore.save(this.state!);
-            this.options.log(`Resolved ${normalized} using ${winner==='local' ? 'local' : 'Overleaf'} content.`);
+            this.options.log(`Resolved ${normalized} using ${winner === 'local' ? 'local' : 'Overleaf'} content.`);
         });
     }
 
-    async retry(path:string):Promise<void> {
+    async retry(path: string): Promise<void> {
         const normalized = normalizePath(path);
         const reason = this.state!.conflicts[normalized];
         this.conflicts.delete(normalized);
@@ -187,7 +214,7 @@ export class SyncEngine {
         try {
             await this.enqueue(() => this.reconcilePath(normalized, 'local'));
         } catch (error) {
-            if (reason!==undefined) {
+            if (reason !== undefined) {
                 this.conflicts.add(normalized);
                 this.state!.conflicts[normalized] = reason;
                 await this.options.stateStore.save(this.state!);
@@ -196,7 +223,7 @@ export class SyncEngine {
         }
     }
 
-    private async initializeState(currentVersion:number, localFiles:string[], remoteFiles:string[]) {
+    private async initializeState(currentVersion: number, localFiles: string[], remoteFiles: string[]) {
         if (!this.state) {
             this.state = createSyncState(this.options.projectUri, currentVersion, false);
             await this.options.stateStore.save(this.state);
@@ -208,9 +235,11 @@ export class SyncEngine {
         const paths = new Set([...localFiles, ...remoteFiles, ...Object.keys(this.state.files)]);
         for (const path of [...paths].sort()) {
             const normalized = normalizePath(path);
-            if (this.conflicts.has(normalized)) { continue; }
+            if (this.conflicts.has(normalized)) {
+                continue;
+            }
             try {
-                if (this.state.files[normalized]!==undefined) {
+                if (this.state.files[normalized] !== undefined) {
                     await this.synchronizePath(normalized, 'local');
                 } else {
                     await this.initializePath(normalized);
@@ -220,20 +249,22 @@ export class SyncEngine {
             }
         }
         await this.finishRemoteBatch();
-        if (this.conflicts.size!==0) {
+        if (this.conflicts.size !== 0) {
             this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
         }
     }
 
-    private async initializePath(path:string) {
+    private async initializePath(path: string) {
         const remoteEntry = this.options.remote.entry(path);
-        if (remoteEntry?.type==='folder') { return; }
+        if (remoteEntry?.type === 'folder') {
+            return;
+        }
         const localContent = await this.options.local.read(path);
         const remoteContent = isRemoteFile(remoteEntry) ? await this.options.remote.read(path) : undefined;
         const localHash = localContent && sha256(localContent);
         const remoteHash = remoteContent && sha256(remoteContent);
 
-        if (localHash===remoteHash) {
+        if (localHash === remoteHash) {
             if (localContent) {
                 updateSyncCheckpoint(this.state!, path, localContent);
                 await this.options.stateStore.save(this.state!);
@@ -258,66 +289,82 @@ export class SyncEngine {
 
     private restoreConflicts() {
         for (const [path, reason] of Object.entries(this.state!.conflicts)) {
-            if (this.conflicts.has(path)) { continue; }
+            if (this.conflicts.has(path)) {
+                continue;
+            }
             this.conflicts.add(path);
             this.options.onConflict(path, reason);
         }
     }
 
-    private async recordConflict(path:string, reason:string) {
+    private async recordConflict(path: string, reason: string) {
         this.conflicts.add(path);
         this.state!.conflicts[path] = reason;
         await this.options.stateStore.save(this.state!);
         this.options.onConflict(path, reason);
     }
 
-    private async startupReconcile(currentVersion:number, localFiles:string[], remoteFiles:string[]) {
+    private async startupReconcile(currentVersion: number, localFiles: string[], remoteFiles: string[]) {
         const state = this.state!;
-        if (state.remoteVersion>currentVersion) {
+        if (state.remoteVersion > currentVersion) {
             throw new Error('Synchronization paused: the local checkpoint is newer than the Overleaf project history.');
         }
-        const localHashes = new Map<string,string>();
+        const localHashes = new Map<string, string>();
         for (const path of localFiles) {
             const content = await this.options.local.read(path);
-            if (content) { localHashes.set(path, sha256(content)); }
+            if (content) {
+                localHashes.set(path, sha256(content));
+            }
         }
         const localChanged = new Set<string>();
         for (const path of new Set([...Object.keys(state.files), ...localFiles])) {
-            if (state.files[path]!==localHashes.get(path)) { localChanged.add(path); }
+            if (state.files[path] !== localHashes.get(path)) {
+                localChanged.add(path);
+            }
         }
 
-        let remoteDiff:ProjectFileTreeDiffResponseSchema|undefined = {diff:[]};
-        if (state.remoteVersion<currentVersion) {
+        let remoteDiff: ProjectFileTreeDiffResponseSchema | undefined = { diff: [] };
+        if (state.remoteVersion < currentVersion) {
             remoteDiff = await this.options.remote.getFileTreeDiff(state.remoteVersion, currentVersion);
             if (!remoteDiff) {
-                throw new Error('Synchronization paused: Overleaf history is unavailable, so remote changes cannot be distinguished safely.');
+                throw new Error(
+                    'Synchronization paused: Overleaf history is unavailable, so remote changes cannot be distinguished safely.',
+                );
             }
         }
         const candidates = new Set<string>([...localChanged, ...this.failedPaths.keys()]);
         const knownFiles = new Set([...Object.keys(state.files), ...localFiles, ...remoteFiles]);
         for (const path of [...localFiles, ...remoteFiles]) {
-            if (state.files[path]===undefined) { candidates.add(path); }
+            if (state.files[path] === undefined) {
+                candidates.add(path);
+            }
         }
         for (const change of remoteDiff.diff) {
             // Overleaf returns unchanged entries too, with only pathname/editable.
-            if (!change.operation) { continue; }
-            const paths = [change.pathname, change.newPathname].filter((path):path is string => Boolean(path));
+            if (!change.operation) {
+                continue;
+            }
+            const paths = [change.pathname, change.newPathname].filter((path): path is string => Boolean(path));
             for (const changedPath of paths.map(normalizePath)) {
                 let matched = false;
                 for (const filePath of knownFiles) {
-                    if (filePath===changedPath || filePath.startsWith(`${changedPath}/`)) {
+                    if (filePath === changedPath || filePath.startsWith(`${changedPath}/`)) {
                         candidates.add(filePath);
                         matched = true;
                     }
                 }
-                if (!matched) { candidates.add(changedPath); }
+                if (!matched) {
+                    candidates.add(changedPath);
+                }
             }
         }
 
         this.pendingRemoteVersion = currentVersion;
         this.options.log(`Reconciling ${candidates.size} changed path(s).`);
         for (const path of [...candidates].sort()) {
-            if (this.stopped) { return; }
+            if (this.stopped) {
+                return;
+            }
             try {
                 await this.synchronizePath(path, localChanged.has(path) ? 'local' : 'remote');
             } catch (error) {
@@ -325,120 +372,152 @@ export class SyncEngine {
             }
         }
         await this.finishRemoteBatch();
-        if (this.conflicts.size!==0) {
+        if (this.conflicts.size !== 0) {
             this.options.log(`Synchronization remains active; ${this.conflicts.size} conflicting path(s) are paused.`);
         }
     }
 
     private async reconcileAfterReconnect() {
-        if (this.stopped) { return; }
+        if (this.stopped) {
+            return;
+        }
         const currentVersion = await this.options.remote.getCurrentVersion();
-        await this.startupReconcile(
-            currentVersion,
-            await this.options.local.listFiles(),
-            this.remoteFilePaths(),
+        await this.startupReconcile(currentVersion, await this.options.local.listFiles(), this.remoteFilePaths());
+        this.options.log(
+            this.syncError
+                ? `Realtime connection restored; ${this.syncError}`
+                : `Realtime connection restored at Overleaf version ${currentVersion}.`,
         );
-        this.options.log(this.syncError
-            ? `Realtime connection restored; ${this.syncError}`
-            : `Realtime connection restored at Overleaf version ${currentVersion}.`);
     }
 
-    private schedule(path:string, source:ChangeSource, actor?:string) {
+    private schedule(path: string, source: ChangeSource, actor?: string) {
         const normalized = normalizePath(path);
-        if (this.stopped || this.shouldIgnore(normalized) || this.conflicts.has(normalized)) { return; }
+        if (this.stopped || this.shouldIgnore(normalized) || this.conflicts.has(normalized)) {
+            return;
+        }
         const previous = this.eventTimers.get(normalized);
-        if (previous) { clearTimeout(previous.timer); }
+        if (previous) {
+            clearTimeout(previous.timer);
+        }
         const actors = previous?.actors ?? new Set<string>();
         let unknownRemoteActor = previous?.unknownRemoteActor ?? false;
-        if (source==='remote') {
-            if (actor) { actors.add(actor); }
-            else { unknownRemoteActor = true; }
+        if (source === 'remote') {
+            if (actor) {
+                actors.add(actor);
+            } else {
+                unknownRemoteActor = true;
+            }
         }
-        const pending:PendingChange = {
-            source:previous?.source==='local' || source==='local' ? 'local' : 'remote',
+        const pending: PendingChange = {
+            source: previous?.source === 'local' || source === 'local' ? 'local' : 'remote',
             actors,
             unknownRemoteActor,
-            timer:setTimeout(() => {
+            timer: setTimeout(() => {
                 this.eventTimers.delete(normalized);
-                if (this.stopped) { return; }
+                if (this.stopped) {
+                    return;
+                }
                 const remoteActor = pending.unknownRemoteActor
                     ? undefined
-                    : pending.actors.size===1
-                        ? [...pending.actors][0]
-                        : pending.actors.size>1
-                            ? 'multiple Overleaf collaborators'
-                            : undefined;
-                this.queue = this.queue.then(() => this.synchronizePath(normalized, pending.source, remoteActor)).catch(error => {
-                    this.recordFailure(normalized, pending.source, error, remoteActor);
-                });
+                    : pending.actors.size === 1
+                      ? [...pending.actors][0]
+                      : pending.actors.size > 1
+                        ? 'multiple Overleaf collaborators'
+                        : undefined;
+                this.queue = this.queue
+                    .then(() => this.synchronizePath(normalized, pending.source, remoteActor))
+                    .catch((error) => {
+                        this.recordFailure(normalized, pending.source, error, remoteActor);
+                    });
             }, 250),
         };
         this.eventTimers.set(normalized, pending);
     }
 
-    private async synchronizePath(path:string, source:ChangeSource, actor?:string):Promise<void> {
-        if (this.pendingInitialization && this.state!.files[path]===undefined) {
+    private async synchronizePath(path: string, source: ChangeSource, actor?: string): Promise<void> {
+        if (this.pendingInitialization && this.state!.files[path] === undefined) {
             await this.initializePath(path);
         } else {
             await this.reconcilePath(path, source, actor);
         }
-        if (this.failedPaths.delete(path)) { this.options.onSyncError?.(this.syncError); }
+        if (this.failedPaths.delete(path)) {
+            this.options.onSyncError?.(this.syncError);
+        }
     }
 
-    private recordFailure(path:string, source:ChangeSource, error:unknown, actor?:string):void {
+    private recordFailure(path: string, source: ChangeSource, error: unknown, actor?: string): void {
         const message = error instanceof Error ? error.message : String(error);
-        this.failedPaths.set(path, {source, actor, message});
+        this.failedPaths.set(path, { source, actor, message });
         this.options.log(`Failed to synchronize ${path}: ${message}; retrying without stopping other paths.`);
         this.options.onSyncError?.(this.syncError);
         this.scheduleRetry();
     }
 
-    private scheduleRetry():void {
-        if (this.stopped || this.retryTimer || this.failedPaths.size===0) { return; }
+    private scheduleRetry(): void {
+        if (this.stopped || this.retryTimer || this.failedPaths.size === 0) {
+            return;
+        }
         this.retryTimer = setTimeout(() => {
             this.retryTimer = undefined;
             void this.enqueue(async () => {
-                if (this.stopped) { return; }
-                for (const [path, failure] of [...this.failedPaths]) {
-                    if (this.stopped) { return; }
+                if (this.stopped) {
+                    return;
+                }
+                for (const [path, failure] of Array.from(this.failedPaths)) {
+                    if (this.stopped) {
+                        return;
+                    }
                     try {
                         await this.synchronizePath(path, failure.source, failure.actor);
                         this.options.log(`Recovered synchronization for ${path}.`);
                     } catch (error) {
                         // Schedule once after the entire retry batch.
                         const message = error instanceof Error ? error.message : String(error);
-                        this.failedPaths.set(path, {...failure, message});
+                        this.failedPaths.set(path, { ...failure, message });
                         this.options.log(`Retry failed for ${path}: ${message}`);
                     }
                 }
                 await this.finishRemoteBatch();
-            }).catch(error => this.options.log(`Could not checkpoint retry batch: ${String(error)}`)).finally(() => {
-                this.retryDelayMs = this.failedPaths.size ? Math.min(this.retryDelayMs*2, 120_000) : 30_000;
-                this.scheduleRetry();
-            });
+            })
+                .catch((error) => this.options.log(`Could not checkpoint retry batch: ${String(error)}`))
+                .finally(() => {
+                    this.retryDelayMs = this.failedPaths.size ? Math.min(this.retryDelayMs * 2, 120_000) : 30_000;
+                    this.scheduleRetry();
+                });
         }, this.retryDelayMs);
     }
 
-    private async finishRemoteBatch():Promise<void> {
-        if (this.stopped || this.failedPaths.size || this.pendingRemoteVersion===undefined) { return; }
+    private async finishRemoteBatch(): Promise<void> {
+        if (this.stopped || this.failedPaths.size || this.pendingRemoteVersion === undefined) {
+            return;
+        }
         this.state!.remoteVersion = this.pendingRemoteVersion;
-        if (this.pendingInitialization) { this.state!.initialized = true; }
+        if (this.pendingInitialization) {
+            this.state!.initialized = true;
+        }
         await this.options.stateStore.save(this.state!);
         this.pendingRemoteVersion = undefined;
         this.pendingInitialization = false;
     }
 
-    private enqueue<T>(operation:() => Promise<T>):Promise<T> {
+    private enqueue<T>(operation: () => Promise<T>): Promise<T> {
         const result = this.queue.then(operation);
-        this.queue = result.then(() => undefined, () => undefined);
+        this.queue = result.then(
+            () => undefined,
+            () => undefined,
+        );
         return result;
     }
 
-    private async reconcilePath(path:string, source:ChangeSource, actor?:string):Promise<void> {
+    private async reconcilePath(path: string, source: ChangeSource, actor?: string): Promise<void> {
         const normalized = normalizePath(path);
-        if (this.stopped || this.shouldIgnore(normalized) || this.conflicts.has(normalized)) { return; }
+        if (this.stopped || this.shouldIgnore(normalized) || this.conflicts.has(normalized)) {
+            return;
+        }
         const remoteEntry = this.options.remote.entry(normalized);
-        if (remoteEntry?.type==='folder') { return; }
+        if (remoteEntry?.type === 'folder') {
+            return;
+        }
         const localContent = await this.options.local.read(normalized);
         const remoteContent = isRemoteFile(remoteEntry) ? await this.options.remote.read(normalized) : undefined;
         const baseHash = this.state!.files[normalized];
@@ -446,21 +525,24 @@ export class SyncEngine {
         const localHash = localContent && sha256(localContent);
         const remoteHash = remoteContent && sha256(remoteContent);
 
-        if (localHash===remoteHash) {
-            if (localHash!==baseHash) {
-                if (localContent) { updateSyncCheckpoint(this.state!, normalized, localContent); }
-                else { removeSyncCheckpoint(this.state!, normalized); }
+        if (localHash === remoteHash) {
+            if (localHash !== baseHash) {
+                if (localContent) {
+                    updateSyncCheckpoint(this.state!, normalized, localContent);
+                } else {
+                    removeSyncCheckpoint(this.state!, normalized);
+                }
                 await this.options.stateStore.save(this.state!);
             }
             return;
         }
 
-        const localChanged = localHash!==baseHash;
-        const remoteChanged = remoteHash!==baseHash;
+        const localChanged = localHash !== baseHash;
+        const remoteChanged = remoteHash !== baseHash;
         if (localChanged && remoteChanged) {
             if (baseContent && localContent && remoteContent) {
                 const merged = mergeText(baseContent, localContent, remoteContent);
-                if (merged.status==='merged' && merged.content) {
+                if (merged.status === 'merged' && merged.content) {
                     await this.options.local.write(normalized, merged.content);
                     await this.options.remote.write(normalized, merged.content);
                     updateSyncCheckpoint(this.state!, normalized, merged.content);
@@ -474,11 +556,11 @@ export class SyncEngine {
             return;
         }
 
-        if (source==='remote' && localChanged && !remoteChanged) {
+        if (source === 'remote' && localChanged && !remoteChanged) {
             return;
         }
 
-        if (localChanged || (!remoteChanged && source==='local')) {
+        if (localChanged || (!remoteChanged && source === 'local')) {
             let pushedContent = localContent;
             if (!localContent) {
                 if (remoteEntry) {
@@ -488,7 +570,7 @@ export class SyncEngine {
             } else {
                 await this.options.remote.write(normalized, localContent);
                 const synchronized = await this.options.remote.read(normalized);
-                if (sha256(synchronized)!==sha256(localContent)) {
+                if (sha256(synchronized) !== sha256(localContent)) {
                     await this.options.local.write(normalized, synchronized);
                 }
                 pushedContent = synchronized;
@@ -499,8 +581,12 @@ export class SyncEngine {
                 this.logChange('push', 'delete', normalized, baseContent ?? remoteContent, undefined, actor);
             } else if (localContent) {
                 this.logChange(
-                    'push', remoteEntry ? 'update' : 'add', normalized,
-                    baseContent ?? remoteContent, pushedContent, actor,
+                    'push',
+                    remoteEntry ? 'update' : 'add',
+                    normalized,
+                    baseContent ?? remoteContent,
+                    pushedContent,
+                    actor,
                 );
             }
             return;
@@ -520,40 +606,46 @@ export class SyncEngine {
             this.logChange('pull', 'delete', normalized, baseContent ?? localContent, undefined, actor);
         } else if (remoteContent) {
             this.logChange(
-                'pull', localContent ? 'update' : 'add', normalized,
-                baseContent ?? localContent, remoteContent, actor,
+                'pull',
+                localContent ? 'update' : 'add',
+                normalized,
+                baseContent ?? localContent,
+                remoteContent,
+                actor,
             );
         }
     }
 
     private logChange(
-        direction:'push'|'pull'|'merge',
-        operation:'add'|'update'|'delete',
-        path:string,
-        before?:Uint8Array,
-        after?:Uint8Array,
-        actor?:string,
-    ):void {
+        direction: 'push' | 'pull' | 'merge',
+        operation: 'add' | 'update' | 'delete',
+        path: string,
+        before?: Uint8Array,
+        after?: Uint8Array,
+        actor?: string,
+    ): void {
         const summary = describeContentChange(before, after);
-        const source = direction==='push'
-            ? 'local filesystem'
-            : direction==='pull'
-                ? actor ?? 'Overleaf'
-                : `local filesystem + ${actor ?? 'Overleaf'}`;
-        this.options.log([
-            `[${direction}] ${operation} ${JSON.stringify(path)}`,
-            summary,
-            `source=${source}`,
-        ].filter(Boolean).join('; '));
+        const source =
+            direction === 'push'
+                ? 'local filesystem'
+                : direction === 'pull'
+                  ? (actor ?? 'Overleaf')
+                  : `local filesystem + ${actor ?? 'Overleaf'}`;
+        this.options.log(
+            [`[${direction}] ${operation} ${JSON.stringify(path)}`, summary, `source=${source}`]
+                .filter(Boolean)
+                .join('; '),
+        );
     }
 
-    private remoteFilePaths():string[] {
-        return this.options.remote.listEntries()
-            .filter(entry => isRemoteFile(entry) && !this.shouldIgnore(entry.path))
-            .map(entry => entry.path);
+    private remoteFilePaths(): string[] {
+        return this.options.remote
+            .listEntries()
+            .filter((entry) => isRemoteFile(entry) && !this.shouldIgnore(entry.path))
+            .map((entry) => entry.path);
     }
 
-    private shouldIgnore(path:string):boolean {
-        return this.options.ignore(path) || path.split('/').some(part => part.startsWith('.'));
+    private shouldIgnore(path: string): boolean {
+        return this.options.ignore(path) || path.split('/').some((part) => part.startsWith('.'));
     }
 }

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-
 export type FileType = 'doc' | 'file' | 'folder' | 'outputs';
 export type FolderKey = 'docs' | 'fileRefs' | 'folders' | 'outputs';
 
@@ -66,8 +64,8 @@ export interface MemberEntity {
 
 export interface ProjectSettingsSchema {
     learnedWords: string[];
-    languages: Array<{code:string; name:string}>;
-    compilers: Array<{code:string; name:string}>;
+    languages: Array<{ code: string; name: string }>;
+    compilers: Array<{ code: string; name: string }>;
 }
 
 export interface ProjectEntity {

@@ -1,5 +1,5 @@
-import {describe, expect, it} from 'vitest';
-import {isCurrentCollaborator} from '../src/collaboration/collaboratorIdentity';
+import { describe, expect, it } from 'vitest';
+import { isCurrentCollaborator } from '../src/collaboration/collaboratorIdentity';
 
 describe('collaborator identity', () => {
     it('recognizes the current connection and other connections from the same account', () => {

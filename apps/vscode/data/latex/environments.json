@@ -1,9 +1,18 @@
 {
   "common": [
-    "abstract", "align", "align*",
-    "center", "document", "equation", "equation*",
-    "gather", "gather*",
-    "multline", "multline*", "quote", "split",
+    "abstract",
+    "align",
+    "align*",
+    "center",
+    "document",
+    "equation",
+    "equation*",
+    "gather",
+    "gather*",
+    "multline",
+    "multline*",
+    "quote",
+    "split",
     "verbatim"
   ],
   "expanded": {

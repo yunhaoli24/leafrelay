@@ -1,8 +1,8 @@
-import {createHash} from 'node:crypto';
-import {posix} from 'node:path';
+import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
 import DiffMatchPatch from 'diff-match-patch';
-import {BaseAPI, type Identity, type ProjectFileTreeDiffResponseSchema} from '../api/base';
-import {SocketIOAPI, type UpdateSchema} from '../api/socketio';
+import { BaseAPI, type Identity, type ProjectFileTreeDiffResponseSchema } from '../api/base';
+import { SocketIOAPI, type UpdateSchema } from '../api/socketio';
 import type {
     DocumentEntity,
     FileEntity,
@@ -19,12 +19,12 @@ export interface RemoteEntry {
     parent?: FolderEntity;
 }
 
-export type RemoteChange = {path:string; previousPath?:string; actor?:string};
+export type RemoteChange = { path: string; previousPath?: string; actor?: string };
 
 export interface RemoteProjectTransport {
-    api:BaseAPI;
-    identity:Identity;
-    socket:SocketIOAPI;
+    api: BaseAPI;
+    identity: Identity;
+    socket: SocketIOAPI;
 }
 
 function normalizePath(path: string): string {
@@ -36,9 +36,11 @@ function normalizePath(path: string): string {
 }
 
 function textContent(content: Uint8Array): string | undefined {
-    if (content.includes(0)) { return undefined; }
+    if (content.includes(0)) {
+        return undefined;
+    }
     try {
-        return new TextDecoder('utf-8', {fatal:true}).decode(content);
+        return new TextDecoder('utf-8', { fatal: true }).decode(content);
     } catch {
         return undefined;
     }
@@ -51,16 +53,16 @@ export class RemoteProject {
     private project!: ProjectEntity;
     private readonly entries = new Map<string, RemoteEntry>();
     private readonly idToPath = new Map<string, string>();
-    private readonly collaboratorNames = new Map<string,string>();
-    private changeHandler?: (change:RemoteChange) => void;
+    private readonly collaboratorNames = new Map<string, string>();
+    private changeHandler?: (change: RemoteChange) => void;
     private reconnectHandler?: () => void;
-    private readonly externalTransport?:RemoteProjectTransport;
+    private readonly externalTransport?: RemoteProjectTransport;
 
     constructor(
-        private readonly url:string,
-        private readonly projectId:string,
-        private readonly cookies:string,
-        transport?:RemoteProjectTransport,
+        private readonly url: string,
+        private readonly projectId: string,
+        private readonly cookies: string,
+        transport?: RemoteProjectTransport,
     ) {
         this.externalTransport = transport;
         this.api = transport?.api ?? new BaseAPI(url);
@@ -72,7 +74,7 @@ export class RemoteProject {
             this.socket = this.externalTransport.socket;
         } else {
             const login = await this.api.cookiesLogin(this.cookies);
-            if (login.type!=='success' || !login.identity) {
+            if (login.type !== 'success' || !login.identity) {
                 throw new Error(login.message || `Authentication to ${this.url} failed.`);
             }
             this.identity = login.identity;
@@ -85,20 +87,26 @@ export class RemoteProject {
     }
 
     disconnect() {
-        if (!this.externalTransport) { this.socket?.disconnect(); }
+        if (!this.externalTransport) {
+            this.socket?.disconnect();
+        }
     }
 
-    onChange(handler: (change:RemoteChange) => void) {
+    onChange(handler: (change: RemoteChange) => void) {
         this.changeHandler = handler;
         return () => {
-            if (this.changeHandler===handler) { this.changeHandler = undefined; }
+            if (this.changeHandler === handler) {
+                this.changeHandler = undefined;
+            }
         };
     }
 
-    onReconnect(handler:() => void) {
+    onReconnect(handler: () => void) {
         this.reconnectHandler = handler;
         return () => {
-            if (this.reconnectHandler===handler) { this.reconnectHandler = undefined; }
+            if (this.reconnectHandler === handler) {
+                this.reconnectHandler = undefined;
+            }
         };
     }
 
@@ -112,13 +120,15 @@ export class RemoteProject {
 
     async read(path: string): Promise<Uint8Array> {
         const entry = this.requireEntry(path);
-        if (entry.type==='doc') {
+        if (entry.type === 'doc') {
             const result = await this.socket.joinDoc(entry.entity._id);
             return new TextEncoder().encode(result.docLines.join('\n'));
         }
-        if (entry.type==='file') {
+        if (entry.type === 'file') {
             const result = await this.api.getFile(this.identity, this.projectId, entry.entity._id);
-            if (result.type==='success' && result.content) { return result.content; }
+            if (result.type === 'success' && result.content) {
+                return result.content;
+            }
             throw new Error(`Could not download ${path}.`);
         }
         throw new Error(`${path} is not a file.`);
@@ -126,10 +136,12 @@ export class RemoteProject {
 
     async mkdir(path: string): Promise<void> {
         const normalized = normalizePath(path);
-        if (this.entries.has(normalized)) { return; }
-        const {parent, name} = await this.ensureParent(normalized);
+        if (this.entries.has(normalized)) {
+            return;
+        }
+        const { parent, name } = await this.ensureParent(normalized);
         const result = await this.api.addFolder(this.identity, this.projectId, name, parent._id);
-        if (result.type!=='success' || !result.entity) {
+        if (result.type !== 'success' || !result.entity) {
             throw new Error(result.message || `Could not create ${normalized}.`);
         }
         const folder = result.entity as FolderEntity;
@@ -144,32 +156,34 @@ export class RemoteProject {
     async write(path: string, content: Uint8Array): Promise<void> {
         const normalized = normalizePath(path);
         const existing = this.entries.get(normalized);
-        if (existing?.type==='folder') {
+        if (existing?.type === 'folder') {
             throw new Error(`${normalized} is a directory.`);
         }
-        if (existing?.type==='doc') {
+        if (existing?.type === 'doc') {
             await this.writeDocument(existing.entity as DocumentEntity, content);
             return;
         }
         if (existing) {
             await this.remove(normalized);
         }
-        const {parent, name} = await this.ensureParent(normalized);
+        const { parent, name } = await this.ensureParent(normalized);
         const text = textContent(content);
-        if (text!==undefined) {
+        if (text !== undefined) {
             const created = await this.api.addDoc(this.identity, this.projectId, parent._id, name);
-            if (created.type!=='success' || !created.entity) {
+            if (created.type !== 'success' || !created.entity) {
                 throw new Error(created.message || `Could not create ${normalized}.`);
             }
             const entity = created.entity as DocumentEntity;
             entity._type = 'doc';
             parent.docs.push(entity);
             this.reindex();
-            if (content.length!==0) { await this.writeDocument(entity, content); }
+            if (content.length !== 0) {
+                await this.writeDocument(entity, content);
+            }
             return;
         }
         const uploaded = await this.api.uploadFile(this.identity, this.projectId, parent._id, name, content);
-        if (uploaded.type!=='success' || !uploaded.entity) {
+        if (uploaded.type !== 'success' || !uploaded.entity) {
             throw new Error(uploaded.message || `Could not upload ${normalized}.`);
         }
         const entity = uploaded.entity as FileRefEntity;
@@ -181,9 +195,11 @@ export class RemoteProject {
     async remove(path: string): Promise<void> {
         const normalized = normalizePath(path);
         const entry = this.requireEntry(normalized);
-        if (!entry.parent) { throw new Error('The project root cannot be removed.'); }
+        if (!entry.parent) {
+            throw new Error('The project root cannot be removed.');
+        }
         const result = await this.api.deleteEntity(this.identity, this.projectId, entry.type, entry.entity._id);
-        if (result.type!=='success') {
+        if (result.type !== 'success') {
             throw new Error(result.message || `Could not remove ${normalized}.`);
         }
         this.removeFromParent(entry);
@@ -193,25 +209,29 @@ export class RemoteProject {
     async getCurrentVersion(): Promise<number> {
         const response = await this.api.proxyToHistoryApiAndGetUpdates(this.identity, this.projectId);
         const version = response.updates?.updates.at(0)?.toV ?? 0;
-        if (response.type!=='success' || !Number.isInteger(version)) {
+        if (response.type !== 'success' || !Number.isInteger(version)) {
             throw new Error(response.message || 'Could not determine the current Overleaf project version.');
         }
         return version;
     }
 
-    async getFileTreeDiff(from:number, to:number): Promise<ProjectFileTreeDiffResponseSchema | undefined> {
-        if (from>=to) { return {diff:[]}; }
-        const response = await this.api.proxyToHistoryApiAndGetFileTreeDiff(
-            this.identity, this.projectId, from, to,
-        );
-        if (response.type==='success') { return response.treeDiff; }
-        if (response.statusCode===404) { return undefined; }
+    async getFileTreeDiff(from: number, to: number): Promise<ProjectFileTreeDiffResponseSchema | undefined> {
+        if (from >= to) {
+            return { diff: [] };
+        }
+        const response = await this.api.proxyToHistoryApiAndGetFileTreeDiff(this.identity, this.projectId, from, to);
+        if (response.type === 'success') {
+            return response.treeDiff;
+        }
+        if (response.statusCode === 404) {
+            return undefined;
+        }
         throw new Error(response.message || 'Could not load the Overleaf file-tree history.');
     }
 
     private async writeDocument(entity: DocumentEntity, content: Uint8Array): Promise<void> {
         const text = textContent(content);
-        if (text===undefined) {
+        if (text === undefined) {
             const path = this.idToPath.get(entity._id)!;
             await this.remove(path);
             await this.write(path, content);
@@ -219,41 +239,51 @@ export class RemoteProject {
         }
         const remote = await this.socket.joinDoc(entity._id);
         const previous = remote.docLines.join('\n');
-        if (previous===text) { return; }
+        if (previous === text) {
+            return;
+        }
         let position = 0;
-        const operations:NonNullable<UpdateSchema['op']> = [];
+        const operations: NonNullable<UpdateSchema['op']> = [];
         for (const part of new DiffMatchPatch().diff_main(previous, text)) {
             const start = position;
-            if (part[0]!==-1) { position += part[1].length; }
-            if (part[0]===1) { operations.push({p:start, i:part[1]}); }
-            if (part[0]===-1) { operations.push({p:start, d:part[1]}); }
+            if (part[0] !== -1) {
+                position += part[1].length;
+            }
+            if (part[0] === 1) {
+                operations.push({ p: start, i: part[1] });
+            }
+            if (part[0] === -1) {
+                operations.push({ p: start, d: part[1] });
+            }
         }
         const update: UpdateSchema = {
-            doc:entity._id,
-            v:remote.version,
-            hash:createHash('sha1').update(`blob ${text.length}\x00${text}`).digest('hex'),
-            op:operations,
+            doc: entity._id,
+            v: remote.version,
+            hash: createHash('sha1').update(`blob ${text.length}\x00${text}`).digest('hex'),
+            op: operations,
         };
         await this.socket.applyOtUpdate(entity._id, update);
     }
 
-    private async ensureParent(path: string): Promise<{parent:FolderEntity; name:string}> {
+    private async ensureParent(path: string): Promise<{ parent: FolderEntity; name: string }> {
         const name = posix.basename(path);
         const parentPath = posix.dirname(path);
-        if (parentPath!=='/' && !this.entries.has(parentPath)) {
+        if (parentPath !== '/' && !this.entries.has(parentPath)) {
             await this.mkdir(parentPath);
         }
-        const parentEntry = parentPath==='/' ? this.entries.get('/') : this.entries.get(parentPath);
-        if (!parentEntry || parentEntry.type!=='folder') {
+        const parentEntry = parentPath === '/' ? this.entries.get('/') : this.entries.get(parentPath);
+        if (!parentEntry || parentEntry.type !== 'folder') {
             throw new Error(`Parent directory ${parentPath} does not exist.`);
         }
-        return {parent:parentEntry.entity as FolderEntity, name};
+        return { parent: parentEntry.entity as FolderEntity, name };
     }
 
     private requireEntry(path: string): RemoteEntry {
         const normalized = normalizePath(path);
         const entry = this.entries.get(normalized);
-        if (!entry) { throw new Error(`Remote path not found: ${normalized}`); }
+        if (!entry) {
+            throw new Error(`Remote path not found: ${normalized}`);
+        }
         return entry;
     }
 
@@ -265,8 +295,8 @@ export class RemoteProject {
         this.indexFolder(root, '/');
     }
 
-    private indexFolder(folder: FolderEntity, path: string, parent?:FolderEntity) {
-        this.entries.set(path, {path, type:'folder', entity:folder, parent});
+    private indexFolder(folder: FolderEntity, path: string, parent?: FolderEntity) {
+        this.entries.set(path, { path, type: 'folder', entity: folder, parent });
         this.idToPath.set(folder._id, path);
         for (const child of folder.folders ?? []) {
             child._type = 'folder';
@@ -275,73 +305,92 @@ export class RemoteProject {
         for (const child of folder.docs ?? []) {
             child._type = 'doc';
             const childPath = normalizePath(posix.join(path, child.name));
-            this.entries.set(childPath, {path:childPath, type:'doc', entity:child, parent:folder});
+            this.entries.set(childPath, { path: childPath, type: 'doc', entity: child, parent: folder });
             this.idToPath.set(child._id, childPath);
         }
         for (const child of folder.fileRefs ?? []) {
             child._type = 'file';
             const childPath = normalizePath(posix.join(path, child.name));
-            this.entries.set(childPath, {path:childPath, type:'file', entity:child, parent:folder});
+            this.entries.set(childPath, { path: childPath, type: 'file', entity: child, parent: folder });
             this.idToPath.set(child._id, childPath);
         }
     }
 
-    private folderById(id:string): FolderEntity | undefined {
+    private folderById(id: string): FolderEntity | undefined {
         const path = this.idToPath.get(id);
         const entry = path ? this.entries.get(path) : undefined;
-        return entry?.type==='folder' ? entry.entity as FolderEntity : undefined;
+        return entry?.type === 'folder' ? (entry.entity as FolderEntity) : undefined;
     }
 
     private removeFromParent(entry: RemoteEntry) {
-        if (!entry.parent) { return; }
-        const collection = entry.type==='folder'
-            ? entry.parent.folders
-            : entry.type==='doc' ? entry.parent.docs : entry.parent.fileRefs;
-        const index = collection.findIndex(item => item._id===entry.entity._id);
-        if (index!==-1) { collection.splice(index, 1); }
+        if (!entry.parent) {
+            return;
+        }
+        const collection =
+            entry.type === 'folder'
+                ? entry.parent.folders
+                : entry.type === 'doc'
+                  ? entry.parent.docs
+                  : entry.parent.fileRefs;
+        const index = collection.findIndex((item) => item._id === entry.entity._id);
+        if (index !== -1) {
+            collection.splice(index, 1);
+        }
     }
 
-    private emitChange(path:string, previousPath?:string, actor?:string) {
-        this.changeHandler?.({path:normalizePath(path), previousPath, actor});
+    private emitChange(path: string, previousPath?: string, actor?: string) {
+        this.changeHandler?.({ path: normalizePath(path), previousPath, actor });
     }
 
     private indexCollaborators() {
         for (const member of [this.project.owner, ...this.project.members]) {
-            if (!member?._id) { continue; }
+            if (!member?._id) {
+                continue;
+            }
             const name = [member.first_name, member.last_name].filter(Boolean).join(' ').trim();
-            if (name) { this.collaboratorNames.set(member._id, name); }
+            if (name) {
+                this.collaboratorNames.set(member._id, name);
+            }
         }
     }
 
-    private actor(userId:string|undefined):string|undefined {
-        if (!userId) { return undefined; }
+    private actor(userId: string | undefined): string | undefined {
+        if (!userId) {
+            return undefined;
+        }
         const name = this.collaboratorNames.get(userId);
         return name ? `${name} (Overleaf)` : `Overleaf user ${userId}`;
     }
 
     private registerEvents() {
         this.socket.updateEventHandlers({
-            onProjectJoined:project => {
+            onProjectJoined: (project) => {
                 this.project = project;
                 this.indexCollaborators();
                 this.reindex();
                 this.reconnectHandler?.();
             },
-            onClientUpdated:user => {
-                if (user.user_id && user.name) { this.collaboratorNames.set(user.user_id, user.name); }
+            onClientUpdated: (user) => {
+                if (user.user_id && user.name) {
+                    this.collaboratorNames.set(user.user_id, user.name);
+                }
             },
-            onFileCreated:(parentId, type, entity) => {
+            onFileCreated: (parentId, type, entity) => {
                 const parent = this.folderById(parentId);
-                if (!parent || type==='outputs') { return; }
-                if (this.idToPath.has(entity._id)) { return; }
+                if (!parent || type === 'outputs') {
+                    return;
+                }
+                if (this.idToPath.has(entity._id)) {
+                    return;
+                }
                 entity._type = type;
-                if (type==='folder') {
+                if (type === 'folder') {
                     const folder = entity as FolderEntity;
                     folder.docs ??= [];
                     folder.fileRefs ??= [];
                     folder.folders ??= [];
                     parent.folders.push(folder);
-                } else if (type==='doc') {
+                } else if (type === 'doc') {
                     parent.docs.push(entity as DocumentEntity);
                 } else {
                     parent.fileRefs.push(entity as FileRefEntity);
@@ -350,36 +399,48 @@ export class RemoteProject {
                 this.reindex();
                 this.emitChange(posix.join(parentPath, entity.name));
             },
-            onFileRenamed:(entityId, newName) => {
+            onFileRenamed: (entityId, newName) => {
                 const previousPath = this.idToPath.get(entityId);
-                if (!previousPath) { return; }
+                if (!previousPath) {
+                    return;
+                }
                 this.entries.get(previousPath)!.entity.name = newName;
                 this.reindex();
                 this.emitChange(this.idToPath.get(entityId)!, previousPath);
             },
-            onFileRemoved:(entityId) => {
+            onFileRemoved: (entityId) => {
                 const previousPath = this.idToPath.get(entityId);
-                if (!previousPath) { return; }
+                if (!previousPath) {
+                    return;
+                }
                 const entry = this.entries.get(previousPath)!;
                 this.removeFromParent(entry);
                 this.reindex();
                 this.emitChange(previousPath);
             },
-            onFileMoved:(entityId, parentId) => {
+            onFileMoved: (entityId, parentId) => {
                 const previousPath = this.idToPath.get(entityId);
                 const nextParent = this.folderById(parentId);
-                if (!previousPath || !nextParent) { return; }
+                if (!previousPath || !nextParent) {
+                    return;
+                }
                 const entry = this.entries.get(previousPath)!;
                 this.removeFromParent(entry);
-                if (entry.type==='folder') { nextParent.folders.push(entry.entity as FolderEntity); }
-                else if (entry.type==='doc') { nextParent.docs.push(entry.entity as DocumentEntity); }
-                else { nextParent.fileRefs.push(entry.entity as FileRefEntity); }
+                if (entry.type === 'folder') {
+                    nextParent.folders.push(entry.entity as FolderEntity);
+                } else if (entry.type === 'doc') {
+                    nextParent.docs.push(entry.entity as DocumentEntity);
+                } else {
+                    nextParent.fileRefs.push(entry.entity as FileRefEntity);
+                }
                 this.reindex();
                 this.emitChange(this.idToPath.get(entityId)!, previousPath);
             },
-            onFileChanged:update => {
+            onFileChanged: (update) => {
                 const path = this.idToPath.get(update.doc);
-                if (path) { this.emitChange(path, undefined, this.actor(update.meta?.user_id)); }
+                if (path) {
+                    this.emitChange(path, undefined, this.actor(update.meta?.user_id));
+                }
             },
         });
     }

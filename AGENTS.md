@@ -43,8 +43,9 @@
 ## Toolchain
 
 - Use the pnpm workspace and the version declared in `package.json`; do not reintroduce npm lock files or per-package lock files.
-- The extension runtime is bundled with esbuild. Keep `vscode` external and package `apps/vscode` with `--no-dependencies`.
+- Library, CLI, daemon, and extension bundles use tsdown (Rolldown/Oxc) with ESM output. Keep `vscode` external and package `apps/vscode` with `--no-dependencies`.
 - Use Node's stable WebSocket implementation for Overleaf realtime transport. Do not reintroduce the patched Socket.IO 0.9 client, copied CommonJS runtime, or `patch-package`.
+- Use Oxlint for linting and Oxfmt for repository formatting (`pnpm lint`, `pnpm format:check`). Prettier remains a runtime dependency only for the LaTeX formatter, which Oxfmt does not support.
 - Unit tests use Vitest and must run in GitHub Actions for pull requests.
 
 ## Release Process
