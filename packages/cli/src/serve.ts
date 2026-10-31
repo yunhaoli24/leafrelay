@@ -1,26 +1,28 @@
-import {LeafRelayDaemonClient} from '@leafrelay/daemon';
-import type {ReplicaAttachResult, ReplicaConflictNotification, ReplicaStatusNotification} from '@leafrelay/protocol';
-import {connectCliDaemon} from './daemonClient';
+import { LeafRelayDaemonClient } from '@leafrelay/daemon';
+import type { ReplicaAttachResult, ReplicaConflictNotification, ReplicaStatusNotification } from '@leafrelay/protocol';
+import { connectCliDaemon } from './daemonClient';
 
 export interface RunningServe {
-    readonly replica:ReplicaAttachResult;
-    stop():Promise<void>;
+    readonly replica: ReplicaAttachResult;
+    stop(): Promise<void>;
 }
 
-export async function startServe(directory=process.cwd()):Promise<RunningServe> {
+export async function startServe(directory = process.cwd()): Promise<RunningServe> {
     const client = await connectCliDaemon();
-    client.onLog(event => console.log(`${event.timestamp} [${event.level}] ${event.message}`));
-    client.onReplicaStatus((event:ReplicaStatusNotification) => {
-        console.log(`Replica ${event.replicaId}: ${event.status.state}${event.status.message ? ` (${event.status.message})` : ''}`);
+    client.onLog((event) => console.log(`${event.timestamp} [${event.level}] ${event.message}`));
+    client.onReplicaStatus((event: ReplicaStatusNotification) => {
+        console.log(
+            `Replica ${event.replicaId}: ${event.status.state}${event.status.message ? ` (${event.status.message})` : ''}`,
+        );
     });
-    client.onReplicaConflict((event:ReplicaConflictNotification) => {
+    client.onReplicaConflict((event: ReplicaConflictNotification) => {
         console.error(`Conflict in ${event.path}: ${event.reason}`);
     });
     try {
-        const replica = await client.attachReplica({directory});
+        const replica = await client.attachReplica({ directory });
         return {
             replica,
-            stop:async () => {
+            stop: async () => {
                 await client.detachReplica(replica.replicaId);
                 client.close();
             },
@@ -31,14 +33,16 @@ export async function startServe(directory=process.cwd()):Promise<RunningServe> 
     }
 }
 
-export async function serve(directory=process.cwd()):Promise<void> {
+export async function serve(directory = process.cwd()): Promise<void> {
     const running = await startServe(directory);
-    console.log(`${running.replica.shared ? 'Attached to' : 'Started'} ${running.replica.projectName} at ${running.replica.root}.`);
+    console.log(
+        `${running.replica.shared ? 'Attached to' : 'Started'} ${running.replica.projectName} at ${running.replica.root}.`,
+    );
     await new Promise<void>((resolveStop) => {
         const stop = () => {
             process.off('SIGINT', stop);
             process.off('SIGTERM', stop);
-            running.stop().then(resolveStop, error => {
+            running.stop().then(resolveStop, (error) => {
                 console.error(error);
                 resolveStop();
             });
@@ -48,8 +52,8 @@ export async function serve(directory=process.cwd()):Promise<void> {
     });
 }
 
-export async function daemonStatus():Promise<void> {
-    let client:LeafRelayDaemonClient|undefined;
+export async function daemonStatus(): Promise<void> {
+    let client: LeafRelayDaemonClient | undefined;
     try {
         client = await connectCliDaemon(false);
         console.log(JSON.stringify(await client.status(), null, 2));
@@ -60,8 +64,8 @@ export async function daemonStatus():Promise<void> {
     }
 }
 
-export async function daemonStop():Promise<void> {
-    let client:LeafRelayDaemonClient|undefined;
+export async function daemonStop(): Promise<void> {
+    let client: LeafRelayDaemonClient | undefined;
     try {
         client = await connectCliDaemon(false);
         await client.shutdownDaemon();
@@ -73,7 +77,7 @@ export async function daemonStop():Promise<void> {
     }
 }
 
-export async function daemonRestart():Promise<void> {
+export async function daemonRestart(): Promise<void> {
     await daemonStop();
     const client = await connectCliDaemon();
     const status = await client.status();

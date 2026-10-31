@@ -6,13 +6,21 @@ import { IntellisenseProvider } from './intellisenseProvider';
 import { TexDocumentSymbolProvider } from './texDocumentSymbolProvider';
 import { TexDocumentFormatProvider } from './texDocumentFormatProvider';
 import { MisspellingCheckProvider } from './langMisspellingCheckProvider';
-import { CommandCompletionProvider, ConstantCompletionProvider, FilePathCompletionProvider, ReferenceCompletionProvider } from './langCompletionProvider';
+import {
+    CommandCompletionProvider,
+    ConstantCompletionProvider,
+    FilePathCompletionProvider,
+    ReferenceCompletionProvider,
+} from './langCompletionProvider';
 
 export class LangIntellisenseProvider {
     private status: vscode.StatusBarItem;
     private providers: IntellisenseProvider[];
 
-    constructor(context: vscode.ExtensionContext, private readonly vfsm: RemoteFileSystemProvider) {
+    constructor(
+        context: vscode.ExtensionContext,
+        private readonly vfsm: RemoteFileSystemProvider,
+    ) {
         const texSymbolProvider = new TexDocumentSymbolProvider(vfsm);
         this.providers = [
             // document symbol provider
@@ -29,23 +37,25 @@ export class LangIntellisenseProvider {
         ];
         this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -2);
         // Enable CSpell
-        const config = vscode.workspace.getConfiguration("cSpell");
-        const enabledSchemes = config.get<Record<string, boolean>>("enabledSchemes") || {}; 
+        const config = vscode.workspace.getConfiguration('cSpell');
+        const enabledSchemes = config.get<Record<string, boolean>>('enabledSchemes') || {};
         enabledSchemes[OVERLEAF_URI_SCHEME] = true;
-        config.update("enabledSchemes", enabledSchemes, vscode.ConfigurationTarget.Global);
-        
+        config.update('enabledSchemes', enabledSchemes, vscode.ConfigurationTarget.Global);
+
         this.activate();
     }
 
     async activate() {
         const uri = vscode.workspace.workspaceFolders?.[0].uri;
-        if (uri?.scheme!==OVERLEAF_URI_SCHEME) { return; }
+        if (uri?.scheme !== OVERLEAF_URI_SCHEME) {
+            return;
+        }
 
-        const vfs = uri && await this.vfsm.prefetch(uri);
+        const vfs = uri && (await this.vfsm.prefetch(uri));
         const languageItem = vfs?.getSpellCheckLanguage();
         if (languageItem) {
-            const {name, code} = languageItem;
-            this.status.text = code===''? '$(eye-closed)' : '$(eye) ' + code.toLocaleUpperCase();
+            const { name, code } = languageItem;
+            this.status.text = code === '' ? '$(eye-closed)' : '$(eye) ' + code.toLocaleUpperCase();
             this.status.tooltip = new vscode.MarkdownString(`${vscode.l10n.t('Spell Check')}: **${name}**`);
             this.status.tooltip.appendMarkdown(`\n\n*${vscode.l10n.t('Click to manage spell check.')}*`);
         } else {
@@ -58,9 +68,6 @@ export class LangIntellisenseProvider {
     }
 
     get triggers() {
-        return [
-            // register provider triggers
-            ...this.providers.map(x => x.triggers).flat(),
-        ];
+        return this.providers.map((x) => x.triggers).flat();
     }
 }

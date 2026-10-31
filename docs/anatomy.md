@@ -51,7 +51,7 @@ The CLI package is published to npm as `leafrelay` and exposes both the command 
 - `leafrelay daemon status|stop|restart` controls the shared process.
 - `LEAFRELAY_HOME` relocates daemon state; `LEAFRELAY_CONFIG` selects another login file; `LEAFRELAY_COOKIE` overrides the stored cookie for one process.
 
-The package is built with tsup. The internal `@leafrelay/core` workspace package is bundled into its JavaScript and declaration outputs, so npm users do not depend on a private package.
+The package is built with tsdown (Rolldown/Oxc). The internal `@leafrelay/core` workspace package is bundled into its JavaScript and declaration outputs, so npm users do not depend on a private package.
 
 ## `apps/vscode`
 
@@ -62,7 +62,7 @@ The VS Code application contains only editor-facing responsibilities:
 - daemon-backed local-replica status and conflict UI;
 - compilation, PDF preview, collaboration UI, and LaTeX language features.
 
-The extension uses RPC adapters for project APIs and local replicas. It contains no Overleaf HTTP client, Socket.IO connection, watcher, or sync engine. The extension and daemon entry points are bundled with esbuild; the chat webview remains a nested pnpm workspace under `apps/vscode/views/chat-view`.
+The extension uses RPC adapters for project APIs and local replicas. It contains no Overleaf HTTP client, Socket.IO connection, watcher, or sync engine. The extension and daemon entry points are bundled as ESM with tsdown; the chat webview remains a nested pnpm workspace under `apps/vscode/views/chat-view`.
 
 ## Build and test
 
@@ -73,7 +73,7 @@ pnpm test:extension
 pnpm test:overleaf
 ```
 
-`pnpm test` builds all workspaces, lints TypeScript, and runs Vitest. Pull requests additionally test IPC on macOS and Windows, activate the extension in a real Linux Extension Host, and run multi-client synchronization, conflict resolution, and daemon recovery against a ShareLaTeX container before packaging artifacts.
+`pnpm test` builds all workspaces, checks types, runs Oxlint and Oxfmt, and runs Vitest. Pull requests additionally test IPC on macOS and Windows, activate the extension in a real Linux Extension Host, and run multi-client synchronization, conflict resolution, and daemon recovery against a ShareLaTeX container before packaging artifacts.
 
 ## Release layout
 

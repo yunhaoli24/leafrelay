@@ -7,7 +7,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - "127.0.0.1:8080:80"
+      - '127.0.0.1:8080:80'
     environment:
       OVERLEAF_APP_NAME: LeafRelay Integration Test
       OVERLEAF_SITE_URL: http://localhost:8080
@@ -15,7 +15,7 @@ services:
       OVERLEAF_REDIS_HOST: redis
       REDIS_HOST: redis
       OVERLEAF_INVITE_TOKEN_SECRET: leafrelay-ci-invite-token-secret
-      EMAIL_CONFIRMATION_DISABLED: "true"
+      EMAIL_CONFIRMATION_DISABLED: 'true'
       ENABLED_LINKED_FILE_TYPES: project_file,project_output_file
 
   mongo:
@@ -24,7 +24,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:
-      - "mongo:127.0.0.1"
+      - 'mongo:127.0.0.1'
     healthcheck:
       test: >-
         echo "try { rs.status() } catch (err) { rs.initiate({_id:'overleaf',members:[{_id:0,host:'mongo:27017'}]}) }"

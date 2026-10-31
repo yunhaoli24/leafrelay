@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import { Blob } from 'node:buffer';
 import mime from 'mime';
-import {OverleafRealtimeSocket} from './overleafRealtimeSocket';
+import { OverleafRealtimeSocket } from './overleafRealtimeSocket';
 import { v4 as uuidv4 } from 'uuid';
 import { FileEntity, FileType, FolderEntity, OutputFileEntity } from '../core/projectTypes';
 import { log } from '../core/logger';
 import type { MemberEntity, ProjectSettingsSchema } from '../core/projectTypes';
-import {HttpRequestScheduler, sharedHttpRequestScheduler} from './requestScheduler';
+import { HttpRequestScheduler, sharedHttpRequestScheduler } from './requestScheduler';
 
 export type { MemberEntity, ProjectSettingsSchema } from '../core/projectTypes';
 
@@ -28,9 +27,9 @@ export interface Identity {
 }
 
 export interface NewProjectResponseSchema {
-    project_id: string,
-    owner_ref: string,
-    owner: MemberEntity
+    project_id: string;
+    owner_ref: string;
+    owner: MemberEntity;
 }
 
 export interface CompileResponseSchema {
@@ -40,52 +39,58 @@ export interface CompileResponseSchema {
     pdfDownloadDomain?: string;
     outputFiles: Array<OutputFileEntity>;
     stats: {
-        "latexmk-errors":number, "pdf-size":number,
-        "latex-runs":number, "latex-runs-with-errors":number,
-        "latex-runs-0":number, "latex-runs-with-error-0s":number,
+        'latexmk-errors': number;
+        'pdf-size': number;
+        'latex-runs': number;
+        'latex-runs-with-errors': number;
+        'latex-runs-0': number;
+        'latex-runs-with-error-0s': number;
     };
     timings: {
-        "sync":number, "compile":number, "output":number, "compileE2E":number,
+        sync: number;
+        compile: number;
+        output: number;
+        compileE2E: number;
     };
     enableHybridPdfDownload: boolean;
 }
 
 export interface SyncPdfResponseSchema {
-    file: string,
-    line: number,
-    column: number
+    file: string;
+    line: number;
+    column: number;
 }
 
 export interface SyncCodeResponseSchema {
     pdf: Array<{
-        page: number,
-        h: number,
-        v: number,
-        width: number,
-        height: number,
-    }>
+        page: number;
+        h: number;
+        v: number;
+        width: number;
+        height: number;
+    }>;
 }
 
 export interface SnippetItemSchema {
-    meta: string,
-    score: number,
-    caption: string,
-    snippet: string,
+    meta: string;
+    score: number;
+    caption: string;
+    snippet: string;
 }
 
 export interface MisspellingItemSchema {
-    index: number,
-    suggestions: string[]
+    index: number;
+    suggestions: string[];
 }
 
 export interface MetadataResponseScheme {
-    projectId: string,
+    projectId: string;
     projectMeta: {
-        [id:string]: {
-            labels: string[],
-            packages: {[K:string]: SnippetItemSchema[]}
-        }
-    }
+        [id: string]: {
+            labels: string[];
+            packages: { [K: string]: SnippetItemSchema[] };
+        };
+    };
 }
 
 export interface ProjectPersist {
@@ -102,69 +107,71 @@ export interface ProjectPersist {
 }
 
 export interface ProjectTagsResponseSchema {
-    __v: number,
-    _id: string,
-    name: string,
-    user_id: string,
-    project_ids: string[],
+    __v: number;
+    _id: string;
+    name: string;
+    user_id: string;
+    project_ids: string[];
 }
 
 export interface ProjectLabelResponseSchema {
-    id: string,
-    comment: string,
-    version: string,
-    user_id: string,
-    created_at: number,
-    user_display_name?: string,
+    id: string;
+    comment: string;
+    version: string;
+    user_id: string;
+    created_at: number;
+    user_display_name?: string;
 }
 
 export interface ProjectUpdateMeta {
-    users: {id:string, first_name:string, last_name?:string, email:string}[],
-    start_ts: number,
-    end_ts: number,
+    users: { id: string; first_name: string; last_name?: string; email: string }[];
+    start_ts: number;
+    end_ts: number;
 }
 
 export interface ProjectHistoryResponseSchema {
-    fromV: number,
-    toV: number,
-    meta: ProjectUpdateMeta,
-    labels: ProjectLabelResponseSchema[],
-    pathnames: string[],
-    project_ops:{
-        add?: {pathname:string},
-        remove?: {pathname:string},
-        atV: number,
-    }[],
+    fromV: number;
+    toV: number;
+    meta: ProjectUpdateMeta;
+    labels: ProjectLabelResponseSchema[];
+    pathnames: string[];
+    project_ops: {
+        add?: { pathname: string };
+        remove?: { pathname: string };
+        atV: number;
+    }[];
 }
 
 export interface ProjectUpdateResponseSchema {
-    updates: ProjectHistoryResponseSchema[],
-    nextBeforeTimestamp: number,
+    updates: ProjectHistoryResponseSchema[];
+    nextBeforeTimestamp: number;
 }
 
 export interface ProjectFileDiffResponseSchema {
     diff: {
-        u?: string, d?: string, i?: string,
-        meta?: ProjectUpdateMeta,
-    }[]
+        u?: string;
+        d?: string;
+        i?: string;
+        meta?: ProjectUpdateMeta;
+    }[];
 }
 
 export interface ProjectFileTreeDiffResponseSchema {
     diff: {
-        pathname: string,
-        newPathname?: string,
-        operation?: 'edited' | 'added' | 'removed' | 'renamed',
-        deletedAtV?: number,
-    }[]
+        pathname: string;
+        newPathname?: string;
+        operation?: 'edited' | 'added' | 'removed' | 'renamed';
+        deletedAtV?: number;
+    }[];
 }
 
 export interface ProjectMessageResponseSchema {
-    id: string,
-    content: string,
-    timestamp: number,
-    user_id: string,
-    user: {id:string, first_name:string, last_name?:string, email:string},
-    clientId: string,
+    id: string;
+    content: string;
+    timestamp: number;
+    user_id: string;
+    user: { id: string; first_name: string; last_name?: string; email: string };
+    clientId: string;
 }
 
 export interface ResponseSchema {
@@ -172,11 +179,11 @@ export interface ResponseSchema {
     statusCode?: number;
     raw?: ArrayBuffer;
     message?: string;
-    userInfo?: {userId:string, userEmail:string};
+    userInfo?: { userId: string; userEmail: string };
     identity?: Identity;
     projects?: ProjectPersist[];
     entity?: FileEntity;
-    entities?: {path:string, type:string}[];
+    entities?: { path: string; type: string }[];
     compile?: CompileResponseSchema;
     content?: Uint8Array;
     syncPdf?: SyncPdfResponseSchema;
@@ -198,26 +205,30 @@ export class BaseAPI {
 
     private retryAfterMs(response: any, attempt: number): number {
         const retryAfter = response.headers?.get?.('retry-after');
-        if (retryAfter!==undefined && retryAfter!==null) {
+        if (retryAfter !== undefined && retryAfter !== null) {
             const seconds = Number(retryAfter);
             if (Number.isFinite(seconds)) {
-                return Math.max(1000, seconds*1000);
+                return Math.max(1000, seconds * 1000);
             }
             const retryAt = Date.parse(retryAfter);
             if (Number.isFinite(retryAt)) {
-                return Math.max(1000, retryAt-Date.now());
+                return Math.max(1000, retryAt - Date.now());
             }
         }
         return 5000 * Math.pow(2, attempt);
     }
 
-    constructor(url:string, private readonly scheduler:HttpRequestScheduler=sharedHttpRequestScheduler) {
+    constructor(
+        url: string,
+        private readonly scheduler: HttpRequestScheduler = sharedHttpRequestScheduler,
+    ) {
         this.url = url;
     }
 
     private async getCsrfToken(): Promise<Identity> {
-        const res = await this.scheduler.fetch(this.url+'login', {
-            method: 'GET', redirect: 'manual',
+        const res = await this.scheduler.fetch(this.url + 'login', {
+            method: 'GET',
+            redirect: 'manual',
         });
         const body = await res.text();
         const match = body.match(/<input.*name="_csrf".*value="([^"]*)">/);
@@ -230,84 +241,85 @@ export class BaseAPI {
         }
     }
 
-    private async getUserId(cookies:string) {
-        const res = await this.scheduler.fetch(this.url+'project', {
-            method: 'GET', redirect:'manual',
+    private async getUserId(cookies: string) {
+        const res = await this.scheduler.fetch(this.url + 'project', {
+            method: 'GET',
+            redirect: 'manual',
             headers: {
-                'Connection': 'keep-alive',
-                'Cookie': cookies,
-            }
+                Connection: 'keep-alive',
+                Cookie: cookies,
+            },
         });
 
         const body = await res.text();
         const userIDMatch = body.match(/<meta\s+name="ol-user_id"\s+content="([^"]*)">/);
         const userEmailMatch = body.match(/<meta\s+name="ol-usersEmail"\s+content="([^"]*)">/);
         const csrfTokenMatch = body.match(/<meta\s+name="ol-csrfToken"\s+content="([^"]*)">/);
-        if (userIDMatch!==null && csrfTokenMatch!==null) {
+        if (userIDMatch !== null && csrfTokenMatch !== null) {
             const userId = userIDMatch[1];
             const csrfToken = csrfTokenMatch[1];
             const userEmail = userEmailMatch ? userEmailMatch[1] : '';
-            return {userId, userEmail, csrfToken};
+            return { userId, userEmail, csrfToken };
         } else {
             return undefined;
         }
     }
 
     // Reference: "github:overleaf/overleaf/services/web/frontend/js/ide/connection/ConnectionManager.js#L137"
-    _initSocketV0(identity:Identity, query?:string) {
+    _initSocketV0(identity: Identity, query?: string) {
         const url = new URL(this.url).origin + (query ?? '');
         return new OverleafRealtimeSocket(url, {
-            origin:new URL(this.url).origin,
-            cookie:identity.cookies,
+            origin: new URL(this.url).origin,
+            cookie: identity.cookies,
             reconnect: true,
-            reconnectionDelay:1000,
-            reconnectionLimit:16000,
-            maxReconnectionAttempts:10,
-            fetch:(input, init) => this.scheduler.fetch(input, init),
+            reconnectionDelay: 1000,
+            reconnectionLimit: 16000,
+            maxReconnectionAttempts: 10,
+            fetch: (input, init) => this.scheduler.fetch(input, init),
         });
     }
 
-    async passportLogin(email:string, password:string): Promise<ResponseSchema> {
+    async passportLogin(email: string, password: string): Promise<ResponseSchema> {
         const identity = await this.getCsrfToken();
-        const res = await this.scheduler.fetch(this.url+'login', {
-            method: 'POST', redirect: 'manual',
+        const res = await this.scheduler.fetch(this.url + 'login', {
+            method: 'POST',
+            redirect: 'manual',
             headers: {
-                'Accept': '*/*',
+                Accept: '*/*',
                 'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
+                Connection: 'keep-alive',
                 'Content-Type': 'application/json',
-                'Cookie': identity.cookies,
+                Cookie: identity.cookies,
                 'X-Csrf-Token': identity.csrfToken,
             },
-            body: JSON.stringify({ _csrf: identity.csrfToken, email: email, password: password })
+            body: JSON.stringify({ _csrf: identity.csrfToken, email: email, password: password }),
         });
 
-        if (res.status===302) {
+        if (res.status === 302) {
             const redirect = ((await res.text()).match(/Found. Redirecting to (.*)/) as any)[1];
-            if (redirect==='/project') {
+            if (redirect === '/project') {
                 const cookies = getSetCookie(res)[0] ?? '';
-                return (await this.cookiesLogin(cookies));
+                return await this.cookiesLogin(cookies);
             } else {
                 return {
                     type: 'error',
-                    message: `Redirecting to /${redirect}`
+                    message: `Redirecting to /${redirect}`,
                 };
             }
-        }
-        else if (res.status===200) {
+        } else if (res.status === 200) {
             return {
                 type: 'error',
-                message: (await res.json() as any).message.message
+                message: ((await res.json()) as any).message.message,
             };
-        } else if (res.status===401) {
+        } else if (res.status === 401) {
             return {
                 type: 'error',
-                message: (await res.json() as any).message.text
+                message: ((await res.json()) as any).message.text,
             };
         } else {
             return {
                 type: 'error',
-                message: `${res.status}: `+await res.text()
+                message: `${res.status}: ` + (await res.text()),
             };
         }
     }
@@ -316,16 +328,16 @@ export class BaseAPI {
         const res = await this.getUserId(cookies);
         if (res) {
             const { userId, userEmail, csrfToken } = res;
-            const identity: Identity =  await this.updateCookies({ cookies, csrfToken });
+            const identity: Identity = await this.updateCookies({ cookies, csrfToken });
             return {
                 type: 'success',
-                userInfo: {userId, userEmail},
-                identity: identity
+                userInfo: { userId, userEmail },
+                identity: identity,
             };
         } else {
             return {
                 type: 'error',
-                message: 'Failed to get User ID.'
+                message: 'Failed to get User ID.',
             };
         }
     }
@@ -335,16 +347,16 @@ export class BaseAPI {
             method: 'GET',
             redirect: 'manual',
             headers: {
-                'Connection': 'keep-alive',
-                'Cookie': identity.cookies,
-            }
+                Connection: 'keep-alive',
+                Cookie: identity.cookies,
+            },
         });
         const cookies = getSetCookie(res)[0]?.split(';')[0];
         if (cookies) {
             identity.cookies = `${identity.cookies}; ${cookies}`;
         }
         return identity;
-    };
+    }
 
     setIdentity(identity: Identity) {
         this.identity = identity;
@@ -365,106 +377,146 @@ export class BaseAPI {
             return true;
         }
         // Common transient network error messages
-        if (errorMessage && (
-            errorMessage.includes('ECONNRESET') ||
-            errorMessage.includes('ETIMEDOUT') ||
-            errorMessage.includes('ECONNREFUSED') ||
-            errorMessage.includes('ENOTFOUND') ||
-            errorMessage.includes('socket hang up')
-        )) {
+        if (
+            errorMessage &&
+            (errorMessage.includes('ECONNRESET') ||
+                errorMessage.includes('ETIMEDOUT') ||
+                errorMessage.includes('ECONNREFUSED') ||
+                errorMessage.includes('ENOTFOUND') ||
+                errorMessage.includes('socket hang up'))
+        ) {
             return true;
         }
         return false;
     }
 
-    protected async request(type:'GET'|'POST'|'PUT'|'DELETE', route:string, body?:FormData|object, callback?: (res?:string)=>object|undefined, extraHeaders?:object, timeoutMs?:number): Promise<ResponseSchema> {
-        if (this.identity===undefined) { return Promise.reject(); }
+    protected async request(
+        type: 'GET' | 'POST' | 'PUT' | 'DELETE',
+        route: string,
+        body?: FormData | object,
+        callback?: (res?: string) => object | undefined,
+        extraHeaders?: object,
+        timeoutMs?: number,
+    ): Promise<ResponseSchema> {
+        if (this.identity === undefined) {
+            return Promise.reject();
+        }
 
         const MAX_HTTP_RETRIES = 2;
-        let lastError: {statusCode?: number, message?: string} = {};
+        let lastError: { statusCode?: number; message?: string } = {};
 
         for (let attempt = 0; attempt <= MAX_HTTP_RETRIES; attempt++) {
             try {
                 let res = undefined;
-                switch(type) {
+                switch (type) {
                     case 'GET':
-                        res = await this.scheduler.fetch(this.url+route, {
-                            method: 'GET', redirect: 'manual',
-                            headers: {
-                                'Connection': 'keep-alive',
-                                'Cookie': this.identity!.cookies,
-                                ...extraHeaders
-                            }
-                        }, timeoutMs);
+                        res = await this.scheduler.fetch(
+                            this.url + route,
+                            {
+                                method: 'GET',
+                                redirect: 'manual',
+                                headers: {
+                                    Connection: 'keep-alive',
+                                    Cookie: this.identity!.cookies,
+                                    ...extraHeaders,
+                                },
+                            },
+                            timeoutMs,
+                        );
                         break;
                     case 'POST':
-                        const content_type = body instanceof FormData ? undefined : {'Content-Type': 'application/json'};
-                        const raw_body = body instanceof FormData ? body : JSON.stringify({
-                            _csrf: this.identity!.csrfToken,
-                            ...body
-                        });
-                        res = await this.scheduler.fetch(this.url+route, {
-                            method: 'POST', redirect: 'manual',
-                            headers: {
-                                'Connection': 'keep-alive',
-                                'Cookie': this.identity!.cookies,
-                                ...content_type,
-                                ...extraHeaders
+                        const content_type =
+                            body instanceof FormData ? undefined : { 'Content-Type': 'application/json' };
+                        const raw_body =
+                            body instanceof FormData
+                                ? body
+                                : JSON.stringify({
+                                      _csrf: this.identity!.csrfToken,
+                                      ...body,
+                                  });
+                        res = await this.scheduler.fetch(
+                            this.url + route,
+                            {
+                                method: 'POST',
+                                redirect: 'manual',
+                                headers: {
+                                    Connection: 'keep-alive',
+                                    Cookie: this.identity!.cookies,
+                                    ...content_type,
+                                    ...extraHeaders,
+                                },
+                                body: raw_body,
                             },
-                            body: raw_body
-                        }, timeoutMs);
+                            timeoutMs,
+                        );
                         break;
                     case 'PUT':
                         break;
                     case 'DELETE':
-                        res = await this.scheduler.fetch(this.url+route, {
-                            method: 'DELETE', redirect: 'manual',
-                            headers: {
-                                'Connection': 'keep-alive',
-                                'Cookie': this.identity!.cookies,
-                                'X-Csrf-Token': this.identity!.csrfToken,
-                                ...extraHeaders
-                            }
-                        }, timeoutMs);
+                        res = await this.scheduler.fetch(
+                            this.url + route,
+                            {
+                                method: 'DELETE',
+                                redirect: 'manual',
+                                headers: {
+                                    Connection: 'keep-alive',
+                                    Cookie: this.identity!.cookies,
+                                    'X-Csrf-Token': this.identity!.csrfToken,
+                                    ...extraHeaders,
+                                },
+                            },
+                            timeoutMs,
+                        );
                         break;
-                };
+                }
 
-                if (res && (res.status===200 || res.status===204)) {
-                    const _res = res.status===200 ? await res.text() : undefined;
+                if (res && (res.status === 200 || res.status === 204)) {
+                    const _res = res.status === 200 ? await res.text() : undefined;
                     const response = callback && callback(_res);
                     return {
                         type: 'success',
-                        ...response
+                        ...response,
                     } as ResponseSchema;
                 } else if (res && this.isTransientError(res.status) && attempt < MAX_HTTP_RETRIES) {
                     // Transient error: retry with backoff
-                    const delayMs = res.status===429 ? this.retryAfterMs(res, attempt) : Math.min(1000 * Math.pow(2, attempt), 4000);
-                    log(`HTTP ${res.status} on ${route}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_HTTP_RETRIES})`);
-                    lastError = {statusCode: res.status, message: await res.text().catch(() => '')};
-                    await new Promise(r => setTimeout(r, delayMs));
+                    const delayMs =
+                        res.status === 429
+                            ? this.retryAfterMs(res, attempt)
+                            : Math.min(1000 * Math.pow(2, attempt), 4000);
+                    log(
+                        `HTTP ${res.status} on ${route}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_HTTP_RETRIES})`,
+                    );
+                    lastError = { statusCode: res.status, message: await res.text().catch(() => '') };
+                    await new Promise((r) => setTimeout(r, delayMs));
                     continue;
                 } else {
-                    const resOrFallback = res || { status:'undefined', text: async () => '' };
+                    const resOrFallback = res || { status: 'undefined', text: async () => '' };
                     let errorBody = '';
-                    try { errorBody = await resOrFallback.text(); } catch { errorBody = ''; }
+                    try {
+                        errorBody = await resOrFallback.text();
+                    } catch {
+                        errorBody = '';
+                    }
                     return {
                         type: 'error',
-                        statusCode: typeof resOrFallback.status==='number' ? resOrFallback.status : undefined,
-                        message: `${resOrFallback.status}: ${errorBody}`
+                        statusCode: typeof resOrFallback.status === 'number' ? resOrFallback.status : undefined,
+                        message: `${resOrFallback.status}: ${errorBody}`,
                     };
                 }
             } catch (err: any) {
                 const errMsg = err?.message || String(err);
                 if (this.isTransientError(undefined, errMsg) && attempt < MAX_HTTP_RETRIES) {
                     const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
-                    log(`HTTP fetch error on ${route}: ${errMsg}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_HTTP_RETRIES})`);
-                    await new Promise(r => setTimeout(r, delayMs));
+                    log(
+                        `HTTP fetch error on ${route}: ${errMsg}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_HTTP_RETRIES})`,
+                    );
+                    await new Promise((r) => setTimeout(r, delayMs));
                     continue;
                 }
                 return {
                     type: 'error',
                     statusCode: undefined,
-                    message: errMsg
+                    message: errMsg,
                 };
             }
         }
@@ -473,299 +525,380 @@ export class BaseAPI {
         return {
             type: 'error',
             statusCode: lastError.statusCode,
-            message: lastError.message || `Request failed after ${MAX_HTTP_RETRIES + 1} attempts`
+            message: lastError.message || `Request failed after ${MAX_HTTP_RETRIES + 1} attempts`,
         };
     }
 
-    protected async download(route:string) {
-        if (this.identity===undefined) { return Promise.reject(); }
+    protected async download(route: string) {
+        if (this.identity === undefined) {
+            return Promise.reject();
+        }
 
         let content: Buffer[] = [];
-        while(true) {
-            const res = await this.scheduler.fetch(this.url+route, {
-                method: 'GET', redirect: 'manual',
+        while (true) {
+            const res = await this.scheduler.fetch(this.url + route, {
+                method: 'GET',
+                redirect: 'manual',
                 headers: {
-                    'Connection': 'keep-alive',
-                    'Cookie': this.identity.cookies,
-                }
+                    Connection: 'keep-alive',
+                    Cookie: this.identity.cookies,
+                },
             });
-            if (res.status===200) {
+            if (res.status === 200) {
                 content.push(Buffer.from(await res.arrayBuffer()));
                 break;
-            }
-            else if (res.status===206) {
+            } else if (res.status === 206) {
                 content.push(Buffer.from(await res.arrayBuffer()));
             } else {
                 break;
             }
-        };
+        }
 
         return Buffer.concat(content);
     }
 
-    async logout(identity:Identity): Promise<ResponseSchema> {
+    async logout(identity: Identity): Promise<ResponseSchema> {
         this.setIdentity(identity);
         return this.request('POST', 'logout');
     }
 
-    async userProjectsJson(identity:Identity): Promise<ResponseSchema> {
+    async userProjectsJson(identity: Identity): Promise<ResponseSchema> {
         this.setIdentity(identity);
         return this.request('GET', 'user/projects', undefined, (res) => {
             const projects = (JSON.parse(res!) as any).projects as any[];
-            projects.forEach(project => {
+            projects.forEach((project) => {
                 project.id = project._id;
                 delete project._id;
             });
-            return {projects};
+            return { projects };
         });
     }
 
-    async getProjectsJson(identity:Identity): Promise<ResponseSchema> {
+    async getProjectsJson(identity: Identity): Promise<ResponseSchema> {
         this.setIdentity(identity);
         return this.request('POST', 'api/project', {}, (res) => {
             const projects = (JSON.parse(res!) as any).projects;
-            return {projects};
+            return { projects };
         });
     }
 
-    async projectEntitiesJson(identity:Identity, projectId:string): Promise<ResponseSchema> {
+    async projectEntitiesJson(identity: Identity, projectId: string): Promise<ResponseSchema> {
         this.setIdentity(identity);
         return this.request('GET', `project/${projectId}/entities`, undefined, (res) => {
             const entities = JSON.parse(res!).entities;
-            return {entities};
+            return { entities };
         });
     }
 
-    async newProject(identity:Identity, projectName:string, template:'none'|'example') {
+    async newProject(identity: Identity, projectName: string, template: 'none' | 'example') {
         this.setIdentity(identity);
-        return this.request('POST', 'project/new', {projectName, template}, (res) => {
+        return this.request('POST', 'project/new', { projectName, template }, (res) => {
             const message = (JSON.parse(res!) as NewProjectResponseSchema).project_id;
-            return {message};
+            return { message };
         });
     }
 
-    async cloneProject(identity:Identity, projectId:string, projectName:string) {
+    async cloneProject(identity: Identity, projectId: string, projectName: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/clone`, {projectName}, (res) => {
+        return this.request('POST', `project/${projectId}/clone`, { projectName }, (res) => {
             const message = (JSON.parse(res!) as NewProjectResponseSchema).project_id;
-            return {message};
+            return { message };
         });
     }
 
-    async renameProject(identity:Identity, projectId:string, newProjectName:string) {
+    async renameProject(identity: Identity, projectId: string, newProjectName: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/rename`, {newProjectName});
+        return this.request('POST', `project/${projectId}/rename`, { newProjectName });
     }
 
-    async deleteProject(identity:Identity, projectId:string) {
+    async deleteProject(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}`);
     }
 
-    async archiveProject(identity:Identity, projectId:string) {
+    async archiveProject(identity: Identity, projectId: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/archive`,
-                            undefined, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request('POST', `project/${projectId}/archive`, undefined, undefined, {
+            'X-Csrf-Token': identity.csrfToken,
+        });
     }
 
-    async unarchiveProject(identity:Identity, projectId:string) {
+    async unarchiveProject(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}/archive`);
     }
 
-    async trashProject(identity:Identity, projectId:string) {
+    async trashProject(identity: Identity, projectId: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/trash`,
-                            undefined, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request('POST', `project/${projectId}/trash`, undefined, undefined, {
+            'X-Csrf-Token': identity.csrfToken,
+        });
     }
 
-    async untrashProject(identity:Identity, projectId:string) {
+    async untrashProject(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}/trash`);
     }
 
-    async getFile(identity:Identity, projectId:string, fileId:string) {
+    async getFile(identity: Identity, projectId: string, fileId: string) {
         this.setIdentity(identity);
         const content = await this.download(`project/${projectId}/file/${fileId}`);
         return {
             type: 'success',
-            content: new Uint8Array( content )
+            content: new Uint8Array(content),
         };
     }
 
-    async addDoc(identity:Identity, projectId:string, parentFolderId:string, filename:string) {
+    async addDoc(identity: Identity, projectId: string, parentFolderId: string, filename: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/doc`, {parent_folder_id:parentFolderId, name:filename}, (res) => {
-            const {_id} = JSON.parse(res!) as any;
-            const entity = {_type:'doc', _id, name:filename} as FileEntity;
-            return {entity};
-        }, {'X-Csrf-Token': identity.csrfToken});
+        return this.request(
+            'POST',
+            `project/${projectId}/doc`,
+            { parent_folder_id: parentFolderId, name: filename },
+            (res) => {
+                const { _id } = JSON.parse(res!) as any;
+                const entity = { _type: 'doc', _id, name: filename } as FileEntity;
+                return { entity };
+            },
+            { 'X-Csrf-Token': identity.csrfToken },
+        );
     }
 
-    async uploadFile(identity:Identity, projectId:string, parentFolderId:string, filename:string, fileContent:Uint8Array) {
+    async uploadFile(
+        identity: Identity,
+        projectId: string,
+        parentFolderId: string,
+        filename: string,
+        fileContent: Uint8Array,
+    ) {
         const formData = new FormData();
         const mimeType = mime.getType(filename);
         formData.append('targetFolderId', parentFolderId);
         formData.append('name', filename);
-        formData.append('type', mimeType? mimeType : 'text/plain');
-        formData.append('qqfile', new Blob([Buffer.from(fileContent)], {
-            type: mimeType ? mimeType : 'application/octet-stream',
-        }), filename);
+        formData.append('type', mimeType ? mimeType : 'text/plain');
+        formData.append(
+            'qqfile',
+            new Blob([Buffer.from(fileContent)], {
+                type: mimeType ? mimeType : 'application/octet-stream',
+            }),
+            filename,
+        );
 
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/upload?folder_id=${parentFolderId}`, formData, (res) => {
-            const {success, entity_id, entity_type} = JSON.parse(res!) as any;
-            const entity = {_type:entity_type, _id:entity_id, name:filename} as FileEntity;
-            return {entity};
-        }, {'X-Csrf-Token': identity.csrfToken});
+        return this.request(
+            'POST',
+            `project/${projectId}/upload?folder_id=${parentFolderId}`,
+            formData,
+            (res) => {
+                const { entity_id, entity_type } = JSON.parse(res!) as any;
+                const entity = { _type: entity_type, _id: entity_id, name: filename } as FileEntity;
+                return { entity };
+            },
+            { 'X-Csrf-Token': identity.csrfToken },
+        );
     }
 
-    async uploadProject(identity:Identity, filename:string, fileContent:Uint8Array) {
+    async uploadProject(identity: Identity, filename: string, fileContent: Uint8Array) {
         const uuid = uuidv4();
         const formData = new FormData();
-        formData.append('qqfile', new Blob([Buffer.from(fileContent)], {
-            type: 'application/zip',
-        }), filename);
+        formData.append(
+            'qqfile',
+            new Blob([Buffer.from(fileContent)], {
+                type: 'application/zip',
+            }),
+            filename,
+        );
 
         this.setIdentity(identity);
-        return this.request('POST', `project/new/upload?_csrf=${identity.csrfToken}&qquuid=${uuid}&qqfilename=${filename}&qqtotalfilesize=${fileContent.length}`, formData, (res) => {
-            const message = (JSON.parse(res!) as NewProjectResponseSchema).project_id;
-            return {message};
-        });
+        return this.request(
+            'POST',
+            `project/new/upload?_csrf=${identity.csrfToken}&qquuid=${uuid}&qqfilename=${filename}&qqtotalfilesize=${fileContent.length}`,
+            formData,
+            (res) => {
+                const message = (JSON.parse(res!) as NewProjectResponseSchema).project_id;
+                return { message };
+            },
+        );
     }
 
-    async addFolder(identity:Identity, projectId:string, folderName:string, parentFolderId:string) {
+    async addFolder(identity: Identity, projectId: string, folderName: string, parentFolderId: string) {
         const body = { name: folderName, parent_folder_id: parentFolderId };
 
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/folder`, body, (res) => {
-            const entity = JSON.parse(res!) as FolderEntity;
-            return {entity};
-        }, {'X-Csrf-Token': identity.csrfToken});
+        return this.request(
+            'POST',
+            `project/${projectId}/folder`,
+            body,
+            (res) => {
+                const entity = JSON.parse(res!) as FolderEntity;
+                return { entity };
+            },
+            { 'X-Csrf-Token': identity.csrfToken },
+        );
     }
 
-    async deleteEntity(identity:Identity, projectId:string, fileType:FileType, fileId:string) {
+    async deleteEntity(identity: Identity, projectId: string, fileType: FileType, fileId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}/${fileType}/${fileId}`);
     }
 
-    async deleteAuxFiles(identity:Identity, projectId:string) {
+    async deleteAuxFiles(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}/output`);
     }
 
-    async renameEntity(identity:Identity, projectId:string, entityType:string, entityId:string, name:string) {
+    async renameEntity(identity: Identity, projectId: string, entityType: string, entityId: string, name: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/${entityType}/${entityId}/rename`,
-                            {name}, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request('POST', `project/${projectId}/${entityType}/${entityId}/rename`, { name }, undefined, {
+            'X-Csrf-Token': identity.csrfToken,
+        });
     }
 
-    async moveEntity(identity:Identity, projectId:string, entityType:string, entityId:string, newParentFolderId:string) {
+    async moveEntity(
+        identity: Identity,
+        projectId: string,
+        entityType: string,
+        entityId: string,
+        newParentFolderId: string,
+    ) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/${entityType}/${entityId}/move`,
-                            {folder_id:newParentFolderId}, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request(
+            'POST',
+            `project/${projectId}/${entityType}/${entityId}/move`,
+            { folder_id: newParentFolderId },
+            undefined,
+            { 'X-Csrf-Token': identity.csrfToken },
+        );
     }
 
-    async compile(identity:Identity, projectId:string, rootResourcePath:string|null,
-        draft:boolean=false, stopOnFirstError:boolean=false
+    async compile(
+        identity: Identity,
+        projectId: string,
+        rootResourcePath: string | null,
+        draft: boolean = false,
+        stopOnFirstError: boolean = false,
     ) {
         const body = {
             check: 'silent',
             draft,
             incrementalCompilesEnabled: true,
-            rootResourcePath,   // file path e.g. "main.tex"
-            stopOnFirstError
+            rootResourcePath, // file path e.g. "main.tex"
+            stopOnFirstError,
         };
 
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/compile?auto_compile=true`, body, (res) => {
-            const compile = JSON.parse(res!) as CompileResponseSchema;
-            return {compile};
-        }, {'X-Csrf-Token': identity.csrfToken}, 300_000);
+        return this.request(
+            'POST',
+            `project/${projectId}/compile?auto_compile=true`,
+            body,
+            (res) => {
+                const compile = JSON.parse(res!) as CompileResponseSchema;
+                return { compile };
+            },
+            { 'X-Csrf-Token': identity.csrfToken },
+            300_000,
+        );
     }
 
-    async stopCompile(identity:Identity, projectId:string) {
+    async stopCompile(identity: Identity, projectId: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/compile/stop`, undefined, undefined, {'X-Csrf-Token': identity.csrfToken});
-    }
-
-    async indexAll(identity:Identity, projectId:string) {
-        this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/references/indexAll`, {shouldBroadcast: false}, undefined);
-    }
-
-    async getMetadata(identity:Identity, projectId:string) {
-        this.setIdentity(identity);
-        return this.request('GET', `project/${projectId}/metadata`, undefined, (res) => {
-            const meta = JSON.parse(res!) as MetadataResponseScheme;
-            return {meta};
+        return this.request('POST', `project/${projectId}/compile/stop`, undefined, undefined, {
+            'X-Csrf-Token': identity.csrfToken,
         });
     }
 
-    async proxyRequestToSpellingApi(identity:Identity, language:string, userId:string, words: string[]) {
+    async indexAll(identity: Identity, projectId: string) {
+        this.setIdentity(identity);
+        return this.request('POST', `project/${projectId}/references/indexAll`, { shouldBroadcast: false }, undefined);
+    }
+
+    async getMetadata(identity: Identity, projectId: string) {
+        this.setIdentity(identity);
+        return this.request('GET', `project/${projectId}/metadata`, undefined, (res) => {
+            const meta = JSON.parse(res!) as MetadataResponseScheme;
+            return { meta };
+        });
+    }
+
+    async proxyRequestToSpellingApi(identity: Identity, language: string, userId: string, words: string[]) {
         const body = {
             language,
             skipLearnedWords: true,
             token: userId,
-            words
+            words,
         };
 
         this.setIdentity(identity);
         return this.request('POST', 'spelling/check', body, (res) => {
             const misspellings = JSON.parse(res!).misspellings as MisspellingItemSchema[];
-            return {misspellings};
+            return { misspellings };
         });
     }
 
-    async spellingControllerLearn(identity:Identity, userId:string, word: string) {
+    async spellingControllerLearn(identity: Identity, userId: string, word: string) {
         const body = {
             token: userId,
-            word
+            word,
         };
 
         this.setIdentity(identity);
         return this.request('POST', 'spelling/learn', body);
     }
 
-    async spellingControllerUnlearn(identity:Identity, word: string) {
+    async spellingControllerUnlearn(identity: Identity, word: string) {
         this.setIdentity(identity);
-        return this.request('POST', 'spelling/unlearn', {word}, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request('POST', 'spelling/unlearn', { word }, undefined, { 'X-Csrf-Token': identity.csrfToken });
     }
 
-    async getProjectSettings(identity:Identity, projectId:string) {
+    async getProjectSettings(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('GET', `project/${projectId}`, undefined, (res) => {
             const body = res || '';
             // parse "ol-learnedWords"
-            const learnedWordsMatch = /<meta\s+name="ol-learnedWords"\s+data-type="json"\s+content="(\[.*?\])">/.exec(body);
-            const learnedWords = (learnedWordsMatch!==null) ? JSON.parse(learnedWordsMatch[1].replace(/&quot;/g, '"')) : [];
+            const learnedWordsMatch = /<meta\s+name="ol-learnedWords"\s+data-type="json"\s+content="(\[.*?\])">/.exec(
+                body,
+            );
+            const learnedWords =
+                learnedWordsMatch !== null ? JSON.parse(learnedWordsMatch[1].replace(/&quot;/g, '"')) : [];
             // parse "ol-languages"
             const languagesMatch = /<meta\s+name="ol-languages"\s+data-type="json"\s+content="(\[.*?\])">/.exec(body);
-            const languages = (languagesMatch!==null) ? JSON.parse(languagesMatch[1].replace(/&quot;/g, '"')) as {code:string,name:string}[] : [];
-            languages.length && languages.unshift({name:'Off', code:''});
+            const languages =
+                languagesMatch !== null
+                    ? (JSON.parse(languagesMatch[1].replace(/&quot;/g, '"')) as { code: string; name: string }[])
+                    : [];
+            if (languages.length) {
+                languages.unshift({ name: 'Off', code: '' });
+            }
             // fill in compilers
             const compilers = [
-                {code: 'pdflatex', name: 'pdfLaTex'},
-                {code: 'latex',    name: 'LaTex'},
-                {code: 'xelatex',  name: 'XeLaTex'},
-                {code: 'lualatex', name: 'LuaLaTex'},
+                { code: 'pdflatex', name: 'pdfLaTex' },
+                { code: 'latex', name: 'LaTex' },
+                { code: 'xelatex', name: 'XeLaTex' },
+                { code: 'lualatex', name: 'LuaLaTex' },
             ];
             // return parsed results
-            const settings = {learnedWords, languages, compilers} as ProjectSettingsSchema;
-            return {settings};
+            const settings = { learnedWords, languages, compilers } as ProjectSettingsSchema;
+            return { settings };
         });
     }
 
-    async updateProjectSettings(identity:Identity, projectId:string, setting:any) {
+    async updateProjectSettings(identity: Identity, projectId: string, setting: any) {
         this.setIdentity(identity);
         return this.request('POST', `project/${projectId}/settings`, setting);
     }
 
-    async getFileFromClsi(identity:Identity, url:string, compileGroup:string, clsiServerId?:string, pdfDownloadDomain?:string) {
+    async getFileFromClsi(
+        identity: Identity,
+        url: string,
+        compileGroup: string,
+        clsiServerId?: string,
+        pdfDownloadDomain?: string,
+    ) {
         // If we have a CDN download domain, construct the full URL with required query params.
         // The CDN is cross-origin, so we must NOT send web frontend cookies.
         if (pdfDownloadDomain && clsiServerId) {
-            const cdnUrl = `${pdfDownloadDomain.replace(/\/+$/, '')}/${url.replace(/^\/+/g, '')}` +
+            const cdnUrl =
+                `${pdfDownloadDomain.replace(/\/+$/, '')}/${url.replace(/^\/+/g, '')}` +
                 `?compileGroup=${encodeURIComponent(compileGroup)}` +
                 `&clsiserverid=${encodeURIComponent(clsiServerId)}` +
                 `&enable_pdf_caching=true`;
@@ -779,14 +912,14 @@ export class BaseAPI {
         const content = await this.download(url);
         return {
             type: 'success',
-            content: new Uint8Array( content )
+            content: new Uint8Array(content),
         };
     }
 
     /** Download from an absolute URL, optionally including web frontend cookies. */
     private async _downloadAbsolute(absoluteUrl: string, includeCookies: boolean): Promise<Buffer> {
         const headers: Record<string, string> = {
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
         };
         if (includeCookies && this.identity) {
             headers['Cookie'] = this.identity.cookies;
@@ -794,8 +927,9 @@ export class BaseAPI {
         let content: Buffer[] = [];
         while (true) {
             const res = await this.scheduler.fetch(absoluteUrl, {
-                method: 'GET', redirect: 'manual',
-                headers
+                method: 'GET',
+                redirect: 'manual',
+                headers,
             });
             if (res.status === 200) {
                 content.push(Buffer.from(await res.arrayBuffer()));
@@ -809,127 +943,156 @@ export class BaseAPI {
         return Buffer.concat(content);
     }
 
-    async proxySyncPdf(identity:Identity, projectId:string, page:number, h:number, v:number, buildId:string) {
+    async proxySyncPdf(identity: Identity, projectId: string, page: number, h: number, v: number, buildId: string) {
         this.setIdentity(identity);
         const request = `project/${projectId}/sync/pdf?page=${page}&h=${h.toFixed(2)}&v=${v.toFixed(2)}&editorId=${uuidv4()}&buildId=${buildId}`;
-        return this.request('GET', `project/${projectId}/sync/pdf?page=${page}&h=${h.toFixed(2)}&v=${v.toFixed(2)}&editorId=${uuidv4()}&buildId=${buildId}`,
-                            undefined, (res) => {
-                                const syncPdf = (JSON.parse(res!) as any).code[0] as SyncPdfResponseSchema;
-                                return {syncPdf};
-                            });
+        return this.request('GET', request, undefined, (res) => {
+            const syncPdf = (JSON.parse(res!) as any).code[0] as SyncPdfResponseSchema;
+            return { syncPdf };
+        });
     }
 
-    async proxySyncCode(identity:Identity, projectId:string, file:string, line:number, column:number, buildId:string) {
+    async proxySyncCode(
+        identity: Identity,
+        projectId: string,
+        file: string,
+        line: number,
+        column: number,
+        buildId: string,
+    ) {
         this.setIdentity(identity);
-        return this.request('GET', `project/${projectId}/sync/code?file=${file}&line=${line}&column=${column}&editorId=${uuidv4()}&buildId=${buildId}`,
-                            undefined, (res) => {
-                                const syncCode = (JSON.parse(res!) as any).pdf as SyncCodeResponseSchema;
-                                return {syncCode};
-                            });
+        return this.request(
+            'GET',
+            `project/${projectId}/sync/code?file=${file}&line=${line}&column=${column}&editorId=${uuidv4()}&buildId=${buildId}`,
+            undefined,
+            (res) => {
+                const syncCode = (JSON.parse(res!) as any).pdf as SyncCodeResponseSchema;
+                return { syncCode };
+            },
+        );
     }
 
-    async getAllTags(identity:Identity) {
+    async getAllTags(identity: Identity) {
         this.setIdentity(identity);
         return this.request('GET', 'tag', undefined, (res) => {
             const tags = JSON.parse(res!) as ProjectTagsResponseSchema[];
-            return {tags};
+            return { tags };
         });
     }
 
-    async createTag(identity:Identity, name:string) {
+    async createTag(identity: Identity, name: string) {
         this.setIdentity(identity);
-        return this.request('POST', 'tag', {name}, (res) => {
+        return this.request('POST', 'tag', { name }, (res) => {
             const tags = JSON.parse(res!) as ProjectTagsResponseSchema[];
-            return {tags};
+            return { tags };
         });
     }
 
-    async renameTag(identity:Identity, tagId:string, name:string) {
+    async renameTag(identity: Identity, tagId: string, name: string) {
         this.setIdentity(identity);
-        return this.request('POST', `tag/${tagId}/rename`, {name});
+        return this.request('POST', `tag/${tagId}/rename`, { name });
     }
 
-    async deleteTag(identity:Identity, tagId:string) {
+    async deleteTag(identity: Identity, tagId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `tag/${tagId}`);
     }
 
-    async addProjectToTag(identity:Identity, tagId:string, projectId:string) {
+    async addProjectToTag(identity: Identity, tagId: string, projectId: string) {
         this.setIdentity(identity);
         return this.request('POST', `tag/${tagId}/project/${projectId}`);
     }
 
-    async removeProjectFromTag(identity:Identity, tagId:string, projectId:string) {
+    async removeProjectFromTag(identity: Identity, tagId: string, projectId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `tag/${tagId}/project/${projectId}`);
     }
 
-    async proxyToHistoryApiAndGetUpdates(identity:Identity, projectId:string, before?:number) {
-        const beforeQuery = before? `&before=${before}` : '';
+    async proxyToHistoryApiAndGetUpdates(identity: Identity, projectId: string, before?: number) {
+        const beforeQuery = before ? `&before=${before}` : '';
 
         this.setIdentity(identity);
         return this.request('GET', `project/${projectId}/updates?min_count=10${beforeQuery}`, undefined, (res) => {
             const updates = JSON.parse(res!) as ProjectUpdateResponseSchema;
-            return {updates};
+            return { updates };
         });
     }
 
-    async proxyToHistoryApiAndGetFileDiff(identity:Identity, projectId:string, pathname:string, from:number, to:number) {
+    async proxyToHistoryApiAndGetFileDiff(
+        identity: Identity,
+        projectId: string,
+        pathname: string,
+        from: number,
+        to: number,
+    ) {
         this.setIdentity(identity);
-        return this.request('GET', `project/${projectId}/diff?pathname=${pathname}&from=${from}&to=${to}`, undefined, (res) => {
-            const diff = JSON.parse(res!) as ProjectFileDiffResponseSchema;
-            return {diff};
-        });
+        return this.request(
+            'GET',
+            `project/${projectId}/diff?pathname=${pathname}&from=${from}&to=${to}`,
+            undefined,
+            (res) => {
+                const diff = JSON.parse(res!) as ProjectFileDiffResponseSchema;
+                return { diff };
+            },
+        );
     }
 
-    async proxyToHistoryApiAndGetFileTreeDiff(identity:Identity, projectId:string, from:number, to:number) {
+    async proxyToHistoryApiAndGetFileTreeDiff(identity: Identity, projectId: string, from: number, to: number) {
         this.setIdentity(identity);
         return this.request('GET', `project/${projectId}/filetree/diff?from=${from}&to=${to}`, undefined, (res) => {
             const treeDiff = JSON.parse(res!) as ProjectFileTreeDiffResponseSchema;
-            return {treeDiff};
+            return { treeDiff };
         });
     }
 
-    async downloadZipOfVersion(identity:Identity, projectId:string, version:number) {
+    async downloadZipOfVersion(identity: Identity, projectId: string, version: number) {
         this.setIdentity(identity);
         const content = await this.download(`project/${projectId}/version/${version}/zip`);
         return {
             type: 'success',
-            content: new Uint8Array(content)
+            content: new Uint8Array(content),
         };
     }
 
-    async getLabels(identity:Identity, projectId:string) {
+    async getLabels(identity: Identity, projectId: string) {
         this.setIdentity(identity);
         return this.request('GET', `project/${projectId}/labels`, undefined, (res) => {
             const labels = JSON.parse(res!) as ProjectLabelResponseSchema[];
-            return {labels};
+            return { labels };
         });
     }
 
-    async createLabel(identity:Identity, projectId:string, comment:string, version:number) {
+    async createLabel(identity: Identity, projectId: string, comment: string, version: number) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/labels`, {comment, version}, (res) => {
+        return this.request('POST', `project/${projectId}/labels`, { comment, version }, (res) => {
             const labels = [JSON.parse(res!)] as ProjectLabelResponseSchema[];
-            return {labels};
+            return { labels };
         });
     }
 
-    async deleteLabel(identity:Identity, projectId:string, labelId:string) {
+    async deleteLabel(identity: Identity, projectId: string, labelId: string) {
         this.setIdentity(identity);
         return this.request('DELETE', `project/${projectId}/labels/${labelId}`);
     }
 
-    async getMessages(identity:Identity, projectId:string, limit:number=50) {
+    async getMessages(identity: Identity, projectId: string, limit: number = 50) {
         this.setIdentity(identity);
-        return this.request('GET', `project/${projectId}/messages?limit=${limit}`, undefined, (res) => {
-            const messages = JSON.parse(res!) as ProjectMessageResponseSchema[];
-            return {messages};
-        }, {'X-Csrf-Token': identity.csrfToken});
+        return this.request(
+            'GET',
+            `project/${projectId}/messages?limit=${limit}`,
+            undefined,
+            (res) => {
+                const messages = JSON.parse(res!) as ProjectMessageResponseSchema[];
+                return { messages };
+            },
+            { 'X-Csrf-Token': identity.csrfToken },
+        );
     }
 
-    async sendMessage(identity:Identity, projectId:string, client_id:string, content:string) {
+    async sendMessage(identity: Identity, projectId: string, client_id: string, content: string) {
         this.setIdentity(identity);
-        return this.request('POST', `project/${projectId}/messages`, {client_id, content}, undefined, {'X-Csrf-Token': identity.csrfToken});
+        return this.request('POST', `project/${projectId}/messages`, { client_id, content }, undefined, {
+            'X-Csrf-Token': identity.csrfToken,
+        });
     }
 }

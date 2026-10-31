@@ -1,39 +1,39 @@
-import {resolve} from 'node:path';
-import {log} from '../core/logger';
-import {createIgnoreMatcher} from '../sync/ignore';
-import {RemoteProject} from '../sync/remoteProject';
-import {SyncEngine, type RemoteReplica} from '../sync/syncEngine';
-import {getServerSession} from './config';
-import {NodeReplicaFileSystem} from './localFileSystem';
-import {readProjectSettings} from './projectSettings';
-import {FileSyncStateStore} from './syncStateStore';
+import { resolve } from 'node:path';
+import { log } from '../core/logger';
+import { createIgnoreMatcher } from '../sync/ignore';
+import { RemoteProject } from '../sync/remoteProject';
+import { SyncEngine, type RemoteReplica } from '../sync/syncEngine';
+import { getServerSession } from './config';
+import { NodeReplicaFileSystem } from './localFileSystem';
+import { readProjectSettings } from './projectSettings';
+import { FileSyncStateStore } from './syncStateStore';
 
 export interface RunningServe {
-    readonly root:string;
-    readonly serverName:string;
-    readonly projectId:string;
-    readonly projectName:string;
-    syncError():string|undefined;
-    conflicts():string[];
-    resolveConflict(path:string, winner:'local'|'remote'):Promise<void>;
-    retry(path:string):Promise<void>;
-    stop():Promise<void>;
+    readonly root: string;
+    readonly serverName: string;
+    readonly projectId: string;
+    readonly projectName: string;
+    syncError(): string | undefined;
+    conflicts(): string[];
+    resolveConflict(path: string, winner: 'local' | 'remote'): Promise<void>;
+    retry(path: string): Promise<void>;
+    stop(): Promise<void>;
 }
 
 export interface StartServeOptions {
-    cookie?:string;
-    log?:(message:string) => void;
-    onConflict?:(path:string, reason:string) => void;
-    onSyncError?:(message:string|undefined) => void;
-    remote?:ServeRemoteProject;
+    cookie?: string;
+    log?: (message: string) => void;
+    onConflict?: (path: string, reason: string) => void;
+    onSyncError?: (message: string | undefined) => void;
+    remote?: ServeRemoteProject;
 }
 
 export interface ServeRemoteProject extends RemoteReplica {
-    connect():Promise<void>;
-    disconnect():void;
+    connect(): Promise<void>;
+    disconnect(): void;
 }
 
-export async function startServe(directory=process.cwd(), options:StartServeOptions={}):Promise<RunningServe> {
+export async function startServe(directory = process.cwd(), options: StartServeOptions = {}): Promise<RunningServe> {
     const root = resolve(directory);
     const settings = await readProjectSettings(root);
     const session = await getServerSession(settings.serverName);
@@ -48,16 +48,18 @@ export async function startServe(directory=process.cwd(), options:StartServeOpti
     const ignore = createIgnoreMatcher(configuredPatterns);
     const local = new NodeReplicaFileSystem(root, ignore);
     const engine = new SyncEngine({
-        projectUri:settings.uri,
+        projectUri: settings.uri,
         local,
         remote,
-        stateStore:new FileSyncStateStore(root, settings.uri),
+        stateStore: new FileSyncStateStore(root, settings.uri),
         ignore,
-        onSyncError:options.onSyncError,
-        log:options.log ?? log,
-        onConflict:options.onConflict ?? ((path, reason) => {
-            (options.log ?? log)(`Conflict paused for ${path}: ${reason}`);
-        }),
+        onSyncError: options.onSyncError,
+        log: options.log ?? log,
+        onConflict:
+            options.onConflict ??
+            ((path, reason) => {
+                (options.log ?? log)(`Conflict paused for ${path}: ${reason}`);
+            }),
     });
     try {
         await engine.start();
@@ -68,14 +70,14 @@ export async function startServe(directory=process.cwd(), options:StartServeOpti
     (options.log ?? log)(`LeafRelay is serving ${root} (${settings.projectName}).`);
     return {
         root,
-        serverName:settings.serverName,
-        projectId:settings.projectId,
-        projectName:settings.projectName,
-        syncError:() => engine.syncError,
-        conflicts:() => engine.getConflicts(),
-        resolveConflict:(path, winner) => engine.resolveConflict(path, winner),
-        retry:path => engine.retry(path),
-        stop:async () => {
+        serverName: settings.serverName,
+        projectId: settings.projectId,
+        projectName: settings.projectName,
+        syncError: () => engine.syncError,
+        conflicts: () => engine.getConflicts(),
+        resolveConflict: (path, winner) => engine.resolveConflict(path, winner),
+        retry: (path) => engine.retry(path),
+        stop: async () => {
             await engine.stop();
             remote.disconnect();
         },

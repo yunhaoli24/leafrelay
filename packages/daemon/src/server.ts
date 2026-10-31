@@ -1,12 +1,8 @@
-import {randomBytes, randomUUID} from 'node:crypto';
-import {appendFile, chmod, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
-import {createServer, type Server, type Socket} from 'node:net';
-import {formatWithOptions} from 'node:util';
-import {
-    readProjectSettings,
-    setLogSink,
-    startServe,
-} from '@leafrelay/core';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer, type Server, type Socket } from 'node:net';
+import { formatWithOptions } from 'node:util';
+import { readProjectSettings, setLogSink, startServe } from '@leafrelay/core';
 import {
     LEAFRELAY_PROTOCOL_VERSION,
     RPC_METHOD,
@@ -27,80 +23,90 @@ import {
     type ServerImportParams,
     type ServerLoginParams,
 } from '@leafrelay/protocol';
-import {ResponseError, type MessageConnection} from 'vscode-jsonrpc/node';
-import {daemonPaths, type DaemonPaths} from './paths';
-import {decodeRpcValue, encodeRpcValue} from './codec';
-import {NetworkRuntimeRegistry} from './networkRuntime';
-import {ReplicaAlreadyActiveError, ReplicaRegistry} from './replicaRegistry';
-import {createSocketRpcConnection} from './transport';
+import { ResponseError, type MessageConnection } from 'vscode-jsonrpc/node';
+import { daemonPaths, type DaemonPaths } from './paths';
+import { decodeRpcValue, encodeRpcValue } from './codec';
+import { NetworkRuntimeRegistry } from './networkRuntime';
+import { ReplicaAlreadyActiveError, ReplicaRegistry } from './replicaRegistry';
+import { createSocketRpcConnection } from './transport';
 
-declare const LEAFRELAY_DAEMON_VERSION:string;
+declare const LEAFRELAY_DAEMON_VERSION: string;
 
 const IDLE_EXIT_MS = 60_000;
 const REPLICA_ALREADY_ACTIVE = -32010;
-const daemonVersion = typeof LEAFRELAY_DAEMON_VERSION==='string' ? LEAFRELAY_DAEMON_VERSION : 'development';
+const daemonVersion = typeof LEAFRELAY_DAEMON_VERSION === 'string' ? LEAFRELAY_DAEMON_VERSION : 'development';
 
 interface ClientConnection {
-    leaseId:string;
-    socket:Socket;
-    rpc:MessageConnection;
-    clientId?:string;
-    initialized:boolean;
+    leaseId: string;
+    socket: Socket;
+    rpc: MessageConnection;
+    clientId?: string;
+    initialized: boolean;
 }
 
 export interface DaemonServerOptions {
-    paths?:DaemonPaths;
-    token?:string;
-    exitOnIdle?:boolean;
+    paths?: DaemonPaths;
+    token?: string;
+    exitOnIdle?: boolean;
 }
 
 export class LeafRelayDaemonServer {
-    private readonly paths:DaemonPaths;
-    private readonly token:string;
+    private readonly paths: DaemonPaths;
+    private readonly token: string;
     private readonly startedAt = new Date().toISOString();
     private readonly clients = new Set<ClientConnection>();
-    private readonly network:NetworkRuntimeRegistry;
-    private readonly replicas:ReplicaRegistry;
-    private server?:Server;
-    private idleTimer?:NodeJS.Timeout;
-    private stopping?:Promise<void>;
+    private readonly network: NetworkRuntimeRegistry;
+    private readonly replicas: ReplicaRegistry;
+    private server?: Server;
+    private idleTimer?: NodeJS.Timeout;
+    private stopping?: Promise<void>;
 
-    constructor(private readonly options:DaemonServerOptions={}) {
+    constructor(private readonly options: DaemonServerOptions = {}) {
         this.paths = options.paths ?? daemonPaths();
         this.token = options.token ?? randomBytes(32).toString('hex');
         this.network = new NetworkRuntimeRegistry({
-            projectEvent:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.projectEvent, notification),
-            log:(level, message) => void this.log(level, message),
+            projectEvent: (owners, notification) =>
+                this.notifyOwners(owners, RPC_NOTIFICATION.projectEvent, notification),
+            log: (level, message) => void this.log(level, message),
         });
-        this.replicas = new ReplicaRegistry({
-            status:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.replicaStatus, notification),
-            conflict:(owners, notification) => this.notifyOwners(owners, RPC_NOTIFICATION.replicaConflict, notification),
-            empty:() => this.scheduleIdleExit(),
-            log:message => void this.log('info', message),
-        }, async (directory, startOptions) => {
-            const settings = await readProjectSettings(directory);
-            const lease = await this.network.acquireReplica(settings.serverName, settings.projectId);
-            try {
-                const running = await startServe(directory, {...startOptions, remote:lease.remote});
-                return {
-                    ...running,
-                    stop:async () => {
-                        await running.stop();
-                        lease.release();
-                    },
-                };
-            } catch (error) {
-                lease.release();
-                throw error;
-            }
-        });
+        this.replicas = new ReplicaRegistry(
+            {
+                status: (owners, notification) =>
+                    this.notifyOwners(owners, RPC_NOTIFICATION.replicaStatus, notification),
+                conflict: (owners, notification) =>
+                    this.notifyOwners(owners, RPC_NOTIFICATION.replicaConflict, notification),
+                empty: () => this.scheduleIdleExit(),
+                log: (message) => void this.log('info', message),
+            },
+            async (directory, startOptions) => {
+                const settings = await readProjectSettings(directory);
+                const lease = await this.network.acquireReplica(settings.serverName, settings.projectId);
+                try {
+                    const running = await startServe(directory, { ...startOptions, remote: lease.remote });
+                    return {
+                        ...running,
+                        stop: async () => {
+                            await running.stop();
+                            lease.release();
+                        },
+                    };
+                } catch (error) {
+                    lease.release();
+                    throw error;
+                }
+            },
+        );
     }
 
-    async start():Promise<DaemonMetadata> {
-        await mkdir(this.paths.home, {recursive:true, mode:0o700});
-        setLogSink((level, args) => void this.log(level, formatWithOptions({depth:5, breakLength:Infinity}, ...args)));
-        if (process.platform!=='win32') { await rm(this.paths.socketPath, {force:true}); }
-        this.server = createServer(socket => this.accept(socket));
+    async start(): Promise<DaemonMetadata> {
+        await mkdir(this.paths.home, { recursive: true, mode: 0o700 });
+        setLogSink(
+            (level, args) => void this.log(level, formatWithOptions({ depth: 5, breakLength: Infinity }, ...args)),
+        );
+        if (process.platform !== 'win32') {
+            await rm(this.paths.socketPath, { force: true });
+        }
+        this.server = createServer((socket) => this.accept(socket));
         await new Promise<void>((resolveListen, reject) => {
             this.server!.once('error', reject);
             this.server!.listen(this.paths.socketPath, () => {
@@ -108,150 +114,210 @@ export class LeafRelayDaemonServer {
                 resolveListen();
             });
         });
-        if (process.platform!=='win32') { await chmod(this.paths.socketPath, 0o600); }
-        const metadata:DaemonMetadata = {
-            pid:process.pid,
-            socketPath:this.paths.socketPath,
-            token:this.token,
-            protocolVersion:LEAFRELAY_PROTOCOL_VERSION,
-            version:daemonVersion,
-            startedAt:this.startedAt,
+        if (process.platform !== 'win32') {
+            await chmod(this.paths.socketPath, 0o600);
+        }
+        const metadata: DaemonMetadata = {
+            pid: process.pid,
+            socketPath: this.paths.socketPath,
+            token: this.token,
+            protocolVersion: LEAFRELAY_PROTOCOL_VERSION,
+            version: daemonVersion,
+            startedAt: this.startedAt,
         };
-        await writeFile(this.paths.metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {encoding:'utf8', mode:0o600});
+        await writeFile(this.paths.metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {
+            encoding: 'utf8',
+            mode: 0o600,
+        });
         await chmod(this.paths.metadataPath, 0o600);
         await this.log('info', `Daemon ${daemonVersion} listening on ${this.paths.socketPath}.`);
         this.scheduleIdleExit();
         return metadata;
     }
 
-    async stop():Promise<void> {
-        if (this.stopping) { return this.stopping; }
+    async stop(): Promise<void> {
+        if (this.stopping) {
+            return this.stopping;
+        }
         this.stopping = this.performStop();
         return this.stopping;
     }
 
-    status():DaemonStatus {
+    status(): DaemonStatus {
         return {
-            pid:process.pid,
-            version:daemonVersion,
-            protocolVersion:LEAFRELAY_PROTOCOL_VERSION,
-            startedAt:this.startedAt,
-            clients:this.clients.size,
-            projects:this.network.projectCount,
-            replicas:this.replicas.list(),
+            pid: process.pid,
+            version: daemonVersion,
+            protocolVersion: LEAFRELAY_PROTOCOL_VERSION,
+            startedAt: this.startedAt,
+            clients: this.clients.size,
+            projects: this.network.projectCount,
+            replicas: this.replicas.list(),
         };
     }
 
-    private accept(socket:Socket):void {
+    private accept(socket: Socket): void {
         this.cancelIdleExit();
         const rpc = createSocketRpcConnection(socket);
-        const client:ClientConnection = {leaseId:randomUUID(), socket, rpc, initialized:false};
+        const client: ClientConnection = { leaseId: randomUUID(), socket, rpc, initialized: false };
         this.clients.add(client);
-        rpc.onRequest(RPC_METHOD.initialize, (params:InitializeParams) => this.initialize(client, params));
+        rpc.onRequest(RPC_METHOD.initialize, (params: InitializeParams) => this.initialize(client, params));
         rpc.onRequest(RPC_METHOD.daemonStatus, () => this.authorized(client, () => this.status()));
-        rpc.onRequest(RPC_METHOD.daemonShutdown, () => this.authorized(client, async () => {
-            setTimeout(() => void this.stop(), 25);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.replicaAttach, (params:ReplicaAttachParams) => this.authorized(client, async () => {
-            try {
-                return await this.replicas.attach(client.leaseId, params);
-            } catch (error) {
-                if (error instanceof ReplicaAlreadyActiveError) {
-                    throw new ResponseError(REPLICA_ALREADY_ACTIVE, error.message, {
-                        code:error.code,
-                        projectId:error.projectId,
-                        activeRoot:error.activeRoot,
-                        requestedRoot:error.requestedRoot,
-                    });
+        rpc.onRequest(RPC_METHOD.daemonShutdown, () =>
+            this.authorized(client, async () => {
+                setTimeout(() => void this.stop(), 25);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.replicaAttach, (params: ReplicaAttachParams) =>
+            this.authorized(client, async () => {
+                try {
+                    return await this.replicas.attach(client.leaseId, params);
+                } catch (error) {
+                    if (error instanceof ReplicaAlreadyActiveError) {
+                        throw new ResponseError(REPLICA_ALREADY_ACTIVE, error.message, {
+                            code: error.code,
+                            projectId: error.projectId,
+                            activeRoot: error.activeRoot,
+                            requestedRoot: error.requestedRoot,
+                        });
+                    }
+                    throw error;
                 }
-                throw error;
-            }
-        }));
-        rpc.onRequest(RPC_METHOD.replicaDetach, (params:{replicaId:string}) => this.authorized(client, async () => {
-            await this.replicas.detach(client.leaseId, params.replicaId);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.replicaResolveConflict, (params:ReplicaConflictResolutionParams) => this.authorized(client, async () => {
-            await this.replicas.resolveConflict(params.replicaId, params.path, params.winner);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.replicaRetry, (params:{replicaId:string; path:string}) => this.authorized(client, async () => {
-            await this.replicas.retry(params.replicaId, params.path);
-            return null;
-        }));
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.replicaDetach, (params: { replicaId: string }) =>
+            this.authorized(client, async () => {
+                await this.replicas.detach(client.leaseId, params.replicaId);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.replicaResolveConflict, (params: ReplicaConflictResolutionParams) =>
+            this.authorized(client, async () => {
+                await this.replicas.resolveConflict(params.replicaId, params.path, params.winner);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.replicaRetry, (params: { replicaId: string; path: string }) =>
+            this.authorized(client, async () => {
+                await this.replicas.retry(params.replicaId, params.path);
+                return null;
+            }),
+        );
         rpc.onRequest(RPC_METHOD.serverList, () => this.authorized(client, () => this.network.listServers()));
-        rpc.onRequest(RPC_METHOD.serverAdd, (params:{name:string; url:string}) => this.authorized(client, async () => {
-            await this.network.addServer(params.name, params.url);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.serverRemove, (params:{server:string}) => this.authorized(client, async () => {
-            await this.network.removeServer(params.server);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.sessionLogin, (params:ServerLoginParams) => this.authorized(client, () => this.network.login(params)));
-        rpc.onRequest(RPC_METHOD.sessionImport, (params:ServerImportParams) => this.authorized(client, () => this.network.importSession(params)));
-        rpc.onRequest(RPC_METHOD.sessionLogout, (params:{server:string}) => this.authorized(client, async () => {
-            await this.network.logout(params.server);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.serverCall, (params:ServerCallParams) => this.authorized(client, async () => {
-            const result = await this.network.callServer(params.server, params.operation, decodeRpcValue(params.args) as unknown[]);
-            return encodeRpcValue(result);
-        }));
-        rpc.onRequest(RPC_METHOD.projectOpen, (params:ProjectOpenParams) => this.authorized(client, () => (
-            this.network.openProject(client.leaseId, params.server, params.projectId)
-        )));
-        rpc.onRequest(RPC_METHOD.projectClose, (params:{projectKey:string}) => this.authorized(client, () => {
-            this.network.closeProject(client.leaseId, params.projectKey);
-            return null;
-        }));
-        rpc.onRequest(RPC_METHOD.projectCall, (params:ProjectCallParams) => this.authorized(client, async () => {
-            const result = await this.network.callProject(params.projectKey, params.operation, decodeRpcValue(params.args) as unknown[]);
-            return encodeRpcValue(await result);
-        }));
+        rpc.onRequest(RPC_METHOD.serverAdd, (params: { name: string; url: string }) =>
+            this.authorized(client, async () => {
+                await this.network.addServer(params.name, params.url);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.serverRemove, (params: { server: string }) =>
+            this.authorized(client, async () => {
+                await this.network.removeServer(params.server);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.sessionLogin, (params: ServerLoginParams) =>
+            this.authorized(client, () => this.network.login(params)),
+        );
+        rpc.onRequest(RPC_METHOD.sessionImport, (params: ServerImportParams) =>
+            this.authorized(client, () => this.network.importSession(params)),
+        );
+        rpc.onRequest(RPC_METHOD.sessionLogout, (params: { server: string }) =>
+            this.authorized(client, async () => {
+                await this.network.logout(params.server);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.serverCall, (params: ServerCallParams) =>
+            this.authorized(client, async () => {
+                const result = await this.network.callServer(
+                    params.server,
+                    params.operation,
+                    decodeRpcValue(params.args) as unknown[],
+                );
+                return encodeRpcValue(result);
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.projectOpen, (params: ProjectOpenParams) =>
+            this.authorized(client, () => this.network.openProject(client.leaseId, params.server, params.projectId)),
+        );
+        rpc.onRequest(RPC_METHOD.projectClose, (params: { projectKey: string }) =>
+            this.authorized(client, () => {
+                this.network.closeProject(client.leaseId, params.projectKey);
+                return null;
+            }),
+        );
+        rpc.onRequest(RPC_METHOD.projectCall, (params: ProjectCallParams) =>
+            this.authorized(client, async () => {
+                const result = await this.network.callProject(
+                    params.projectKey,
+                    params.operation,
+                    decodeRpcValue(params.args) as unknown[],
+                );
+                return encodeRpcValue(await result);
+            }),
+        );
         rpc.onClose(() => void this.closeClient(client));
-        rpc.onError(error => void this.log('error', `JSON-RPC connection error: ${String(error[0])}`));
+        rpc.onError((error) => void this.log('error', `JSON-RPC connection error: ${String(error[0])}`));
         rpc.listen();
     }
 
-    private initialize(client:ClientConnection, params:InitializeParams):InitializeResult {
-        if (params.token!==this.token) { throw new ResponseError(-32001, 'Daemon authentication failed.'); }
-        if (params.protocolVersion!==LEAFRELAY_PROTOCOL_VERSION) {
-            throw new ResponseError(-32002, `Protocol ${params.protocolVersion} is incompatible with daemon protocol ${LEAFRELAY_PROTOCOL_VERSION}.`);
+    private initialize(client: ClientConnection, params: InitializeParams): InitializeResult {
+        if (params.token !== this.token) {
+            throw new ResponseError(-32001, 'Daemon authentication failed.');
         }
-        if (!params.clientId) { throw new ResponseError(-32602, 'clientId is required.'); }
+        if (params.protocolVersion !== LEAFRELAY_PROTOCOL_VERSION) {
+            throw new ResponseError(
+                -32002,
+                `Protocol ${params.protocolVersion} is incompatible with daemon protocol ${LEAFRELAY_PROTOCOL_VERSION}.`,
+            );
+        }
+        if (!params.clientId) {
+            throw new ResponseError(-32602, 'clientId is required.');
+        }
         client.clientId = params.clientId;
         client.initialized = true;
         this.replicas.registerClient(client.leaseId);
         void this.log('info', `${params.clientName} ${params.clientVersion} connected (${params.clientId}).`);
         return {
-            daemonVersion:daemonVersion,
-            protocolVersion:LEAFRELAY_PROTOCOL_VERSION,
-            pid:process.pid,
-            startedAt:this.startedAt,
+            daemonVersion: daemonVersion,
+            protocolVersion: LEAFRELAY_PROTOCOL_VERSION,
+            pid: process.pid,
+            startedAt: this.startedAt,
         };
     }
 
-    private async authorized<T>(client:ClientConnection, operation:() => T|Promise<T>):Promise<T> {
-        if (!client.initialized) { throw new ResponseError(-32001, 'Initialize the daemon connection first.'); }
+    private async authorized<T>(client: ClientConnection, operation: () => T | Promise<T>): Promise<T> {
+        if (!client.initialized) {
+            throw new ResponseError(-32001, 'Initialize the daemon connection first.');
+        }
         try {
             return await operation();
         } catch (error) {
-            if (error instanceof ResponseError) { throw error; }
+            if (error instanceof ResponseError) {
+                throw error;
+            }
             const message = error instanceof Error ? error.message : String(error);
-            await this.log('error', `RPC operation failed: ${formatWithOptions({depth:5, breakLength:Infinity}, error)}`);
+            await this.log(
+                'error',
+                `RPC operation failed: ${formatWithOptions({ depth: 5, breakLength: Infinity }, error)}`,
+            );
             throw new ResponseError(-32603, message);
         }
     }
 
-    private async closeClient(client:ClientConnection):Promise<void> {
-        if (!this.clients.delete(client)) { return; }
+    private async closeClient(client: ClientConnection): Promise<void> {
+        if (!this.clients.delete(client)) {
+            return;
+        }
         if (client.clientId) {
             try {
                 await this.replicas.detachClient(client.leaseId);
             } catch (error) {
-                await this.log('error', `Failed to stop replicas for a disconnected client: ${error instanceof Error ? error.message : String(error)}`);
+                await this.log(
+                    'error',
+                    `Failed to stop replicas for a disconnected client: ${error instanceof Error ? error.message : String(error)}`,
+                );
             } finally {
                 this.network.detachClient(client.leaseId);
             }
@@ -260,39 +326,61 @@ export class LeafRelayDaemonServer {
     }
 
     private notifyOwners(
-        owners:ReadonlySet<string>,
-        method:typeof RPC_NOTIFICATION.replicaStatus|typeof RPC_NOTIFICATION.replicaConflict|typeof RPC_NOTIFICATION.projectEvent,
-        notification:ReplicaStatusNotification|ReplicaConflictNotification|ProjectEventNotification,
-    ):void {
+        owners: ReadonlySet<string>,
+        method:
+            | typeof RPC_NOTIFICATION.replicaStatus
+            | typeof RPC_NOTIFICATION.replicaConflict
+            | typeof RPC_NOTIFICATION.projectEvent,
+        notification: ReplicaStatusNotification | ReplicaConflictNotification | ProjectEventNotification,
+    ): void {
         for (const client of this.clients) {
-            if (owners.has(client.leaseId)) { this.notifyClient(client, method, notification); }
+            if (owners.has(client.leaseId)) {
+                this.notifyClient(client, method, notification);
+            }
         }
     }
 
-    private async log(level:LogNotification['level'], message:string):Promise<void> {
-        const notification:LogNotification = {timestamp:new Date().toISOString(), level, message};
-        await appendFile(this.paths.logPath, `${notification.timestamp} [${level}] ${message}\n`, {encoding:'utf8', mode:0o600});
+    private async log(level: LogNotification['level'], message: string): Promise<void> {
+        const notification: LogNotification = { timestamp: new Date().toISOString(), level, message };
+        await appendFile(this.paths.logPath, `${notification.timestamp} [${level}] ${message}\n`, {
+            encoding: 'utf8',
+            mode: 0o600,
+        });
         for (const client of this.clients) {
-            if (client.initialized) { this.notifyClient(client, RPC_NOTIFICATION.log, notification); }
+            if (client.initialized) {
+                this.notifyClient(client, RPC_NOTIFICATION.log, notification);
+            }
         }
     }
 
-    private notifyClient(client:ClientConnection, method:string, notification:unknown):void {
-        if (!this.clients.has(client) || client.socket.destroyed) { return; }
+    private notifyClient(client: ClientConnection, method: string, notification: unknown): void {
+        if (!this.clients.has(client) || client.socket.destroyed) {
+            return;
+        }
         void client.rpc.sendNotification(method, notification).catch(() => this.closeClient(client));
     }
 
-    private scheduleIdleExit():void {
-        if (this.options.exitOnIdle===false || this.clients.size!==0 || this.replicas.size!==0 || this.idleTimer) { return; }
+    private scheduleIdleExit(): void {
+        if (
+            this.options.exitOnIdle === false ||
+            this.clients.size !== 0 ||
+            this.replicas.size !== 0 ||
+            this.idleTimer
+        ) {
+            return;
+        }
         this.idleTimer = setTimeout(() => void this.stop(), IDLE_EXIT_MS);
         this.idleTimer.unref();
     }
 
-    private cancelIdleExit():void {
-        if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = undefined; }
+    private cancelIdleExit(): void {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = undefined;
+        }
     }
 
-    private async performStop():Promise<void> {
+    private async performStop(): Promise<void> {
         this.cancelIdleExit();
         await this.replicas.stopAll();
         await this.network.stopAll();
@@ -303,18 +391,22 @@ export class LeafRelayDaemonServer {
         }
         this.clients.clear();
         if (this.server) {
-            await new Promise<void>(resolveClose => this.server!.close(() => resolveClose()));
+            await new Promise<void>((resolveClose) => this.server!.close(() => resolveClose()));
         }
-        await rm(this.paths.metadataPath, {force:true});
-        if (process.platform!=='win32') { await rm(this.paths.socketPath, {force:true}); }
+        await rm(this.paths.metadataPath, { force: true });
+        if (process.platform !== 'win32') {
+            await rm(this.paths.socketPath, { force: true });
+        }
     }
 }
 
-export async function readDaemonMetadata(paths:DaemonPaths=daemonPaths()):Promise<DaemonMetadata|undefined> {
+export async function readDaemonMetadata(paths: DaemonPaths = daemonPaths()): Promise<DaemonMetadata | undefined> {
     try {
         return JSON.parse(await readFile(paths.metadataPath, 'utf8')) as DaemonMetadata;
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code==='ENOENT') { return undefined; }
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return undefined;
+        }
         throw error;
     }
 }

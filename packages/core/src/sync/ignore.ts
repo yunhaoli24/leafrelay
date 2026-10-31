@@ -1,4 +1,4 @@
-import {minimatch} from 'minimatch';
+import { minimatch } from 'minimatch';
 
 export const DEFAULT_IGNORE_PATTERNS = [
     '**/.*',
@@ -23,14 +23,16 @@ export const DEFAULT_IGNORE_PATTERNS = [
     '**/output.pdf',
 ];
 
-export function createIgnoreMatcher(patterns:unknown): (path:string)=>boolean {
+export function createIgnoreMatcher(patterns: unknown): (path: string) => boolean {
     const configured = Array.isArray(patterns)
-        ? patterns.filter((pattern):pattern is string => typeof pattern==='string')
+        ? patterns.filter((pattern): pattern is string => typeof pattern === 'string')
         : [];
     const allPatterns = [...DEFAULT_IGNORE_PATTERNS, ...configured];
-    return path => {
+    return (path) => {
         const normalized = path.replace(/^\/+/, '');
-        return normalized.split('/').some(part => part.startsWith('.')) ||
-            allPatterns.some(pattern => minimatch(normalized, pattern, {dot:true}));
+        return (
+            normalized.split('/').some((part) => part.startsWith('.')) ||
+            allPatterns.some((pattern) => minimatch(normalized, pattern, { dot: true }))
+        );
     };
 }

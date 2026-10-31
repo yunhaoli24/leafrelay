@@ -1,5 +1,5 @@
-import {describe, expect, it} from 'vitest';
-import {encodeTextBase, mergeText} from '../src/sync/threeWayMerge';
+import { describe, expect, it } from 'vitest';
+import { encodeTextBase, mergeText } from '../src/sync/threeWayMerge';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -20,21 +20,13 @@ describe('mergeText', () => {
     });
 
     it('reports overlapping line edits as a conflict', () => {
-        const result = mergeText(
-            bytes('shared line\n'),
-            bytes('local line\n'),
-            bytes('remote line\n'),
-        );
+        const result = mergeText(bytes('shared line\n'), bytes('local line\n'), bytes('remote line\n'));
 
-        expect(result).toEqual({status:'conflict'});
+        expect(result).toEqual({ status: 'conflict' });
     });
 
     it('accepts an identical edit made on both sides', () => {
-        const result = mergeText(
-            bytes('before\n'),
-            bytes('after\n'),
-            bytes('after\n'),
-        );
+        const result = mergeText(bytes('before\n'), bytes('after\n'), bytes('after\n'));
 
         expect(result.status).toBe('merged');
         expect(decoder.decode(result.content)).toBe('after\n');
@@ -52,23 +44,15 @@ describe('mergeText', () => {
     });
 
     it('keeps adjacent edits conservative', () => {
-        const result = mergeText(
-            bytes('one\ntwo\n'),
-            bytes('ONE\ntwo\n'),
-            bytes('one\nTWO\n'),
-        );
+        const result = mergeText(bytes('one\ntwo\n'), bytes('ONE\ntwo\n'), bytes('one\nTWO\n'));
 
-        expect(result).toEqual({status:'conflict'});
+        expect(result).toEqual({ status: 'conflict' });
     });
 
     it('does not attempt to merge binary content', () => {
-        const result = mergeText(
-            new Uint8Array([0, 1]),
-            new Uint8Array([0, 2]),
-            new Uint8Array([0, 3]),
-        );
+        const result = mergeText(new Uint8Array([0, 1]), new Uint8Array([0, 2]), new Uint8Array([0, 3]));
 
-        expect(result).toEqual({status:'binary'});
+        expect(result).toEqual({ status: 'binary' });
         expect(encodeTextBase(new Uint8Array([0, 1]))).toBeUndefined();
     });
 });

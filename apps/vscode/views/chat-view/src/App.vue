@@ -1,54 +1,54 @@
 <script setup lang="ts">
-    import '@vscode-elements/elements/dist/vscode-badge/index.js';
-    import '@vscode-elements/elements/dist/vscode-button/index.js';
-    import '@vscode-elements/elements/dist/vscode-divider/index.js';
-    import '@vscode-elements/elements/dist/vscode-textarea/index.js';
+import '@vscode-elements/elements/dist/vscode-badge/index.js';
+import '@vscode-elements/elements/dist/vscode-button/index.js';
+import '@vscode-elements/elements/dist/vscode-divider/index.js';
+import '@vscode-elements/elements/dist/vscode-textarea/index.js';
 
-    import { ref, onMounted, provide, watchEffect } from "vue";
-    import { getMessages, MessageTree, type Message } from "./utils";
-    import InputBox from "./components/InputBox.vue";
-    import MessageList from "./components/MessageList.vue";
-    import NewMessageNotice from "./components/NewMessageNotice.vue";
+import { ref, onMounted, provide, watchEffect } from 'vue';
+import { getMessages, MessageTree, type Message } from './utils';
+import InputBox from './components/InputBox.vue';
+import MessageList from './components/MessageList.vue';
+import NewMessageNotice from './components/NewMessageNotice.vue';
 
-    const unreadRecord = ref([]);
-    const activeInputBox = ref();
-    provide('activeInputBox', activeInputBox);
-    provide('unreadRecord', unreadRecord);
+const unreadRecord = ref([]);
+const activeInputBox = ref();
+provide('activeInputBox', activeInputBox);
+provide('unreadRecord', unreadRecord);
 
-    const messageList = ref();
-    const inputBox = ref();
-    const messages = ref<Message[]>([]);
-    const messageTree = new MessageTree(messages, unreadRecord);
+const messageList = ref();
+const inputBox = ref();
+const messages = ref<Message[]>([]);
+const messageTree = new MessageTree(messages, unreadRecord);
 
-    onMounted(() => {
-        window.addEventListener('message', async (e) => {
-            const data = e.data;
-            switch (data.type) {
-                case 'get-messages':
-                    messageTree.userId = data.userId;
-                    messageTree.update(data.content.reverse());
-                    break;
-                case 'new-message':
-                    messageTree.pushMessage(data.content, true);
-                    break;
-                case 'insert-text':
-                    activeInputBox.value.value.insertText(data.content);
-                    break;
-            }
-        });
-
-        watchEffect(async () => {
-            if (activeInputBox.value===undefined || activeInputBox.value.value===undefined) {
-                activeInputBox.value = inputBox;
-            }
-        });
-
-        getMessages();
+onMounted(() => {
+    window.addEventListener('message', async (e) => {
+        const data = e.data;
+        switch (data.type) {
+            case 'get-messages':
+                messageTree.userId = data.userId;
+                messageTree.update(data.content.reverse());
+                break;
+            case 'new-message':
+                messageTree.pushMessage(data.content, true);
+                break;
+            case 'insert-text':
+                activeInputBox.value.value.insertText(data.content);
+                break;
+        }
     });
 
-    function clickCallback(messageId: string) {
-        messageList.value?.scrollItemIntoView(messageId);
-    }
+    watchEffect(async () => {
+        if (activeInputBox.value === undefined || activeInputBox.value.value === undefined) {
+            activeInputBox.value = inputBox;
+        }
+    });
+
+    getMessages();
+});
+
+function clickCallback(messageId: string) {
+    messageList.value?.scrollItemIntoView(messageId);
+}
 </script>
 
 <template>
@@ -61,15 +61,17 @@
 
 <style src="@vscode/codicons/dist/codicon.css"></style>
 <style>
-    html,body,#app {
-        height: 100%;
-    }
-    main {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        align-items: flex-end;
-        height: 100%;
-        overflow: auto;
-    }
+html,
+body,
+#app {
+    height: 100%;
+}
+main {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+    height: 100%;
+    overflow: auto;
+}
 </style>

@@ -16,31 +16,27 @@ const severityMap: Record<string, vscode.DiagnosticSeverity> = {
 };
 
 // Match the document class in the tex file
-const documentClassRegex = new RegExp(/\\documentclass(?:\[[^\[\]\{\}]*\])?\{([^\[\]\{\}]+)\}/);
+const documentClassRegex = new RegExp(/\\documentclass(?:\[[^[\]{}]*\])?\{([^[\]{}]+)}/);
 
 const pdfViewRecord: {
     [key: string]: {
-        [key: string]: { doc: PdfDocument, webviewPanel: vscode.WebviewPanel }
-    }
+        [key: string]: { doc: PdfDocument; webviewPanel: vscode.WebviewPanel };
+    };
 } = {};
 
 class CompileDiagnosticProvider {
     private diagnosticCollection = vscode.languages.createDiagnosticCollection(EXTENSION_NAMESPACE);
-    constructor(private readonly vfsm: RemoteFileSystemProvider) {};
+    constructor(private readonly vfsm: RemoteFileSystemProvider) {}
 
     private async getRange(log: ErrorSchema, path: string, vfs: any) {
         let textDoc: vscode.TextDocument;
         try {
-            textDoc = (await vscode.workspace.openTextDocument(vfs.pathToUri(path)));
-        }
-        catch (error) {
+            textDoc = await vscode.workspace.openTextDocument(vfs.pathToUri(path));
+        } catch {
             return null;
         }
         if (log.line !== null) {
-            const _range = new vscode.Range(
-                new vscode.Position(log.line - 1, 0),
-                new vscode.Position(log.line, 0),
-            );
+            const _range = new vscode.Range(new vscode.Position(log.line - 1, 0), new vscode.Position(log.line, 0));
             const lineContent = textDoc.getText(_range);
             const lineMatch = lineContent.match(/^\s*(.*?)\s*$/)?.[1] || '';
             const lineStart = lineContent.indexOf(lineMatch);
@@ -49,12 +45,8 @@ class CompileDiagnosticProvider {
                 new vscode.Position(log.line - 1, lineStart),
                 new vscode.Position(log.line - 1, lineEnd),
             );
-        }
-        else {
-            return new vscode.Range(
-                new vscode.Position(0, 0),
-                new vscode.Position(1, 0),
-            );
+        } else {
+            return new vscode.Range(new vscode.Position(0, 0), new vscode.Position(1, 0));
         }
     }
     private validatePath(path: string) {
@@ -83,12 +75,14 @@ class CompileDiagnosticProvider {
         }
         const logs = new LatexParser(content).parse();
         if (logs === undefined) {
-            return content === ''? true :false;
+            return content === '' ? true : false;
         }
         let hasError = false;
         const diagnosticsRecorder: { [key: string]: vscode.Diagnostic[] } = {};
         for (const log of logs.all) {
-            if (!log.file.startsWith('./')) { continue; }
+            if (!log.file.startsWith('./')) {
+                continue;
+            }
             const path = this.validatePath(log.file);
             const range = await this.getRange(log, path, vfs);
             if (range === null) {
@@ -130,21 +124,18 @@ export class CompileManager {
     private compileAsDraft: boolean = false;
     private compileStopOnFirstError: boolean = false;
 
-    constructor(
-        private vfsm: RemoteFileSystemProvider,
-    ) {
-        this.vfsm = vfsm;
+    constructor(private vfsm: RemoteFileSystemProvider) {
         this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -1);
         this.status.command = `${EXTENSION_NAMESPACE}.compilerManager.settings`;
         this.diagnosticProvider = new CompileDiagnosticProvider(vfsm);
         // listen pdf open event
-        EventBus.on('pdfWillOpenEvent', ({uri, doc, webviewPanel}) => {
-            const {identifier,pathParts} = parseUri(uri);
+        EventBus.on('pdfWillOpenEvent', ({ uri, doc, webviewPanel }) => {
+            const { identifier, pathParts } = parseUri(uri);
             const filePath = pathParts.join('/');
             if (pdfViewRecord[identifier]) {
-                pdfViewRecord[identifier][filePath] = {doc, webviewPanel};
+                pdfViewRecord[identifier][filePath] = { doc, webviewPanel };
             } else {
-                pdfViewRecord[identifier] = {[filePath]:{doc, webviewPanel}};
+                pdfViewRecord[identifier] = { [filePath]: { doc, webviewPanel } };
             }
         });
     }
@@ -158,14 +149,14 @@ export class CompileManager {
         }
         // check if supported local replica
         const localSetting = await LocalReplicaSCMProvider.readSettings();
-        if (localSetting?.uri && localSetting?.enableCompileNPreview===true) {
+        if (localSetting?.uri && localSetting?.enableCompileNPreview === true) {
             return vscode.Uri.parse(localSetting.uri);
         }
         // otherwise return undefined
         return undefined;
     }
 
-    async update(status: 'success'|'compiling'|'failed'|'alert') {
+    async update(status: 'success' | 'compiling' | 'failed' | 'alert') {
         const uri = await CompileManager.check();
         if (uri) {
             this.inCompiling = status === 'compiling';
@@ -176,7 +167,9 @@ export class CompileManager {
                 switch (status) {
                     case 'success':
                         this.status.text = `${compilerName}`;
-                        this.status.tooltip.appendMarkdown(`\`${rootDocName}\` **${vscode.l10n.t('Compile Success')}**`);
+                        this.status.tooltip.appendMarkdown(
+                            `\`${rootDocName}\` **${vscode.l10n.t('Compile Success')}**`,
+                        );
                         this.status.backgroundColor = undefined;
                         break;
                     case 'compiling':
@@ -204,15 +197,18 @@ export class CompileManager {
         return uri;
     }
 
-    async compile(force:boolean=false) {
-        if (this.inCompiling) { return; }
+    async compile(force: boolean = false) {
+        if (this.inCompiling) {
+            return;
+        }
         await vscode.workspace.saveAll(); // save all dirty files
 
         const uri = await this.update('compiling');
         if (uri) {
-            this.vfsm.prefetch(uri)
+            this.vfsm
+                .prefetch(uri)
                 .then(async (vfs) => {
-                    const content = new TextDecoder().decode( await vfs?.openFile(uri) );
+                    const content = new TextDecoder().decode(await vfs?.openFile(uri));
                     const match = RegExp(documentClassRegex).exec(content);
                     const fileId = (await vfs._resolveUri(uri)).fileId;
                     const rootDocId = match ? fileId : undefined;
@@ -233,10 +229,10 @@ export class CompileManager {
                             break;
                     }
                 })
-                .then(status =>
-                    status ?
-                        vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.compileErrorCheck`, uri)
-                        : Promise.reject()
+                .then((status) =>
+                    status
+                        ? vscode.commands.executeCommand(`${EXTENSION_NAMESPACE}.compileManager.compileErrorCheck`, uri)
+                        : Promise.reject(),
                 )
                 .then(async (hasError) => {
                     if (hasError) {
@@ -246,11 +242,10 @@ export class CompileManager {
                     }
                     // refresh pdf
                     const { identifier } = parseUri(uri);
-                    pdfViewRecord[identifier] && Object.values(pdfViewRecord[identifier]).forEach(
-                        (record) => record.doc.refresh()
-                    );
+                    if (pdfViewRecord[identifier]) {
+                        Object.values(pdfViewRecord[identifier]).forEach((record) => record.doc.refresh());
+                    }
                 });
-
         }
     }
 
@@ -270,10 +265,10 @@ export class CompileManager {
             const pdfUri = uri.with({
                 path: `/${rootPath}/${OUTPUT_FOLDER_NAME}/output.pdf`,
             });
-            vscode.commands.executeCommand('vscode.openWith', pdfUri,
-                `${EXTENSION_NAMESPACE}.pdfViewer`,
-                { preview: false, viewColumn: vscode.ViewColumn.Beside }
-            );
+            vscode.commands.executeCommand('vscode.openWith', pdfUri, `${EXTENSION_NAMESPACE}.pdfViewer`, {
+                preview: false,
+                viewColumn: vscode.ViewColumn.Beside,
+            });
         }
     }
 
@@ -285,7 +280,8 @@ export class CompileManager {
             const filePath = pathParts.join('/');
             const line = startPoint.line;
             const column = startPoint.character;
-            this.vfsm.prefetch(uri)
+            this.vfsm
+                .prefetch(uri)
                 .then((vfs) => vfs.syncCode(filePath, line, column))
                 .then((res) => {
                     if (res) {
@@ -294,7 +290,7 @@ export class CompileManager {
                         // get page
                         webview.postMessage({
                             type: 'syncCode',
-                            content: res
+                            content: res,
                         });
                     }
                 });
@@ -307,7 +303,9 @@ export class CompileManager {
         const lineIndex = targetLine - 1;
 
         if (lineIndex < 0 || lineIndex >= editor.document.lineCount) {
-            warn(`${ELEGANT_NAME}: Invalid line number ${targetLine} for revealing in editor. Document has ${editor.document.lineCount} lines.`);
+            warn(
+                `${ELEGANT_NAME}: Invalid line number ${targetLine} for revealing in editor. Document has ${editor.document.lineCount} lines.`,
+            );
             // Optionally, just focus the editor if the line is invalid
             vscode.window.showTextDocument(editor.document, { viewColumn: editor.viewColumn, preserveFocus: false });
             return;
@@ -320,41 +318,45 @@ export class CompileManager {
         let newSelections: vscode.Selection[];
         const newSelection = new vscode.Selection(lineIndex, matchIndex, lineIndex, matchIndex);
         if (editor.selections.length > 0) {
-            newSelections = editor.selections.map((sel, index) =>
-                index === 0 ? newSelection : sel
-            );
+            newSelections = editor.selections.map((sel, index) => (index === 0 ? newSelection : sel));
         } else {
             newSelections = [newSelection];
         }
         editor.selections = newSelections;
 
-        editor.revealRange(new vscode.Range(lineIndex, matchIndex, lineIndex, matchIndex), vscode.TextEditorRevealType.InCenter);
+        editor.revealRange(
+            new vscode.Range(lineIndex, matchIndex, lineIndex, matchIndex),
+            vscode.TextEditorRevealType.InCenter,
+        );
     }
 
-    async syncPdf(r: { page: number, h: number, v: number, identifier: string }) {
+    async syncPdf(r: { page: number; h: number; v: number; identifier: string }) {
         const uri = await CompileManager.check();
         if (uri) {
-            this.vfsm.prefetch(uri)
+            this.vfsm
+                .prefetch(uri)
                 .then((vfs) => vfs.syncPdf(r.page, r.h, r.v))
                 .then((res) => {
                     if (res) {
                         const { projectName } = parseUri(uri);
-                        const { file, line, column } = res;
-                        const _file = file.match(/output\.[^\.]+$/) ? `${OUTPUT_FOLDER_NAME}/${file}` : file;
+                        const { file, line } = res;
+                        const _file = file.match(/output\.[^.]+$/) ? `${OUTPUT_FOLDER_NAME}/${file}` : file;
                         const fileUri = uri.with({ path: `/${projectName}/${_file}` });
 
                         let viewColumnToUse: vscode.ViewColumn | undefined;
                         const existingEditor = vscode.window.visibleTextEditors.find(
-                            e => e.document.uri.toString() === fileUri.toString()
+                            (e) => e.document.uri.toString() === fileUri.toString(),
                         );
 
                         if (existingEditor) {
                             viewColumnToUse = existingEditor.viewColumn;
                         } else {
-                            viewColumnToUse = vscode.window.visibleTextEditors.at(-1)?.viewColumn || vscode.ViewColumn.Beside;
+                            viewColumnToUse =
+                                vscode.window.visibleTextEditors.at(-1)?.viewColumn || vscode.ViewColumn.Beside;
                         }
 
-                        vscode.window.showTextDocument(fileUri, { viewColumn: viewColumnToUse, preserveFocus: false })
+                        vscode.window
+                            .showTextDocument(fileUri, { viewColumn: viewColumnToUse, preserveFocus: false })
                             .then(
                                 (openedEditor) => {
                                     if (openedEditor) {
@@ -362,12 +364,15 @@ export class CompileManager {
                                     }
                                 },
                                 (error) => {
-                                    logError(`${ELEGANT_NAME}: Failed to open document ${fileUri.fsPath} for syncPdf:`, error);
-                                }
+                                    logError(
+                                        `${ELEGANT_NAME}: Failed to open document ${fileUri.fsPath} for syncPdf:`,
+                                        error,
+                                    );
+                                },
                             );
                     }
                 })
-                .catch(error => {
+                .catch((error) => {
                     logError(`${ELEGANT_NAME}: Error in syncPdf promise chain:`, error);
                 });
         }
@@ -375,59 +380,79 @@ export class CompileManager {
 
     async setCompiler() {
         const uri = await CompileManager.check();
-        const vfs = uri && await this.vfsm.prefetch(uri);
+        const vfs = uri && (await this.vfsm.prefetch(uri));
         const currentCompiler = vfs?.getCompiler();
         const compilers = vfs?.getAllCompilers();
-        compilers && vscode.window.showQuickPick(compilers.map((item) => {
-            return {
-                label: item.name,
-                description: item.code,
-                picked: item.code === currentCompiler?.code,
-            };
-        }), {
-            canPickMany: false,
-            placeHolder: vscode.l10n.t('Select Compiler'),
-        }).then(async (option) => {
-            option && await vfs?.updateSettings({ compiler: option.description }) && this.compile(true);
-        });
+        if (compilers) {
+            vscode.window
+                .showQuickPick(
+                    compilers.map((item) => {
+                        return {
+                            label: item.name,
+                            description: item.code,
+                            picked: item.code === currentCompiler?.code,
+                        };
+                    }),
+                    {
+                        canPickMany: false,
+                        placeHolder: vscode.l10n.t('Select Compiler'),
+                    },
+                )
+                .then(async (option) => {
+                    if (option && (await vfs?.updateSettings({ compiler: option.description }))) {
+                        this.compile(true);
+                    }
+                });
+        }
     }
 
     async setRootDoc() {
         const uri = await CompileManager.check();
-        const vfs = uri && await this.vfsm.prefetch(uri);
+        const vfs = uri && (await this.vfsm.prefetch(uri));
         const currentRootDoc = vfs?.getRootDocName();
         const rootDocs = vfs?.getValidMainDocs();
-        rootDocs && vscode.window.showQuickPick(rootDocs.map((item) => {
-            return {
-                id: item.entity._id,
-                label: item.path,
-                picked: item.path === currentRootDoc,
-            };
-        }), {
-            canPickMany: false,
-            placeHolder: vscode.l10n.t('Select Main Document'),
-        }).then(async (option) => {
-            option && await vfs?.updateSettings({ rootDocId: option.id }) && this.compile(true);
-        });
+        if (rootDocs) {
+            vscode.window
+                .showQuickPick(
+                    rootDocs.map((item) => {
+                        return {
+                            id: item.entity._id,
+                            label: item.path,
+                            picked: item.path === currentRootDoc,
+                        };
+                    }),
+                    {
+                        canPickMany: false,
+                        placeHolder: vscode.l10n.t('Select Main Document'),
+                    },
+                )
+                .then(async (option) => {
+                    if (option && (await vfs?.updateSettings({ rootDocId: option.id }))) {
+                        this.compile(true);
+                    }
+                });
+        }
     }
 
     async compileSettings() {
         const uri = await CompileManager.check();
-        const vfs = uri && await this.vfsm.prefetch(uri);
+        const vfs = uri && (await this.vfsm.prefetch(uri));
         const currentCompiler = vfs?.getCompiler();
         const currentRootDoc = vfs?.getRootDocName();
 
         const currentDraftMode = this.compileAsDraft ? vscode.l10n.t('Draft Mode') : vscode.l10n.t('Normal Mode');
-        const currentStopOnError = this.compileStopOnFirstError ? vscode.l10n.t('Stop on first error') : vscode.l10n.t('Try to compile despite errors');
+        const currentStopOnError = this.compileStopOnFirstError
+            ? vscode.l10n.t('Stop on first error')
+            : vscode.l10n.t('Try to compile despite errors');
         const settingItems = [
-            {label: vscode.l10n.t('Compile Mode'), description: currentDraftMode},
-            {label: vscode.l10n.t('Compile Error Handling'), description: currentStopOnError},
-            {label: '', kind: vscode.QuickPickItemKind.Separator},
-            {label: vscode.l10n.t('Setting: Compiler'), description: currentCompiler?.name, },
-            {label: vscode.l10n.t('Setting: Main Document'), description: currentRootDoc, },
+            { label: vscode.l10n.t('Compile Mode'), description: currentDraftMode },
+            { label: vscode.l10n.t('Compile Error Handling'), description: currentStopOnError },
+            { label: '', kind: vscode.QuickPickItemKind.Separator },
+            { label: vscode.l10n.t('Setting: Compiler'), description: currentCompiler?.name },
+            { label: vscode.l10n.t('Setting: Main Document'), description: currentRootDoc },
         ];
         if (this.inCompiling) {
-            settingItems.unshift({label: vscode.l10n.t('Stop compilation'), description: undefined});
+            settingItems.unshift({ label: vscode.l10n.t('Stop compilation'), description: undefined });
         }
 
         const setting = await vscode.window.showQuickPick(settingItems);
@@ -460,17 +485,25 @@ export class CompileManager {
             this.status,
             // register compile commands
             vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.compile`, () => this.compile(true)),
-            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.viewPdf`, () =>  this.openPdf()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.viewPdf`, () => this.openPdf()),
             vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.syncCode`, () => this.syncCode()),
             vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.syncPdf`, (r) => this.syncPdf(r)),
-            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compilerManager.settings`, ()=> this.compileSettings()),
-            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setCompiler`, () => this.setCompiler()),
-            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setRootDoc`, () => this.setRootDoc()),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compilerManager.settings`, () =>
+                this.compileSettings(),
+            ),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setCompiler`, () =>
+                this.setCompiler(),
+            ),
+            vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.compileManager.setRootDoc`, () =>
+                this.setRootDoc(),
+            ),
             // register compile conditions
             vscode.workspace.onDidSaveTextDocument(async (e) => {
                 const uri = await CompileManager.check.bind(this)(e.uri);
-                const vfs = uri && await this.vfsm.prefetch(uri);
-                const compileCondition = vscode.workspace.getConfiguration(`${EXTENSION_NAMESPACE}.compileOnSave`).get('enabled', true);
+                const vfs = uri && (await this.vfsm.prefetch(uri));
+                const compileCondition = vscode.workspace
+                    .getConfiguration(`${EXTENSION_NAMESPACE}.compileOnSave`)
+                    .get('enabled', true);
                 const postfixCondition = e.fileName.match(/\.tex$|\.sty$|\.cls$|\.bib$/i);
                 if (compileCondition && postfixCondition && vfs) {
                     this.compile();

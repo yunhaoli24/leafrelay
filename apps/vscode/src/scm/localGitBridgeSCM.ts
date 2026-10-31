@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BaseSCM, CommitItem, SettingItem } from ".";
+import { BaseSCM, CommitItem, SettingItem } from '.';
 import { VirtualFileSystem } from '../core/remoteFileSystemProvider';
 
 export class LocalGitBridgeSCMProvider extends BaseSCM {
@@ -14,11 +14,11 @@ export class LocalGitBridgeSCMProvider extends BaseSCM {
         super(vfs, baseUri);
     }
 
-    writeFile(path: string, content: Uint8Array): Thenable<void> {
+    writeFile(_path: string, _content: Uint8Array): Thenable<void> {
         return Promise.resolve();
     }
 
-    readFile(path: string): Thenable<Uint8Array> {
+    readFile(_path: string): Thenable<Uint8Array> {
         return Promise.resolve(new Uint8Array());
     }
 
@@ -26,11 +26,11 @@ export class LocalGitBridgeSCMProvider extends BaseSCM {
         return [];
     }
 
-    async apply(commitItem: CommitItem): Promise<void> {
+    async apply(_commitItem: CommitItem): Promise<void> {
         return;
     }
 
-    async syncFromSCM(commits: Iterable<CommitItem>): Promise<void> {
+    async syncFromSCM(_commits: Iterable<CommitItem>): Promise<void> {
         return Promise.resolve();
     }
 

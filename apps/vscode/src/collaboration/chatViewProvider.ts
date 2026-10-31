@@ -15,44 +15,52 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         private readonly socket: ProjectSocket,
     ) {
         this.socket.updateEventHandlers({
-            onReceivedMessage: this.onReceivedMessage.bind(this)
+            onReceivedMessage: this.onReceivedMessage.bind(this),
         });
     }
 
-    updatePublicId(publicId:string) {
+    updatePublicId(publicId: string) {
         this.publicId = publicId;
     }
 
-    async loadWebviewHtml(webview: vscode.Webview): Promise<string> {
+    async loadWebviewHtml(): Promise<string> {
         const rootFolder = 'views/chat-view/dist';
-        const webviewPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, rootFolder)).toString();
-    
+
         // load root html
         const htmlPath = vscode.Uri.joinPath(this.extensionUri, rootFolder, 'index.html');
         let html = (await vscode.workspace.fs.readFile(htmlPath)).toString();
-        
+
         // patch root path (deprecated due to vite-plugin-singlefile)
         // html = html.replace(/href="\/(.*?)"/g, `href="${webviewPath}/$1"`);
         // html = html.replace(/src="\/(.*?)"/g, `src="${webviewPath}/$1"`);
-    
+
         return html;
     }
 
-    resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext<unknown>, token: vscode.CancellationToken): Thenable<void> {
+    resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext<unknown>,
+        _token: vscode.CancellationToken,
+    ): Thenable<void> {
         this.webviewView = webviewView;
-        return this.loadWebviewHtml(webviewView.webview).then((html) => {
-            webviewView.webview.options = {enableScripts:true};
+        return this.loadWebviewHtml().then((html) => {
+            webviewView.webview.options = { enableScripts: true };
             webviewView.webview.html = html;
             webviewView.webview.onDidReceiveMessage((e) => {
                 switch (e.type) {
-                    case 'get-messages': this.getMessages(); break;
-                    case 'send-message': this.sendMessage(e.content); break;
+                    case 'get-messages':
+                        this.getMessages();
+                        break;
+                    case 'send-message':
+                        this.sendMessage(e.content);
+                        break;
                     case 'show-line-ref':
-                        const {path, L1, C1, L2, C2} = e.content;
+                        const { path, L1, C1, L2, C2 } = e.content;
                         const range = new vscode.Range(L1, C1, L2, C2);
                         this.showLineRef(path, range);
                         break;
-                    default: break;
+                    default:
+                        break;
                 }
             });
         });
@@ -100,7 +108,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.hasUnreadMessages = 0;
     }
 
-    insertText(text: string='') {
+    insertText(text: string = '') {
         this.revealChatView();
         if (this.webviewView === undefined) {
             setTimeout(() => this.insertText(text), 100);
@@ -115,20 +123,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     private getLineRef() {
         const editor = vscode.window.activeTextEditor;
-        if (editor === undefined) { return; }
+        if (editor === undefined) {
+            return;
+        }
 
         const filePath = parseUri(editor.document.uri).pathParts.join('/');
-        const start = editor.selection.start, end = editor.selection.end;
+        const start = editor.selection.start,
+            end = editor.selection.end;
         const ref = `[[${filePath}#L${start.line}C${start.character}-L${end.line}C${end.character}]]`;
         return ref;
     }
 
-    private async showLineRef(path:string, range:vscode.Range) {
-        const uri = (vscode.workspace.workspaceFolders?.[0].uri.scheme===OVERLEAF_URI_SCHEME) ?
-                    this.vfs.pathToUri(path) : await LocalReplicaSCMProvider.pathToUri(path);
-        if (uri === undefined) { return; }
+    private async showLineRef(path: string, range: vscode.Range) {
+        const uri =
+            vscode.workspace.workspaceFolders?.[0].uri.scheme === OVERLEAF_URI_SCHEME
+                ? this.vfs.pathToUri(path)
+                : await LocalReplicaSCMProvider.pathToUri(path);
+        if (uri === undefined) {
+            return;
+        }
 
-        vscode.window.showTextDocument(uri).then(editor => {
+        vscode.window.showTextDocument(uri).then((editor) => {
             editor.revealRange(range);
             editor.selection = new vscode.Selection(range.start, range.end);
         });
@@ -139,14 +154,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // register commands
             vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.collaboration.copyLineRef`, () => {
                 const ref = this.getLineRef();
-                ref && vscode.env.clipboard.writeText(ref);
+                if (ref) {
+                    vscode.env.clipboard.writeText(ref);
+                }
             }),
             vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.collaboration.insertLineRef`, () => {
                 const ref = this.getLineRef();
-                ref && this.insertText(ref + ' ');
+                if (ref) {
+                    this.insertText(ref + ' ');
+                }
             }),
             // register chat webview
-            vscode.window.registerWebviewViewProvider(`${EXTENSION_NAMESPACE}.chatWebview`, this, {webviewOptions:{retainContextWhenHidden:true}}),
+            vscode.window.registerWebviewViewProvider(`${EXTENSION_NAMESPACE}.chatWebview`, this, {
+                webviewOptions: { retainContextWhenHidden: true },
+            }),
         ];
     }
 }

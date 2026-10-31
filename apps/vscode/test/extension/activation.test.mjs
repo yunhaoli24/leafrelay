@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
-import {homedir} from 'node:os';
-import {join} from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import * as vscode from 'vscode';
 
 suite('LeafRelay activation', () => {
@@ -21,6 +21,6 @@ suite('LeafRelay activation', () => {
         const daemonHome = process.env.LEAFRELAY_HOME ?? join(homedir(), '.leafrelay');
         const metadata = JSON.parse(await readFile(join(daemonHome, 'daemon.json'), 'utf8'));
         assert.equal(metadata.protocolVersion, 1, 'the extension activates through the shared daemon protocol');
-        assert.ok(metadata.pid>0, 'the shared daemon is running');
+        assert.ok(metadata.pid > 0, 'the shared daemon is running');
     });
 });

@@ -1,4 +1,4 @@
-import {EventEmitter} from 'node:events';
+import { EventEmitter } from 'node:events';
 
 const PACKET_TYPES = [
     'disconnect',
@@ -12,7 +12,7 @@ const PACKET_TYPES = [
     'noop',
 ] as const;
 
-type PacketType = typeof PACKET_TYPES[number];
+type PacketType = (typeof PACKET_TYPES)[number];
 
 interface SocketPacket {
     type?: PacketType;
@@ -34,7 +34,7 @@ export interface OverleafRealtimeSocketOptions {
     reconnectionDelay?: number;
     reconnectionLimit?: number;
     maxReconnectionAttempts?: number;
-    fetch?:typeof fetch;
+    fetch?: typeof fetch;
 }
 
 function encodePacket(packet: SocketPacket): string {
@@ -44,7 +44,7 @@ function encodePacket(packet: SocketPacket): string {
 
     switch (packet.type) {
         case 'event':
-            data = JSON.stringify({name:packet.name, args:packet.args ?? []});
+            data = JSON.stringify({ name: packet.name, args: packet.args ?? [] });
             break;
         case 'ack':
             data = `${packet.ackId ?? ''}${packet.args?.length ? `+${JSON.stringify(packet.args)}` : ''}`;
@@ -59,18 +59,22 @@ function encodePacket(packet: SocketPacket): string {
             break;
     }
 
-    const fields = [String(type), `${id}${packet.ack==='data' ? '+' : ''}`, packet.endpoint ?? ''];
-    if (data!==undefined) { fields.push(data); }
+    const fields = [String(type), `${id}${packet.ack === 'data' ? '+' : ''}`, packet.endpoint ?? ''];
+    if (data !== undefined) {
+        fields.push(data);
+    }
     return fields.join(':');
 }
 
 function decodePacket(value: string): SocketPacket {
     const match = value.match(/([^:]+):([0-9]+)?(\+)?:([^:]+)?:?([\s\S]*)?/);
-    if (!match) { return {}; }
+    if (!match) {
+        return {};
+    }
 
-    const packet:SocketPacket = {
-        type:PACKET_TYPES[Number(match[1])],
-        endpoint:match[4] || '',
+    const packet: SocketPacket = {
+        type: PACKET_TYPES[Number(match[1])],
+        endpoint: match[4] || '',
     };
     if (match[2]) {
         packet.id = match[2];
@@ -80,7 +84,7 @@ function decodePacket(value: string): SocketPacket {
     const data = match[5] || '';
     switch (packet.type) {
         case 'event': {
-            const event = JSON.parse(data) as {name:string; args?:unknown[]};
+            const event = JSON.parse(data) as { name: string; args?: unknown[] };
             packet.name = event.name;
             packet.args = event.args ?? [];
             break;
@@ -89,7 +93,7 @@ function decodePacket(value: string): SocketPacket {
             const ack = data.match(/^([0-9]+)(\+)?([\s\S]*)/);
             if (ack) {
                 packet.ackId = ack[1];
-                packet.args = ack[3] ? JSON.parse(ack[3]) as unknown[] : [];
+                packet.args = ack[3] ? (JSON.parse(ack[3]) as unknown[]) : [];
             }
             break;
         }
@@ -112,27 +116,33 @@ function decodePacket(value: string): SocketPacket {
 }
 
 function decodePayload(value: string): SocketPacket[] {
-    if (!value.startsWith('\ufffd')) { return [decodePacket(value)]; }
-    const packets:SocketPacket[] = [];
+    if (!value.startsWith('\ufffd')) {
+        return [decodePacket(value)];
+    }
+    const packets: SocketPacket[] = [];
     let offset = 1;
-    while (offset<value.length) {
+    while (offset < value.length) {
         const separator = value.indexOf('\ufffd', offset);
-        if (separator===-1) { break; }
+        if (separator === -1) {
+            break;
+        }
         const length = Number(value.slice(offset, separator));
-        const start = separator+1;
-        packets.push(decodePacket(value.slice(start, start+length)));
-        offset = start+length+1;
+        const start = separator + 1;
+        packets.push(decodePacket(value.slice(start, start + length)));
+        offset = start + length + 1;
     }
     return packets;
 }
 
 function mergeCookies(current: string, additions: string[]): string {
     const cookies = new Map<string, string>();
-    for (const value of [current, ...additions.map(cookie => cookie.split(';', 1)[0])]) {
+    for (const value of [current, ...additions.map((cookie) => cookie.split(';', 1)[0])]) {
         for (const part of value.split(';')) {
             const separator = part.indexOf('=');
-            if (separator===-1) { continue; }
-            cookies.set(part.slice(0, separator).trim(), part.slice(separator+1).trim());
+            if (separator === -1) {
+                continue;
+            }
+            cookies.set(part.slice(0, separator).trim(), part.slice(separator + 1).trim());
         }
     }
     return [...cookies].map(([name, value]) => `${name}=${value}`).join('; ');
@@ -151,13 +161,13 @@ export class OverleafRealtimeSocket {
     private reconnectAttempts = 0;
     private reconnectTimer?: NodeJS.Timeout;
     private inactivityTimer?: NodeJS.Timeout;
-    private connectionAbort?:AbortController;
+    private connectionAbort?: AbortController;
     private closeTimeoutMs = 60_000;
     private acknowledgementId = 0;
-    private readonly acknowledgements = new Map<string, (...args:unknown[]) => void>();
+    private readonly acknowledgements = new Map<string, (...args: unknown[]) => void>();
 
     readonly io = {
-        reconnect:(enabled:boolean) => {
+        reconnect: (enabled: boolean) => {
             this.reconnectEnabled = enabled;
             if (!enabled && this.reconnectTimer) {
                 clearTimeout(this.reconnectTimer);
@@ -166,7 +176,10 @@ export class OverleafRealtimeSocket {
         },
     };
 
-    constructor(url: string, private readonly options: OverleafRealtimeSocketOptions) {
+    constructor(
+        url: string,
+        private readonly options: OverleafRealtimeSocketOptions,
+    ) {
         this.endpoint = new URL(url);
         this.origin = options.origin;
         this.cookie = options.cookie;
@@ -174,17 +187,17 @@ export class OverleafRealtimeSocket {
         void this.connect();
     }
 
-    on(event: string, handler: (...args:any[]) => void): this {
+    on(event: string, handler: (...args: any[]) => void): this {
         this.events.on(event, handler);
         return this;
     }
 
-    once(event: string, handler: (...args:any[]) => void): this {
+    once(event: string, handler: (...args: any[]) => void): this {
         this.events.once(event, handler);
         return this;
     }
 
-    removeListener(event: string, handler: (...args:any[]) => void): this {
+    removeListener(event: string, handler: (...args: any[]) => void): this {
         this.events.removeListener(event, handler);
         return this;
     }
@@ -194,39 +207,49 @@ export class OverleafRealtimeSocket {
         return this;
     }
 
-    emit(event: string, ...args:any[]): this {
-        const callback = typeof args.at(-1)==='function' ? args.pop() as (...values:unknown[]) => void : undefined;
+    emit(event: string, ...args: any[]): this {
+        const callback = typeof args.at(-1) === 'function' ? (args.pop() as (...values: unknown[]) => void) : undefined;
         const id = callback ? String(++this.acknowledgementId) : undefined;
-        if (id && callback) { this.acknowledgements.set(id, callback); }
+        if (id && callback) {
+            this.acknowledgements.set(id, callback);
+        }
         const packet = encodePacket({
-            type:'event',
+            type: 'event',
             id,
-            ack:callback ? 'data' : undefined,
-            name:event,
+            ack: callback ? 'data' : undefined,
+            name: event,
             args,
         });
         if (!this.sendApplicationEvent(packet) && callback) {
-            if (id) { this.acknowledgements.delete(id); }
+            if (id) {
+                this.acknowledgements.delete(id);
+            }
             queueMicrotask(() => callback(new Error('The Overleaf project session is not connected.')));
         }
         return this;
     }
 
-    markProjectJoined():void {
+    markProjectJoined(): void {
         this.projectJoined = true;
     }
 
     disconnect(): this {
         this.explicitlyDisconnected = true;
         this.reconnectEnabled = false;
-        if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); }
-        if (this.connected) { this.send(encodePacket({type:'disconnect'})); }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
+        if (this.connected) {
+            this.send(encodePacket({ type: 'disconnect' }));
+        }
         this.closeSocket('booted');
         return this;
     }
 
     private async connect(): Promise<void> {
-        if (this.explicitlyDisconnected) { return; }
+        if (this.explicitlyDisconnected) {
+            return;
+        }
         const controller = new AbortController();
         this.connectionAbort?.abort();
         this.connectionAbort = controller;
@@ -238,9 +261,9 @@ export class OverleafRealtimeSocket {
             }
             handshakeUrl.searchParams.set('t', String(Date.now()));
             const response = await (this.options.fetch ?? fetch)(handshakeUrl, {
-                headers:{origin:this.origin, cookie:this.cookie},
-                redirect:'manual',
-                signal:AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+                headers: { origin: this.origin, cookie: this.cookie },
+                redirect: 'manual',
+                signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
             });
             if (!response.ok) {
                 throw new Error(`Socket.IO handshake failed: HTTP ${response.status} ${await response.text()}`);
@@ -251,53 +274,70 @@ export class OverleafRealtimeSocket {
             if (!sessionId || !transports?.split(',').includes('websocket')) {
                 throw new Error('Overleaf did not offer a Socket.IO WebSocket transport.');
             }
-            this.closeTimeoutMs = Math.max(Number(heartbeatTimeout), Number(closeTimeout), 10)*1000;
+            this.closeTimeoutMs = Math.max(Number(heartbeatTimeout), Number(closeTimeout), 10) * 1000;
 
             const websocketUrl = new URL(`/socket.io/1/websocket/${sessionId}`, this.endpoint.origin);
-            websocketUrl.protocol = websocketUrl.protocol==='https:' ? 'wss:' : 'ws:';
+            websocketUrl.protocol = websocketUrl.protocol === 'https:' ? 'wss:' : 'ws:';
             websocketUrl.search = this.endpoint.search;
-            if (controller.signal.aborted) { return; }
+            if (controller.signal.aborted) {
+                return;
+            }
             const socket = new WebSocket(websocketUrl, {
-                headers:{origin:this.origin, cookie:this.cookie},
+                headers: { origin: this.origin, cookie: this.cookie },
             });
             this.socket = socket;
             socket.addEventListener('open', () => {
-                if (this.socket!==socket) { return; }
+                if (this.socket !== socket) {
+                    return;
+                }
                 this.resetInactivityTimer();
                 this.events.emit('connecting', 'websocket');
             });
-            socket.addEventListener('message', event => {
-                if (this.socket===socket) { void this.receive(event.data, socket); }
+            socket.addEventListener('message', (event) => {
+                if (this.socket === socket) {
+                    void this.receive(event.data, socket);
+                }
             });
-            socket.addEventListener('error', error => {
-                if (this.socket===socket) { this.events.emit('error', error); }
+            socket.addEventListener('error', (error) => {
+                if (this.socket === socket) {
+                    this.events.emit('error', error);
+                }
             });
-            socket.addEventListener('close', event => {
-                if (this.socket===socket) { this.handleClose(event); }
+            socket.addEventListener('close', (event) => {
+                if (this.socket === socket) {
+                    this.handleClose(event);
+                }
             });
         } catch (error) {
-            if (controller.signal.aborted) { return; }
+            if (controller.signal.aborted) {
+                return;
+            }
             this.events.emit('connect_failed', error);
             this.events.emit('error', error);
             this.scheduleReconnect();
         }
     }
 
-    private async receive(data: unknown, socket:WebSocket) {
+    private async receive(data: unknown, socket: WebSocket) {
         this.resetInactivityTimer();
-        const value = typeof data==='string'
-            ? data
-            : data instanceof Blob
-                ? await data.text()
-                : Buffer.from(data as ArrayBuffer).toString('utf8');
-        if (this.socket!==socket) { return; }
-        for (const packet of decodePayload(value)) { this.handlePacket(packet); }
+        const value =
+            typeof data === 'string'
+                ? data
+                : data instanceof Blob
+                  ? await data.text()
+                  : Buffer.from(data as ArrayBuffer).toString('utf8');
+        if (this.socket !== socket) {
+            return;
+        }
+        for (const packet of decodePayload(value)) {
+            this.handlePacket(packet);
+        }
     }
 
     private handlePacket(packet: SocketPacket) {
         switch (packet.type) {
             case 'connect': {
-                const wasReconnecting = this.reconnectAttempts>0;
+                const wasReconnecting = this.reconnectAttempts > 0;
                 this.connected = true;
                 this.events.emit('connect');
                 if (wasReconnecting) {
@@ -307,13 +347,13 @@ export class OverleafRealtimeSocket {
                 break;
             }
             case 'heartbeat':
-                this.send(encodePacket({type:'heartbeat'}));
+                this.send(encodePacket({ type: 'heartbeat' }));
                 break;
             case 'event': {
                 const args = [...(packet.args ?? [])];
-                if (packet.ack==='data' && packet.id) {
-                    args.push((...acknowledgement:unknown[]) => {
-                        this.send(encodePacket({type:'ack', ackId:packet.id, args:acknowledgement}));
+                if (packet.ack === 'data' && packet.id) {
+                    args.push((...acknowledgement: unknown[]) => {
+                        this.send(encodePacket({ type: 'ack', ackId: packet.id, args: acknowledgement }));
                     });
                 }
                 this.events.emit(packet.name ?? '', ...args);
@@ -332,7 +372,9 @@ export class OverleafRealtimeSocket {
                 break;
             case 'error':
                 this.events.emit('error', packet.reason || 'Socket.IO protocol error');
-                if (packet.advice==='reconnect') { this.closeSocket('server error'); }
+                if (packet.advice === 'reconnect') {
+                    this.closeSocket('server error');
+                }
                 break;
             case 'message':
             case 'json':
@@ -344,13 +386,13 @@ export class OverleafRealtimeSocket {
     }
 
     private send(packet: string) {
-        if (this.connected && this.socket?.readyState===WebSocket.OPEN) {
+        if (this.connected && this.socket?.readyState === WebSocket.OPEN) {
             this.socket.send(packet);
         }
     }
 
-    private sendApplicationEvent(packet:string):boolean {
-        if (!this.connected || !this.projectJoined || this.socket?.readyState!==WebSocket.OPEN) {
+    private sendApplicationEvent(packet: string): boolean {
+        if (!this.connected || !this.projectJoined || this.socket?.readyState !== WebSocket.OPEN) {
             return false;
         }
         this.socket.send(packet);
@@ -358,16 +400,20 @@ export class OverleafRealtimeSocket {
     }
 
     private resetInactivityTimer() {
-        if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+        }
         this.inactivityTimer = setTimeout(() => this.closeSocket('timeout'), this.closeTimeoutMs);
     }
 
-    private handleClose(event:CloseEvent) {
+    private handleClose(event: CloseEvent) {
         const wasConnected = this.connected;
         this.socket = undefined;
         this.connected = false;
         this.projectJoined = false;
-        if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+        }
         if (wasConnected) {
             const detail = event.reason ? `: ${event.reason}` : '';
             const reason = `transport close (code ${event.code})${detail}`;
@@ -383,7 +429,9 @@ export class OverleafRealtimeSocket {
         const wasConnected = this.connected;
         this.connected = false;
         this.projectJoined = false;
-        if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); }
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+        }
         const socket = this.socket;
         this.socket = undefined;
         socket?.close();
@@ -391,26 +439,32 @@ export class OverleafRealtimeSocket {
             this.failAcknowledgements(reason);
             this.events.emit('disconnect', reason);
         }
-        if (!this.explicitlyDisconnected) { this.scheduleReconnect(); }
+        if (!this.explicitlyDisconnected) {
+            this.scheduleReconnect();
+        }
     }
 
-    private failAcknowledgements(reason:string) {
+    private failAcknowledgements(reason: string) {
         const error = new Error(`Overleaf realtime connection closed: ${reason}`);
-        for (const callback of this.acknowledgements.values()) { callback(error); }
+        for (const callback of this.acknowledgements.values()) {
+            callback(error);
+        }
         this.acknowledgements.clear();
     }
 
     private scheduleReconnect() {
-        if (!this.reconnectEnabled || this.explicitlyDisconnected || this.reconnectTimer) { return; }
+        if (!this.reconnectEnabled || this.explicitlyDisconnected || this.reconnectTimer) {
+            return;
+        }
         const maxAttempts = this.options.maxReconnectionAttempts ?? Infinity;
-        if (this.reconnectAttempts>=maxAttempts) {
+        if (this.reconnectAttempts >= maxAttempts) {
             this.events.emit('reconnect_failed');
             return;
         }
         this.reconnectAttempts += 1;
         const initial = this.options.reconnectionDelay ?? 1000;
         const limit = this.options.reconnectionLimit ?? 16_000;
-        const delay = Math.min(initial*2**(this.reconnectAttempts-1), limit);
+        const delay = Math.min(initial * 2 ** (this.reconnectAttempts - 1), limit);
         this.events.emit('reconnecting', delay, this.reconnectAttempts);
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = undefined;
@@ -419,4 +473,4 @@ export class OverleafRealtimeSocket {
     }
 }
 
-export const overleafSocketProtocol = {encodePacket, decodePacket, decodePayload};
+export const overleafSocketProtocol = { encodePacket, decodePacket, decodePayload };

@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-"use strict";
+'use strict';
 
 // Reference: https://github.com/tomoki1207/vscode-pdfviewer/blob/main/lib/main.js
-(function(){
-    const CursorTool = { SELECT:0, HAND:1, ZOOM:2 };
-    const SpreadMode = { UNKNOWN:-1, NONE:0, ODD:1, EVEN:2 };
-    const ScrollMode = { UNKNOWN:-1, VERTICAL:0, HORIZONTAL:1, WRAPPED:2, PAGE:3 };
-    const SidebarView = { UNKNOWN:-1, NONE:0, THUMBS:1, OUTLINE:2, ATTACHMENTS:3, LAYERS:4 };
+(function () {
+    const CursorTool = { SELECT: 0, HAND: 1, ZOOM: 2 };
+    const SpreadMode = { UNKNOWN: -1, NONE: 0, ODD: 1, EVEN: 2 };
+    const ScrollMode = { UNKNOWN: -1, VERTICAL: 0, HORIZONTAL: 1, WRAPPED: 2, PAGE: 3 };
+    const SidebarView = { UNKNOWN: -1, NONE: 0, THUMBS: 1, OUTLINE: 2, ATTACHMENTS: 3, LAYERS: 4 };
     const ScrollModeMap = {
         vertical: ScrollMode.VERTICAL,
         horizontal: ScrollMode.HORIZONTAL,
@@ -19,9 +18,9 @@
         even: SpreadMode.EVEN,
     };
     let ColorThemes = {
-        'default': {fontColor:'black', bgColor:'white'},
-        'light': {fontColor:'black', bgColor:'#F5F5DC'},
-        'dark': {fontColor:'#FBF0D9', bgColor:'#4B4B4B'}
+        default: { fontColor: 'black', bgColor: 'white' },
+        light: { fontColor: 'black', bgColor: '#F5F5DC' },
+        dark: { fontColor: '#FBF0D9', bgColor: '#4B4B4B' },
     };
 
     // @ts-ignore
@@ -29,7 +28,7 @@
     let globalPdfViewerState = {
         colorTheme: 'default',
         containerScrollLeft: 0,
-        containerScrollTop:  0,
+        containerScrollTop: 0,
         currentScaleValue: 'auto',
         pdfCursorTools: CursorTool.SELECT,
         pdfViewerScrollMode: ScrollMode.VERTICAL,
@@ -48,11 +47,11 @@
         pdfjsLib.ViewerBgColor = ColorThemes[pdfViewerState.colorTheme].bgColor;
 
         PDFViewerApplication.pdfViewer.currentScaleValue = pdfViewerState.currentScaleValue;
-        PDFViewerApplication.pdfCursorTools.switchTool( pdfViewerState.pdfCursorTools );
+        PDFViewerApplication.pdfCursorTools.switchTool(pdfViewerState.pdfCursorTools);
         PDFViewerApplication.pdfViewer.scrollMode = pdfViewerState.pdfViewerScrollMode;
         PDFViewerApplication.pdfViewer.spreadMode = pdfViewerState.pdfViewerSpreadMode;
-        PDFViewerApplication.pdfSidebar.setInitialView( pdfViewerState.pdfSidebarView );
-        PDFViewerApplication.pdfSidebar.switchView( pdfViewerState.pdfSidebarView );
+        PDFViewerApplication.pdfSidebar.setInitialView(pdfViewerState.pdfSidebarView);
+        PDFViewerApplication.pdfSidebar.switchView(pdfViewerState.pdfSidebarView);
         document.getElementById('viewerContainer').scrollLeft = pdfViewerState.containerScrollLeft;
         document.getElementById('viewerContainer').scrollTop = pdfViewerState.containerScrollTop;
         PDFViewerApplication.pdfViewer.refresh();
@@ -60,7 +59,7 @@
 
     function backupPdfViewerState() {
         if (PDFViewerApplication.pdfViewer.currentScaleValue !== null) {
-            console.log( PDFViewerApplication.pdfViewer.currentScaleValue );
+            console.log(PDFViewerApplication.pdfViewer.currentScaleValue);
             globalPdfViewerState.currentScaleValue = PDFViewerApplication.pdfViewer.currentScaleValue;
         }
         globalPdfViewerState.pdfViewerScrollMode = PDFViewerApplication.pdfViewer.scrollMode;
@@ -119,7 +118,7 @@
         }
     }
 
-    function enableThemeToggleButton(initIndex = 0){
+    function enableThemeToggleButton(initIndex = 0) {
         // create toggle theme button
         const button = document.createElement('button');
         button.setAttribute('class', 'toolbarButton hiddenMediumView');
@@ -152,7 +151,7 @@
         const doc = await pdfjsLib.getDocument({
             data: pdf,
             cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.10.111/cmaps/',
-            cMapPacked: true
+            cMapPacked: true,
         }).promise;
         if (firstLoaded) {
             firstLoaded = false;
@@ -176,8 +175,8 @@
         if (page === null || page === undefined) {
             return;
         }
-        const {viewport} = PDFViewerApplication.pdfViewer.getPageView(pageNum - 1);
-        let [left, top] = viewport.convertToPdfPoint(h , v);
+        const { viewport } = PDFViewerApplication.pdfViewer.getPageView(pageNum - 1);
+        let [left, top] = viewport.convertToPdfPoint(h, v);
         let scrollX = page.offsetLeft + left;
         scrollX = Math.min(scrollX, maxScrollX);
         scrollX = Math.max(scrollX, minScrollX);
@@ -196,79 +195,81 @@
     function syncPdf(pageElem, pageNum, clientX, clientY, innerText) {
         const pageCanvas = pageElem.querySelector('canvas');
         const pageRect = pageCanvas.getBoundingClientRect();
-        const {viewport} = PDFViewerApplication.pdfViewer.getPageView(pageNum - 1);
+        const { viewport } = PDFViewerApplication.pdfViewer.getPageView(pageNum - 1);
         const dx = clientX - pageRect.left;
         const dy = clientY - pageRect.top;
         let [left, top] = viewport.convertToPdfPoint(dx, dy);
         top = viewport.viewBox[3] - top;
         vscode.postMessage({
             type: 'syncPdf',
-            content: { page: Number(pageNum), h: left, v: top, identifier: innerText},
+            content: { page: Number(pageNum), h: left, v: top, identifier: innerText },
         });
         backupPdfViewerState();
     }
 
-    window.addEventListener('load', async () => {
-        // init pdf.js configuration
-        PDFViewerApplication.initializedPromise
-        .then(() => {
-            const {eventBus, _boundEvents} = PDFViewerApplication;
-            eventBus._off("beforeprint", _boundEvents.beforePrint);
-            eventBus.on('documentloaded', updatePdfViewerState);
-            // backup scale
-            eventBus._on('scalechanged', backupPdfViewerState);
-            eventBus._on("zoomin", backupPdfViewerState);
-            eventBus._on("zoomout", backupPdfViewerState);
-            eventBus._on("zoomreset", backupPdfViewerState);
-            // backup scroll/spread mode
-            eventBus._on("switchscrollmode", backupPdfViewerState);
-            eventBus._on("scrollmodechanged", backupPdfViewerState);
-            eventBus._on("switchspreadmode", backupPdfViewerState);
-            vscode.postMessage({type: 'ready'});
-        });
+    window.addEventListener(
+        'load',
+        async () => {
+            // init pdf.js configuration
+            PDFViewerApplication.initializedPromise.then(() => {
+                const { eventBus, _boundEvents } = PDFViewerApplication;
+                eventBus._off('beforeprint', _boundEvents.beforePrint);
+                eventBus.on('documentloaded', updatePdfViewerState);
+                // backup scale
+                eventBus._on('scalechanged', backupPdfViewerState);
+                eventBus._on('zoomin', backupPdfViewerState);
+                eventBus._on('zoomout', backupPdfViewerState);
+                eventBus._on('zoomreset', backupPdfViewerState);
+                // backup scroll/spread mode
+                eventBus._on('switchscrollmode', backupPdfViewerState);
+                eventBus._on('scrollmodechanged', backupPdfViewerState);
+                eventBus._on('switchspreadmode', backupPdfViewerState);
+                vscode.postMessage({ type: 'ready' });
+            });
 
-        // add message listener
-        window.addEventListener('message', async (e) => {
-            const message = e.data;
-            switch (message.type) {
-                case 'update':
-                    updatePdf(message.content);
-                    break;
-                case 'syncCode':
-                    syncCode(message.content);
-                    break;
-                case 'initState':
-                    updatePdfViewerDefaults(message.defaults);
-                    if (message.content!==undefined) {
-                        Object.assign(globalPdfViewerState, message.content);
-                    }
-                    if (message.colorThemes!==undefined) {
-                        updateColorThemes(message.colorThemes);
-                    }
-                    updatePdfViewerState();
-                    enableThemeToggleButton( Object.keys(ColorThemes).indexOf(globalPdfViewerState.colorTheme) );
-                    break;
-                default:
-                    break;
-            }
-        });
+            // add message listener
+            window.addEventListener('message', async (e) => {
+                const message = e.data;
+                switch (message.type) {
+                    case 'update':
+                        updatePdf(message.content);
+                        break;
+                    case 'syncCode':
+                        syncCode(message.content);
+                        break;
+                    case 'initState':
+                        updatePdfViewerDefaults(message.defaults);
+                        if (message.content !== undefined) {
+                            Object.assign(globalPdfViewerState, message.content);
+                        }
+                        if (message.colorThemes !== undefined) {
+                            updateColorThemes(message.colorThemes);
+                        }
+                        updatePdfViewerState();
+                        enableThemeToggleButton(Object.keys(ColorThemes).indexOf(globalPdfViewerState.colorTheme));
+                        break;
+                    default:
+                        break;
+                }
+            });
 
-        // add mouse double click listener
-        window.addEventListener('dblclick', (e) => {
-            const pageElem = e.target.parentElement.parentElement;
-            const pageNum = pageElem.getAttribute('data-page-number');
-            if (pageNum === null || pageNum === undefined) {
-                return;
-            }
-            syncPdf(pageElem, pageNum, e.clientX, e.clientY, e.target.innerText);
-        });
+            // add mouse double click listener
+            window.addEventListener('dblclick', (e) => {
+                const pageElem = e.target.parentElement.parentElement;
+                const pageNum = pageElem.getAttribute('data-page-number');
+                if (pageNum === null || pageNum === undefined) {
+                    return;
+                }
+                syncPdf(pageElem, pageNum, e.clientX, e.clientY, e.target.innerText);
+            });
 
-        // Display Error Message
-        window.onerror = () => {
-            const msg = document.createElement('body');
-            msg.innerText = 'An error occurred while loading the file. Please open it again.';
-            document.body = msg;
-        };
-    }, { once : true });
-
-}());
+            // Display Error Message
+            window.onerror = () => {
+                const msg = document.createElement('body');
+                msg.innerText = 'An error occurred while loading the file. Please open it again.';
+                document.body = msg;
+            };
+        },
+        { once: true },
+    );
+})();

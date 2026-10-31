@@ -4,8 +4,8 @@ import { partitionLocalReplicas } from '../src/scm/localReplicaSelection';
 describe('partitionLocalReplicas', () => {
     it('activates only the replica matching the current workspace', () => {
         const candidates = [
-            {baseUri:'file:///workspace/current', value:'current'},
-            {baseUri:'file:///workspace/other', value:'other'},
+            { baseUri: 'file:///workspace/current', value: 'current' },
+            { baseUri: 'file:///workspace/other', value: 'other' },
         ];
 
         expect(partitionLocalReplicas(candidates, 'file:///workspace/current')).toEqual({
@@ -15,9 +15,7 @@ describe('partitionLocalReplicas', () => {
     });
 
     it('does not fall back to another replica when the workspace has no match', () => {
-        const candidates = [
-            {baseUri:'file:///workspace/other', value:'other'},
-        ];
+        const candidates = [{ baseUri: 'file:///workspace/other', value: 'other' }];
 
         expect(partitionLocalReplicas(candidates, 'file:///workspace/current')).toEqual({
             active: [],
@@ -27,8 +25,8 @@ describe('partitionLocalReplicas', () => {
 
     it('keeps every replica inactive outside a single local-folder workspace', () => {
         const candidates = [
-            {baseUri:'file:///workspace/one', value:'one'},
-            {baseUri:'file:///workspace/two', value:'two'},
+            { baseUri: 'file:///workspace/one', value: 'one' },
+            { baseUri: 'file:///workspace/two', value: 'two' },
         ];
 
         expect(partitionLocalReplicas(candidates)).toEqual({

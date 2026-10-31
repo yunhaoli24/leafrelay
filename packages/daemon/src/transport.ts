@@ -1,4 +1,4 @@
-import type {Socket} from 'node:net';
+import type { Socket } from 'node:net';
 import {
     createMessageConnection,
     SocketMessageReader,
@@ -16,21 +16,27 @@ const CLOSED_SOCKET_ERRORS = new Set([
 ]);
 
 class LeafRelaySocketWriter extends SocketMessageWriter {
-    constructor(private readonly transportSocket:Socket) {
+    constructor(private readonly transportSocket: Socket) {
         super(transportSocket);
     }
 
-    override async write(message:Message):Promise<void> {
+    override async write(message: Message): Promise<void> {
         try {
             await super.write(message);
         } catch (error) {
             const code = (error as NodeJS.ErrnoException).code;
-            if (this.transportSocket.destroyed || this.transportSocket.writableEnded || (code && CLOSED_SOCKET_ERRORS.has(code))) { return; }
+            if (
+                this.transportSocket.destroyed ||
+                this.transportSocket.writableEnded ||
+                (code && CLOSED_SOCKET_ERRORS.has(code))
+            ) {
+                return;
+            }
             throw error;
         }
     }
 }
 
-export function createSocketRpcConnection(socket:Socket):MessageConnection {
+export function createSocketRpcConnection(socket: Socket): MessageConnection {
     return createMessageConnection(new SocketMessageReader(socket), new LeafRelaySocketWriter(socket));
 }

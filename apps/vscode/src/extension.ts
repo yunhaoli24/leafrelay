@@ -9,7 +9,7 @@ import { LangIntellisenseProvider } from './intellisense';
 import { LocalReplicaSCMProvider } from './scm/localReplicaSCM';
 import { GlobalStateManager } from './utils/globalStateManager';
 import { initOutputChannel, log, notifyError } from './utils/outputChannel';
-import {DaemonService} from './utils/daemonService';
+import { DaemonService } from './utils/daemonService';
 
 let localReplicaActivation: Promise<void> | undefined;
 
@@ -22,39 +22,50 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register: [core] RemoteFileSystemProvider
     const remoteFileSystemProvider = new RemoteFileSystemProvider(context);
-    context.subscriptions.push( ...remoteFileSystemProvider.triggers );
+    context.subscriptions.push(...remoteFileSystemProvider.triggers);
 
     // Register: [core] ProjectManagerProvider on Activitybar
     const projectManagerProvider = new ProjectManagerProvider(context);
-    context.subscriptions.push( ...projectManagerProvider.triggers );
+    context.subscriptions.push(...projectManagerProvider.triggers);
 
     // Register: [core] PdfViewEditorProvider
     const pdfViewEditorProvider = new PdfViewEditorProvider(context);
-    context.subscriptions.push( ...pdfViewEditorProvider.triggers );
+    context.subscriptions.push(...pdfViewEditorProvider.triggers);
 
     // Register: [compile] CompileManager on Statusbar
     const compileManager = new CompileManager(remoteFileSystemProvider);
-    context.subscriptions.push( ...compileManager.triggers );
+    context.subscriptions.push(...compileManager.triggers);
 
     // Register: [intellisense] LangIntellisenseProvider
     const langIntellisenseProvider = new LangIntellisenseProvider(context, remoteFileSystemProvider);
-    context.subscriptions.push( ...langIntellisenseProvider.triggers );
+    context.subscriptions.push(...langIntellisenseProvider.triggers);
 
-    const activateLocalReplica = (forceReset=false): Promise<void> => {
-        if (localReplicaActivation!==undefined) { return localReplicaActivation; }
+    const activateLocalReplica = (forceReset = false): Promise<void> => {
+        if (localReplicaActivation !== undefined) {
+            return localReplicaActivation;
+        }
         localReplicaActivation = (async () => {
             const setting = await LocalReplicaSCMProvider.readSettings();
-            if (!setting?.uri) { return; }
+            if (!setting?.uri) {
+                return;
+            }
             const uri = vscode.Uri.parse(setting.uri);
-            if (uri.scheme!==OVERLEAF_URI_SCHEME) { return; }
+            if (uri.scheme !== OVERLEAF_URI_SCHEME) {
+                return;
+            }
             const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-            if (workspaceRoot===undefined || workspaceRoot.scheme!=='file') { return; }
+            if (workspaceRoot === undefined || workspaceRoot.scheme !== 'file') {
+                return;
+            }
 
-            const {serverName, projectId, projectName, userId} = parseUri(uri);
+            const { serverName, projectId, projectName, userId } = parseUri(uri);
             const existing = GlobalStateManager.getServerProjectSCMPersists(context, serverName, projectId);
-            const existingPersist = Object.values(existing).find(persist => {
+            const existingPersist = Object.values(existing).find((persist) => {
                 const baseUri = vscode.Uri.parse(persist.baseUri);
-                return (baseUri.scheme==='' ? vscode.Uri.file(persist.baseUri) : baseUri).toString()===workspaceRoot.toString();
+                return (
+                    (baseUri.scheme === '' ? vscode.Uri.file(persist.baseUri) : baseUri).toString() ===
+                    workspaceRoot.toString()
+                );
             });
             const restored = await GlobalStateManager.restoreLocalReplicaSCM(
                 context,
@@ -67,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     enabled: true,
                     label: LocalReplicaSCMProvider.label,
                     baseUri: workspaceRoot.toString(),
-                    settings: setting.localReplica?.settings ?? existingPersist?.settings ?? {} as JSON,
+                    settings: setting.localReplica?.settings ?? existingPersist?.settings ?? ({} as JSON),
                 },
             );
             if (!restored) {
@@ -79,26 +90,37 @@ export async function activate(context: vscode.ExtensionContext) {
             const vfs = (await vscode.commands.executeCommand('remoteFileSystem.prefetch', uri)) as VirtualFileSystem;
             await vfs.init();
             await vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activate`, true);
-            await vscode.commands.executeCommand('setContext', `${EXTENSION_NAMESPACE}.activateCompile`, Boolean(setting.enableCompileNPreview));
-        })()
-        .catch(error => {
-            notifyError(
-                'The local Overleaf project could not reconnect. Check the connection details in the LeafRelay Output channel, then retry.',
-                error,
-                'local-replica-reconnect',
-                [
-                    {title:'Open LeafRelay', run:() => vscode.commands.executeCommand('workbench.view.extension.leafrelay')},
-                    {title:'Retry Connection', run:() => activateLocalReplica(true)},
-                ],
+            await vscode.commands.executeCommand(
+                'setContext',
+                `${EXTENSION_NAMESPACE}.activateCompile`,
+                Boolean(setting.enableCompileNPreview),
             );
-        })
-        .finally(() => { localReplicaActivation = undefined; });
+        })()
+            .catch((error) => {
+                notifyError(
+                    'The local Overleaf project could not reconnect. Check the connection details in the LeafRelay Output channel, then retry.',
+                    error,
+                    'local-replica-reconnect',
+                    [
+                        {
+                            title: 'Open LeafRelay',
+                            run: () => vscode.commands.executeCommand('workbench.view.extension.leafrelay'),
+                        },
+                        { title: 'Retry Connection', run: () => activateLocalReplica(true) },
+                    ],
+                );
+            })
+            .finally(() => {
+                localReplicaActivation = undefined;
+            });
         return localReplicaActivation;
     };
 
-    context.subscriptions.push(vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, (forceReset?: boolean) => {
-        return activateLocalReplica(forceReset===true);
-    }));
+    context.subscriptions.push(
+        vscode.commands.registerCommand(`${EXTENSION_NAMESPACE}.localReplica.activate`, (forceReset?: boolean) => {
+            return activateLocalReplica(forceReset === true);
+        }),
+    );
     activateLocalReplica();
 }
 
