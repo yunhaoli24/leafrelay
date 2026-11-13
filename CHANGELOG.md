@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10](https://github.com/yunhaoli24/leafrelay/compare/v0.2.9...v0.2.10) (2026-11-13)
+
+
+### Bug Fixes
+
+* unify proxy routing for sync connections ([59af2a4](https://github.com/yunhaoli24/leafrelay/commit/59af2a4bbdd5311cbf321abc4c4d4e1fbfa3b61c))
+* use one proxy path for HTTP and realtime sync ([e79471e](https://github.com/yunhaoli24/leafrelay/commit/e79471e00e399964aabb9bdfdc7ddb3c6402be5b))
+
 ## [0.2.9](https://github.com/yunhaoli24/leafrelay/compare/v0.2.8...v0.2.9) (2026-10-31)
 
 
