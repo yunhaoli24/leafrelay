@@ -37,6 +37,6 @@ leafrelay daemon stop
 leafrelay daemon restart
 ```
 
-`LEAFRELAY_HOME` relocates all user state, `LEAFRELAY_CONFIG` selects another login file, and `LEAFRELAY_COOKIE` overrides the saved cookie for the current process. Dot-prefixed paths and symbolic links are excluded from synchronization.
+`LEAFRELAY_HOME` relocates all user state, `LEAFRELAY_CONFIG` selects another login file, and `LEAFRELAY_COOKIE` overrides the saved cookie for the current process. LeafRelay uses one network dispatcher for Overleaf HTTP and WebSocket traffic: set `LEAFRELAY_PROXY=http://127.0.0.1:7890` (or a `socks5://` URL) to select a proxy explicitly, or `LEAFRELAY_PROXY=direct` to bypass proxy environment variables. Without that override, standard `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY` variables are honored. Dot-prefixed paths and symbolic links are excluded from synchronization.
 
 For the library's `startServe()` API, configuration, and architecture, see the [documentation](https://github.com/yunhaoli24/leafrelay/blob/main/docs/anatomy.md). LeafRelay is an independently maintained fork of [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop), licensed under AGPL-3.0-only.

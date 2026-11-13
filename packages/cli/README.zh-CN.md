@@ -37,6 +37,6 @@ leafrelay daemon stop
 leafrelay daemon restart
 ```
 
-`LEAFRELAY_HOME` 可以移动全部用户状态，`LEAFRELAY_CONFIG` 指定其他登录文件，`LEAFRELAY_COOKIE` 只覆盖当前进程使用的 Cookie。点号开头的路径与软链接不会参与同步。
+`LEAFRELAY_HOME` 可以移动全部用户状态，`LEAFRELAY_CONFIG` 指定其他登录文件，`LEAFRELAY_COOKIE` 只覆盖当前进程使用的 Cookie。LeafRelay 会让 Overleaf 的 HTTP 和 WebSocket 共用同一个网络 dispatcher：可以用 `LEAFRELAY_PROXY=http://127.0.0.1:7890`（或 `socks5://` 地址）显式指定代理，也可以用 `LEAFRELAY_PROXY=direct` 绕过代理环境变量。没有显式设置时，会读取标准的 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 和 `NO_PROXY`。点号开头的路径与软链接不会参与同步。
 
 库接口 `startServe()`、配置及架构说明见[文档](https://github.com/yunhaoli24/leafrelay/blob/main/docs/anatomy.md)。LeafRelay 是独立维护的 [Overleaf Workshop](https://github.com/overleaf-workshop/Overleaf-Workshop) 分支，采用 AGPL-3.0-only 许可证。

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import type { Dispatcher } from 'undici';
 
 const PACKET_TYPES = [
     'disconnect',
@@ -35,6 +36,7 @@ export interface OverleafRealtimeSocketOptions {
     reconnectionLimit?: number;
     maxReconnectionAttempts?: number;
     fetch?: typeof fetch;
+    dispatcher?: Dispatcher;
 }
 
 function encodePacket(packet: SocketPacket): string {
@@ -282,9 +284,11 @@ export class OverleafRealtimeSocket {
             if (controller.signal.aborted) {
                 return;
             }
-            const socket = new WebSocket(websocketUrl, {
+            const socketOptions = {
                 headers: { origin: this.origin, cookie: this.cookie },
-            });
+                dispatcher: this.options.dispatcher,
+            } as unknown as ConstructorParameters<typeof WebSocket>[1];
+            const socket = new WebSocket(websocketUrl, socketOptions);
             this.socket = socket;
             socket.addEventListener('open', () => {
                 if (this.socket !== socket) {

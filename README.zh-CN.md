@@ -65,6 +65,8 @@ leafrelay daemon status
 
 保持 `serve` 运行即可持续同步，按 **Ctrl+C** 退出当前客户端。CLI 负责文件同步；远端编译与 PDF 查看界面由 VS Code 扩展提供。
 
+如果电脑使用 Clash 或其他代理，可以设置 `LEAFRELAY_PROXY=http://127.0.0.1:7890`（或 `socks5://` 地址），让 HTTP 握手和 WebSocket 使用同一条链路。设置 `LEAFRELAY_PROXY=direct` 可以绕过代理环境变量；没有显式设置时，LeafRelay 会读取 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 和 `NO_PROXY`。
+
 ## VS Code 和 CLI 同时使用
 
 VS Code 和 CLI 连接同一个本地 daemon，同时打开相同目录时共用一个同步引擎。每个 Overleaf 项目对应一个可写本地目录，不同项目可以并行同步。某个目录的最后一个客户端断开后，该目录立即停止同步，并释放远端连接。

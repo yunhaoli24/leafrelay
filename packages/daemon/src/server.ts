@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type Socket } from 'node:net';
 import { formatWithOptions } from 'node:util';
-import { readProjectSettings, setLogSink, startServe } from '@leafrelay/core';
+import { describeNetworkDispatcher, readProjectSettings, setLogSink, startServe } from '@leafrelay/core';
 import {
     LEAFRELAY_PROTOCOL_VERSION,
     RPC_METHOD,
@@ -103,6 +103,7 @@ export class LeafRelayDaemonServer {
         setLogSink(
             (level, args) => void this.log(level, formatWithOptions({ depth: 5, breakLength: Infinity }, ...args)),
         );
+        await this.log('info', `Network transport: ${describeNetworkDispatcher()}.`);
         if (process.platform !== 'win32') {
             await rm(this.paths.socketPath, { force: true });
         }

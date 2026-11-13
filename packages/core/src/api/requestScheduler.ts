@@ -1,4 +1,6 @@
 import { error as logError, log } from '../core/logger';
+import { getDefaultNetworkDispatcher } from './networkDispatcher';
+import type { Dispatcher } from 'undici';
 
 export interface HttpRequestSchedulerOptions {
     minimumIntervalMs?: number;
@@ -8,6 +10,7 @@ export interface HttpRequestSchedulerOptions {
     wait?: (milliseconds: number) => Promise<void>;
     onRateLimit?: (until: number) => void;
     requestTimeoutMs?: number;
+    dispatcher?: Dispatcher;
 }
 
 function retryAfterMilliseconds(response: Response, now: number): number {
@@ -35,6 +38,7 @@ export class HttpRequestScheduler {
     private readonly fetchImplementation: typeof fetch;
     private readonly now: () => number;
     private readonly wait: (milliseconds: number) => Promise<void>;
+    private readonly dispatcher?: Dispatcher;
 
     constructor(private readonly options: HttpRequestSchedulerOptions = {}) {
         this.minimumIntervalMs = options.minimumIntervalMs ?? 300;
@@ -43,6 +47,11 @@ export class HttpRequestScheduler {
         this.now = options.now ?? Date.now;
         this.wait =
             options.wait ?? ((milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds)));
+        this.dispatcher = options.dispatcher;
+    }
+
+    get networkDispatcher(): Dispatcher | undefined {
+        return this.dispatcher ?? getDefaultNetworkDispatcher();
     }
 
     fetch(
@@ -73,7 +82,11 @@ export class HttpRequestScheduler {
             );
             let response: Response;
             try {
-                response = await this.fetchImplementation(input, { ...init, signal: AbortSignal.any(signals) });
+                const requestInit = { ...init, signal: AbortSignal.any(signals) } as RequestInit;
+                if (!this.options.fetch) {
+                    (requestInit as unknown as { dispatcher?: Dispatcher }).dispatcher = this.networkDispatcher;
+                }
+                response = await this.fetchImplementation(input, requestInit);
             } catch (error) {
                 const destination = new URL(url);
                 logError('HTTP request failed', {
