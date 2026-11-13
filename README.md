@@ -65,6 +65,8 @@ leafrelay daemon status
 
 Keep `serve` running for terminal-only synchronization, and press **Ctrl+C** to detach. The CLI syncs files; remote compilation and the PDF viewer are available in the VS Code extension.
 
+If the computer uses Clash or another proxy, set `LEAFRELAY_PROXY=http://127.0.0.1:7890` (or a `socks5://` URL) so the HTTP handshake and WebSocket use the same route. Set `LEAFRELAY_PROXY=direct` to bypass proxy environment variables. Without an override, LeafRelay honors `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`.
+
 ## Use both together
 
 VS Code and the CLI connect to one local daemon, so opening the same folder in both shares one sync engine. Each Overleaf project has one writable local directory; different projects can sync in parallel. When the last client for a folder disconnects, that folder stops syncing and releases its remote connection.

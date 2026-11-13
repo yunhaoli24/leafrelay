@@ -21,6 +21,7 @@ leafrelay/
 Core has no dependency on the VS Code API. Its public entry point is `packages/core/src/index.ts`.
 
 - `src/api` implements Overleaf HTTP requests and realtime events. Overleaf still exposes the Socket.IO 0.9 wire protocol; `overleafRealtimeSocket.ts` implements the required framing over Node's stable WebSocket API without the historical Socket.IO client or CommonJS runtime.
+- `src/api/networkDispatcher.ts` gives HTTP and WebSocket traffic the same proxy path. `LEAFRELAY_PROXY` accepts an HTTP(S) or SOCKS5 proxy, or `direct`; when unset, standard proxy environment variables and `NO_PROXY` are used.
 - `src/sync` owns checkpoints, ignore rules, incremental reconciliation, three-way text merging, and per-path conflict handling.
 - `src/node` provides local filesystem watching, `.overleaf/settings.json` loading, user session configuration, sharded `.overleaf/sync/` state persistence, and the long-running service entry point.
 - `src/core` contains shared logging and Overleaf project entity types.

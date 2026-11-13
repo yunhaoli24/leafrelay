@@ -276,6 +276,7 @@ export class BaseAPI {
             reconnectionLimit: 16000,
             maxReconnectionAttempts: 10,
             fetch: (input, init) => this.scheduler.fetch(input, init),
+            dispatcher: this.scheduler.networkDispatcher,
         });
     }
 
